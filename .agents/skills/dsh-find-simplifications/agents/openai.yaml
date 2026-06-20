@@ -1,0 +1,4 @@
+interface:
+  display_name: "DSH Find Simplifications"
+  short_description: "Find dead or overbuilt harness surfaces"
+  default_prompt: "Use $dsh-find-simplifications to find simplification candidates and write proposed RFCs."
