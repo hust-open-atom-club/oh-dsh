@@ -9,7 +9,7 @@ This skill helps turn a broad "find things to simplify" request into evidence-ba
 
 ## Start With Repo Context
 
-- Read `AGENTS.md`, especially the pre-release stance, tests-document-behavior section, conventions, defensive patterns, and Type Safety and Documentation section.
+- Read `AGENTS.md`, especially the pre-release stance and the conventions (including the tests-are-not-golden-truth and RFCs-are-not-golden-truth doctrines), plus [docs/defensive-patterns.md](../../../docs/defensive-patterns.md) and [docs/testing.md](../../../docs/testing.md).
 - Skim [docs/architecture.md](../../../docs/architecture.md) before judging anything under `packages/`; simplifications that fight the service map or event taxonomy need extra evidence.
 - Use the RFC index ([docs/rfc/README.md](../../../docs/rfc/README.md)) to understand intentional architecture. The most relevant implemented examples are [drop mutable session summary](../../../docs/rfc/implemented/simplification/2026-06-19-drop-mutable-session-summary.md), [shared persistence write coordinator](../../../docs/rfc/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.md), [capability seams](../../../docs/rfc/implemented/architecture/2026-06-13-capability-seams.md), and the twin adapter / dual persistence backend RFCs.
 - Treat dual LLM adapters and dual persistence backends as intentional by default. Do not propose deleting either twin/backend as "low effort" unless the user explicitly overrides that constraint. Removing an unused method or hook inside a protected seam can still be valid if it does not collapse the protected design.
