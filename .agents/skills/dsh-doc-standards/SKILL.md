@@ -10,7 +10,7 @@ The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md) — the tier tax
 ## Sources of truth (read, don't re-summarize)
 
 - [docs/AGENTS.md](../../../docs/AGENTS.md) — the taxonomy ("one home per fact"), budgets, slop checklist.
-- [docs/rfc/README.md](../../../docs/rfc/README.md) — when a decision earns an RFC and how to file it; [docs/postmortem/README.md](../../../docs/postmortem/README.md) — when an incident earns a postmortem.
+- [docs/rfc/README.md](../../../docs/rfc/README.md) — when a decision earns an RFC, how to file it, and what goes inside one (the header block, per-lifecycle skeleton, and Alternatives-considered mandate, gated by `verify-rfc-format`); [docs/postmortem/README.md](../../../docs/postmortem/README.md) — when an incident earns a postmortem.
 - [docs/i18n/README.md](../../../docs/i18n/README.md) — the bilingual pairing contract; editing either side of a pair obligates the counterpart in the same change.
 - Root [AGENTS.md](../../../AGENTS.md) — the standing orders whose budget discipline this skill protects.
 
@@ -31,7 +31,7 @@ The audit is a hunt for the standard's slop checklist, cheapest probes first:
 2. Hunt narrated history: `rg -n -g '!vendor' -t md "no longer|used to|previously|was moved|renamed"` — judge each hit; some are legitimate (quoting a contrast against a live alternative), most are drift.
 3. Hunt duplication: take each standing-doc rule, grep one distinctive phrase from it across all Markdown; more than one home means all but one become links.
 4. Hunt catalog restatement: compare README event/tool tables against the generated catalogs and JSDoc; hand copies get replaced by links.
-5. Hunt spec-speak in `implemented/` RFCs: migration plans, test checklists, future-tense "should" — an implemented RFC describes what is.
+5. Hunt spec-speak in `implemented/` RFCs: migration plans, test checklists, future-tense "should" — an implemented RFC describes what is. The heading-level cases (`## Plan`, `## Acceptance criteria`, …) are mechanically gated by `verify-rfc-format`; the prose-level "should" hunt remains manual.
 6. Classify each finding: a mechanical trim lands as a small PR; a restructure or removal that changes what a doc promises gets a proposed RFC first (follow [dsh-find-simplifications](../dsh-find-simplifications/SKILL.md) for the RFC shape).
 
 Compression discipline: every load-bearing rule survives — as one to three lines plus a link to the home that carries its why. Cut stories, duplicates, and status annotations; never silently drop a rule. If a cut rule has no durable home to link, create it (usually an RFC or postmortem) in the same change.
