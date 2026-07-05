@@ -15,7 +15,7 @@ On GitHub, **deleting a PR's base branch auto-closes that PR.** In a stack `A �
 
 Given `A ← B ← C` landing on `master`:
 
-1. **Merge PR A into master, keeping its branch.** `gh pr merge A --merge` — no `--delete-branch`. Branch A must survive because PR B still bases on it.
+1. **Merge PR A into master, keeping its branch.** `gh pr merge A --merge` — no `--delete-branch`. Branch A must survive because PR B still bases on it. Before touching the next link, confirm the merge actually landed: with required checks pending or a merge queue, `gh pr merge` may only enable auto-merge and return early, so wait until `gh pr view A --json state` reports `MERGED`. This applies after every merge in the stack.
 
 2. **Retarget PR B, refresh it, then merge it — keeping its branch.**
    - `gh pr edit B --base master` (now that A is in master, B's base becomes master).
@@ -46,7 +46,7 @@ The pattern extends to any depth. For `A ← B ← C ← D ← …`, walk the st
 
 ## Quick checklist
 
-- [ ] Merge bottom PR first, `--merge`, no `--delete-branch`.
-- [ ] For each dependent: `gh pr edit <n> --base master` → fetch and merge `origin/master` into the branch (resolve conflicts there, push) → `gh pr merge <n> --merge`, no `--delete-branch`.
+- [ ] Merge bottom PR first, `--merge`, no `--delete-branch`; wait until `gh pr view <n> --json state` shows `MERGED`.
+- [ ] For each dependent: `gh pr edit <n> --base master` → fetch and merge `origin/master` into the branch (resolve conflicts there, push) → `gh pr merge <n> --merge`, no `--delete-branch`; again wait for `MERGED`.
 - [ ] Run `gh pr list --state open --limit 1000 --json number,baseRefName` to confirm no open dependents remain.
 - [ ] Delete all branches (local + remote) only as a final pass.
