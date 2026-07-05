@@ -38,7 +38,7 @@ Before deleting a branch, ask GitHub directly whether any open PR still bases on
 gh pr list --state open --base <branch> --json number --jq length
 ```
 
-Anything other than `0` means deleting `<branch>` auto-closes that many open PRs — do not delete it. The `--base` filter is applied server-side, so the answer is exact no matter how many PRs are open, and the output is a single number. Default to merging without `--delete-branch` throughout, and do the deletions as a separate final pass once every branch you're about to delete reports `0`.
+Anything other than `0` means open PRs still base on `<branch>` and deleting it would auto-close them — do not delete it. The `--base` filter is applied server-side, so zero-versus-non-zero is exact no matter how many PRs are open; the printed number itself saturates at `gh`'s `--limit` (default 30), which never matters here because only `0` clears a delete. Default to merging without `--delete-branch` throughout, and do the deletions as a separate final pass once every branch you're about to delete reports `0`.
 
 ## Longer chains
 
