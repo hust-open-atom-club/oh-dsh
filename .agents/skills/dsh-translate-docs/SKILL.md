@@ -37,7 +37,9 @@ Do not process every file the same way:
 
 ## Translate
 
-- Work through the document applying [translation-rules.md](../../../docs/i18n/translation-rules.md). Internally: first render faithfully, then re-read the counterpart alone for awkward or ambiguous phrasing, then polish — but write ONLY the final text to the file, never drafts or notes.
+- **Pass 1 — write, don't transpose.** You are a native technical author of the target language. Read a semantic unit of the source (a paragraph or a tight group), close it, and state its content the way [docs/i18n/style-samples.md](../../../docs/i18n/style-samples.md) does — match the nearest genre sample's register. Shape is the gate's job, not yours: never trade natural phrasing for sentence-by-sentence correspondence.
+- **Pass 2 — verify against the source, clause by clause.** Fidelity is checked here, not written in: confirm nothing was added or dropped, every term follows the table, and each code span survived verbatim. Fix by rewriting the sentence natively, not by patching words into it.
+- Write ONLY the final text to the file, never drafts or notes.
 - Every term in [terminology.md](../../../docs/i18n/terminology.md) renders exactly as specified, in both directions, including first-occurrence annotations. A term the table misses: translate only with a citable precedent from a major Chinese OSS/vendor doc; otherwise keep the English and add it to the PR's 「待定术语」 list with your suggested rendering. Never invent a rendering inline — that decision belongs to a human and then to the table.
 - Code blocks are byte-identical across the pair, comments included. Relative links keep their `.md` targets; only the switcher line links `.zh.md`.
 
