@@ -1,0 +1,52 @@
+---
+name: dsh-merging-stacked-prs
+description: Use when landing a stack of dependent GitHub PRs (A ← B ← C, where each bases on the one below) onto master — merging more than one PR in a chain, merging a PR whose base is another open PR's branch, or whenever a request mentions "stacked PRs", "PR stack", "dependent PRs", "base branch", or merging several related PRs in sequence. Critical because deleting a base branch mid-chain auto-closes the open PR that bases on it — get the order wrong and you silently close unmerged work.
+---
+
+# Merging a stacked PR chain
+
+This skill is the landing procedure for a dependent PR stack. The standing orders it rests on — merge commits only (`gh pr merge --merge`), never rewrite a pushed branch — live in the root [AGENTS.md](../../../AGENTS.md) § Conventions; the discipline for handling review comments across a stack before it lands is the [responding-to-pr-review-on-a-stack](../../../docs/cookbook/responding-to-pr-review-on-a-stack.md) cookbook guide.
+
+## The hazard this prevents
+
+On GitHub, **deleting a PR's base branch auto-closes that PR.** In a stack `A ← B ← C` (B bases on A, C bases on B), branch A is the base of PR B, and branch B is the base of PR C. So if you merge A with `--delete-branch`, GitHub closes PR B before it's merged — silently destroying the chain. The whole procedure below exists to avoid that: **merge one at a time, retarget each dependent as you go, and delete nothing until every PR has landed.**
+
+## The procedure
+
+Given `A ← B ← C` landing on `master`:
+
+1. **Merge PR A into master, keeping its branch.** `gh pr merge A --merge` — no `--delete-branch`. Branch A must survive because PR B still bases on it.
+
+2. **Retarget PR B, refresh it, then merge it — keeping its branch.**
+   - `gh pr edit B --base master` (now that A is in master, B's base becomes master).
+   - Merge the new master *into* branch B (check out B, `git merge master`, resolve any conflicts here, push). This makes B current and surfaces conflicts in the working branch where they can be tested — not as a surprise at the GitHub merge.
+   - `gh pr merge B --merge` — still no `--delete-branch` (PR C bases on branch B).
+
+3. **Retarget PR C, refresh it, then merge it — keeping its branch.** Same steps: `gh pr edit C --base master`, merge new master into branch C and resolve conflicts there, then `gh pr merge C --merge` without `--delete-branch`.
+
+4. **Only after every PR (A, B, C) is merged, delete the branches** — local and remote, for all of A, B, C.
+
+## Why "merge new master into the dependent before merging it"
+
+Each retarget step merges the freshly-updated master back into the dependent branch *before* merging the PR. This keeps each PR's diff clean (it only shows that PR's own changes, not the parent's) and forces conflicts to surface in the working branch, where you can build and test the resolution — instead of letting GitHub attempt a blind merge that may conflict or quietly mis-resolve.
+
+## Verify before deleting anything
+
+Before *any* branch delete, confirm nothing still depends on it:
+
+```sh
+gh pr list --json number,baseRefName
+```
+
+If any open PR's `baseRefName` is a branch you're about to delete, **do not delete it** — that PR will auto-close. Default to merging without `--delete-branch` throughout, and do the deletions as a separate final pass once the list shows no open dependents.
+
+## Longer chains
+
+The pattern extends to any depth. For `A ← B ← C ← D ← …`, walk the stack from the bottom up: merge the lowest, then for each next link retarget to master, merge master into it, merge the PR — always without deleting — and only sweep up all the branches at the very end. The invariant never changes: **a branch may be deleted only when no open PR bases on it.**
+
+## Quick checklist
+
+- [ ] Merge bottom PR first, `--merge`, no `--delete-branch`.
+- [ ] For each dependent: `gh pr edit <n> --base master` → merge master into the branch (resolve conflicts there) → `gh pr merge <n> --merge`, no `--delete-branch`.
+- [ ] Run `gh pr list --json number,baseRefName` to confirm no open dependents remain.
+- [ ] Delete all branches (local + remote) only as a final pass.
