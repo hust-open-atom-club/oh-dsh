@@ -32,13 +32,13 @@ Each retarget step merges the freshly-updated master back into the dependent bra
 
 ## Verify before deleting anything
 
-Before *any* branch delete, confirm nothing still depends on it:
+Before deleting a branch, ask GitHub directly whether any open PR still bases on it:
 
 ```sh
-gh pr list --state open --limit 1000 --json number,baseRefName
+gh pr list --state open --base <branch> --json number --jq length
 ```
 
-The explicit `--limit` matters: without it the list is paginated, and a dependent past the first page would make deletion look safe when it is not. If any open PR's `baseRefName` is a branch you're about to delete, **do not delete it** — that PR will auto-close. Default to merging without `--delete-branch` throughout, and do the deletions as a separate final pass once the list shows no open dependents.
+Anything other than `0` means deleting `<branch>` auto-closes that many open PRs — do not delete it. The `--base` filter is applied server-side, so the answer is exact no matter how many PRs are open, and the output is a single number. Default to merging without `--delete-branch` throughout, and do the deletions as a separate final pass once every branch you're about to delete reports `0`.
 
 ## Longer chains
 
@@ -48,5 +48,5 @@ The pattern extends to any depth. For `A ← B ← C ← D ← …`, walk the st
 
 - [ ] Merge bottom PR first, `--merge`, no `--delete-branch`; wait until `gh pr view <n> --json state` shows `MERGED`.
 - [ ] For each dependent: `gh pr edit <n> --base master` → fetch and merge `origin/master` into the branch (resolve conflicts there, push) → `gh pr merge <n> --merge`, no `--delete-branch`; again wait for `MERGED`.
-- [ ] Run `gh pr list --state open --limit 1000 --json number,baseRefName` to confirm no open dependents remain.
+- [ ] Before each branch delete: `gh pr list --state open --base <branch> --json number --jq length` prints `0`.
 - [ ] Delete all branches (local + remote) only as a final pass.
