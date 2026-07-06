@@ -1,0 +1,4 @@
+interface:
+  display_name: "DSH Pre-Push Checks"
+  short_description: "Run the right DeepSeek Harness gates before push"
+  default_prompt: "Use $dsh-pre-push-checks before pushing this DeepSeek Harness branch."
