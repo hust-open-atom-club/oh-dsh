@@ -79,10 +79,15 @@ pnpm run test:coverage
 pnpm run test:snapshot
 pnpm run build
 pnpm run hygiene
+out=$(printf 'echo ci smoke\n' | pnpm run demo:echo 2>&1)
+printf '%s\n' "$out" | grep -q '\[tool call\] echo({"text":"ci smoke"})'
+printf '%s\n' "$out" | grep -q '\[tool result\] ECHO: CI SMOKE'
+ls .sessions/_no-cwd/main-session-*.jsonl >/dev/null
+rm -rf .sessions
 pnpm exec vitest run --config vitest.e2e.config.ts packages/ui/stdio-agent/tests/built-bin.e2e.ts packages/ui/acp-agent/tests/built-bin.e2e.ts
 ```
 
-Add `pnpm run test:e2e` when a key is available and the feature has real-agent behavior.
+The `demo:echo` smoke validates the mock-model REPL path and leaves a session log; assert both transcript lines and then remove `.sessions`. Add `pnpm run test:e2e` when a key is available and the feature has real-agent behavior.
 
 ## Handling Failures
 
