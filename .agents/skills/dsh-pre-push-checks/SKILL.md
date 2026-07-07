@@ -1,6 +1,6 @@
 ---
 name: dsh-pre-push-checks
-description: Use before pushing, force-pushing, marking ready for review, replying that checks pass, or bypassing a local hook on a deepseek-harness branch. Guides Codex to run the right local gates for the touched surface so CI is unlikely to fail after push, especially after merges, review fixes, package graph changes, docs/catalog updates, snapshots, e2e behavior, or built artifact changes.
+description: Use before pushing, force-pushing, marking ready for review, claiming checks pass, or bypassing a local hook on a deepseek-harness branch, especially after merges, review fixes, package graph changes, docs/catalog updates, snapshots, e2e behavior, or built artifact changes.
 ---
 
 # DSH Pre-Push Checks
@@ -25,7 +25,7 @@ git diff --name-only origin/$(git branch --show-current)...HEAD
 
 If the branch has no upstream or the command is not meaningful for the stack shape, use `git diff --name-only origin/master...HEAD` or the PR base branch.
 
-3. If the branch was just merged with `master`, or the user says master changed, run the gates after resolving and committing the merge. Do not push a conflict-resolution commit that has only typecheck/lint evidence.
+3. If the branch was just merged with `master`, or the user says master changed, run the gates after resolving the merge and before pushing or marking ready. Do not present a conflict-resolution commit as ready with only typecheck/lint evidence.
 
 ## Required Baseline
 
@@ -67,27 +67,7 @@ Run a targeted test first for the changed package, but never use targeted tests 
 
 ## Full Local CI Approximation
 
-Use this before high-risk pushes, after large merges, before asking for review on a major PR, or when prior pushes have caused CI churn:
-
-```sh
-pnpm run constraints
-pnpm run typecheck
-pnpm run lint
-pnpm run doc-sync
-pnpm run verify-module-graph
-pnpm run test:coverage
-pnpm run test:snapshot
-pnpm run build
-pnpm run hygiene
-out=$(printf 'echo ci smoke\n' | pnpm run demo:echo 2>&1)
-printf '%s\n' "$out" | grep -q '\[tool call\] echo({"text":"ci smoke"})'
-printf '%s\n' "$out" | grep -q '\[tool result\] ECHO: CI SMOKE'
-ls .sessions/_no-cwd/main-session-*.jsonl >/dev/null
-rm -rf .sessions
-pnpm exec vitest run --config vitest.e2e.config.ts packages/ui/stdio-agent/tests/built-bin.e2e.ts packages/ui/acp-agent/tests/built-bin.e2e.ts
-```
-
-The `demo:echo` smoke validates the mock-model REPL path and leaves a session log; assert both transcript lines and then remove `.sessions`. Add `pnpm run test:e2e` when a key is available and the feature has real-agent behavior.
+Use this before high-risk pushes, after large merges, before asking for review on a major PR, or when prior pushes have caused CI churn. The authoritative command list is the root [AGENTS.md § Run the CI gates locally before marking a PR ready](../../../AGENTS.md#run-the-ci-gates-locally-before-marking-a-pr-ready); run that block rather than copying a local variant into this skill. Add `pnpm run test:e2e` when a key is available and the feature has real-agent behavior.
 
 ## Handling Failures
 
@@ -104,8 +84,8 @@ Known pattern to watch for: Linux CI and macOS local behavior can differ for she
 
 ## Push Procedure
 
-1. Commit only after the relevant gates pass.
-2. Let the normal pre-commit hook run. If it changes files, inspect and amend with a new commit rather than hiding the change.
+1. Local commits may happen before the full gate set, but do not push, mark ready, or claim checks pass until the relevant gates pass or any blocker is explicitly documented.
+2. Let the normal pre-commit hook run. If it changes files, inspect and commit or amend the change intentionally rather than hiding it.
 3. Push normally first so the pre-push hook can run.
 4. If a local hook is bypassed after user approval, use the narrow bypass and say so in the final response.
 5. After push, verify the remote ref matches local HEAD.
