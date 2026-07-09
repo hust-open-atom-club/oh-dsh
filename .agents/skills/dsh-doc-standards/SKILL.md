@@ -38,9 +38,7 @@ Compression discipline: every load-bearing rule survives — as one to three lin
 
 ## When verify-doc-budgets goes red
 
-1. Relocate: does the new content belong in a linked home (RFC, postmortem, cookbook, README) with a one-line pointer left behind?
-2. Condense: can existing prose in the doc pay for the addition — a story compressed to its rule, a duplicate converted to a link?
-3. Only then raise the ceiling: edit `scripts/doc-budgets.manifest.json` and justify the raise explicitly in the PR description. After any rewrite that shrinks a budgeted doc, ratchet its ceiling down to the new size plus working headroom (at least 5%) in the same PR.
+Apply the ordered relocate-condense-raise policy in [docs/AGENTS.md](../../../docs/AGENTS.md); this skill only supplies the workflow probes above.
 
 ## Validation and PR hygiene
 
