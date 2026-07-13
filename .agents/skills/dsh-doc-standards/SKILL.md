@@ -5,12 +5,12 @@ description: 'Use when writing, moving, reviewing, or auditing documentation in 
 
 # Applying the DeepSeek Harness Documentation Standard
 
-The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md). This workflow covers Markdown, JSDoc, and code comments; use judgment rather than treating length alone as a defect.
+The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md) — the tier taxonomy, the word budgets, and the slop checklist. This skill is the workflow for applying it: placing content, auditing the corpus, and handling a red budget gate. It is guidance, not a script; keep judgment active and prefer a few well-proven fixes over a mass rewording pass.
 
 ## Sources of truth (read, don't re-summarize)
 
 - [docs/AGENTS.md](../../../docs/AGENTS.md) — the taxonomy ("one home per fact"), budgets, slop checklist.
-- [docs/rfc/README.md](../../../docs/rfc/README.md) — when a decision earns an RFC, how to file it, and what goes inside one (the header block, per-lifecycle skeleton, and Alternatives-considered mandate, gated by `verify-rfc-format`); [docs/postmortem/README.md](../../../docs/postmortem/README.md) — when an incident earns a postmortem.
+- [docs/rfc/README.md](../../../docs/rfc/README.md) — when a decision earns an RFC and how to file it; [docs/postmortem/README.md](../../../docs/postmortem/README.md) — when an incident earns a postmortem.
 - [docs/i18n/README.md](../../../docs/i18n/README.md) — the bilingual pairing contract; editing either side of a pair obligates the counterpart in the same change.
 - Root [AGENTS.md](../../../AGENTS.md) — the standing orders whose budget discipline this skill protects.
 
@@ -28,19 +28,20 @@ Run the placement test in the standard's taxonomy table, then check the constrai
 The audit is a hunt for the standard's slop checklist, cheapest probes first:
 
 1. Measure: `pnpm run verify-doc-budgets --list`, then `git ls-files '*.md' | grep -v '^vendor/' | xargs wc -w | sort -rn | head -30` to spot unbudgeted outliers.
-2. Hunt narrated history: `rg -n -g '!vendor' "no longer|used to|previously|was moved|renamed" --glob '*.md' --glob '*.ts'` and keep only contrasts against a live alternative.
-3. Inspect long comments for reasoning transcripts: control-flow narration, test walkthroughs, proof of obvious branches, review findings, and rejected local alternatives. Preserve only a non-obvious contract or durable rationale; otherwise delete the comment.
-4. Hunt duplication by grepping distinctive phrases. Keep one home and replace other copies with links.
-5. Replace hand-written catalog or JSDoc restatements with links to generated references.
-6. In `implemented/` RFCs, remove migration plans, test checklists, and future-tense spec language; keep the decision, rationale, and shipped constraints.
-7. If removing prose changes a promised behavior rather than its explanation, use a proposed RFC first (follow [dsh-find-simplifications](../dsh-find-simplifications/SKILL.md)).
+2. Hunt narrated history: `rg -n -g '!vendor' -t md "no longer|used to|previously|was moved|renamed"` — judge each hit; some are legitimate (quoting a contrast against a live alternative), most are drift.
+3. Hunt duplication: take each standing-doc rule, grep one distinctive phrase from it across all Markdown; more than one home means all but one become links.
+4. Hunt catalog restatement: compare README event/tool tables against the generated catalogs and JSDoc; hand copies get replaced by links.
+5. Hunt spec-speak in `implemented/` RFCs: migration plans, test checklists, future-tense "should" — an implemented RFC describes what is.
+6. Classify each finding: a mechanical trim lands as a small PR; a restructure or removal that changes what a doc promises gets a proposed RFC first (follow [dsh-find-simplifications](../dsh-find-simplifications/SKILL.md) for the RFC shape).
 
-Keep every load-bearing rule, preferably as one to three lines plus a link to its rationale. Cut stories, duplicates, status notes, and the path used to derive the rule. Do not create a new explanation merely to relocate disposable reasoning.
+Compression discipline: every load-bearing rule survives — as one to three lines plus a link to the home that carries its why. Cut stories, duplicates, and status annotations; never silently drop a rule. If a cut rule has no durable home to link, create it (usually an RFC or postmortem) in the same change.
 
 ## When verify-doc-budgets goes red
 
-Apply the ordered relocate-condense-raise policy in [docs/AGENTS.md](../../../docs/AGENTS.md); this skill only supplies the workflow probes above.
+1. Relocate: does the new content belong in a linked home (RFC, postmortem, cookbook, README) with a one-line pointer left behind?
+2. Condense: can existing prose in the doc pay for the addition — a story compressed to its rule, a duplicate converted to a link?
+3. Only then raise the ceiling: edit `scripts/doc-budgets.manifest.json` and justify the raise explicitly in the PR description. After any rewrite that shrinks a budgeted doc, ratchet its ceiling down to the new size plus working headroom (at least 5%) in the same PR.
 
 ## Validation and PR hygiene
 
-Run at least `pnpm run doc-sync`, `pnpm run lint`, and `git diff --check`; JSDoc changes may regenerate catalogs. If a paired doc changed, follow [dsh-translate-docs](../dsh-translate-docs/SKILL.md) and run `pnpm run verify-translation-pairing --write`. The PR body should give word deltas, explain any deliberately long exception, and list checks.
+For docs-only changes run at least `pnpm run doc-sync`, `pnpm run lint`, and `git diff --check`; if a paired doc was touched, update the counterpart (see [dsh-translate-docs](../dsh-translate-docs/SKILL.md)) and re-record with `pnpm run verify-translation-pairing --write`. Open a draft PR while the audit is still expanding; in the PR body, list what was trimmed/moved with word deltas, what was deliberately kept long and why, and which checks ran. The first audit cycle's deferred work list lives in [the doc-tiers-and-budgets RFC](../../../docs/rfc/implemented/process/2026-07-04-doc-tiers-and-budgets.md) § Deferred work.
