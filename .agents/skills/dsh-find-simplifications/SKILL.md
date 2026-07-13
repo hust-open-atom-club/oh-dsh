@@ -41,6 +41,14 @@ Use parallel subagents when the user asks for breadth or many candidates. Give e
 
 If subagents are unavailable, simulate the same breadth yourself. Do not let the first good candidate stop the survey.
 
+Start with the largest production-code deltas. A broad simplification audit that stops after obvious unused symbols can miss the files where duplicated lifecycle or defensive machinery carries most of the cost.
+
+## Audit Trust And Lifecycle Boundaries
+
+Classify every defensive copy, freeze, validator, and callback capture by the boundary it crosses. Same-process typed service/plugin calls ordinarily borrow readonly values; parser/config, queue, model/tool JSON, durable/file, worker, process, and wire boundaries own or validate data. Tests built around hostile getters, fake typed objects, callback replacement, or mutation after a same-process handoff are evidence of a potentially speculative contract, not automatic justification for keeping it.
+
+For complex asynchronous code, draw the ownership graph and map each sentinel, readiness promise, cancellation path, disposer, and state flag to a distinct owner or transition. When several mechanisms mirror the same liveness or settlement fact, propose one transaction or lifecycle controller instead. Preserve separate machinery where it protects a real boundary: synchronous publication and rollback, callback containment, first-terminal-outcome arbitration, worker/process ownership, or dispose-to-quiescence.
+
 ## Prove Or Reject Each Candidate
 
 For every symbol or behavior, classify consumers before writing:
@@ -60,7 +68,7 @@ Reject or downgrade a candidate when:
 
 ## Write The RFC
 
-Create one file per durable proposal under `docs/rfc/proposed/yyyy-mm-dd-topic.md` and add it to the Proposed table in `docs/rfc/README.md`. Keep prose paragraphs on one physical line and use relative Markdown links.
+Create one file per durable proposal under `docs/rfc/<lifecycle>/<class>/yyyy-mm-dd-topic.md`, following the lifecycle/classification contract in `docs/rfc/README.md`. Regenerate `docs/rfc/INDEX.md`; never add a manual RFC table to the README. Keep prose paragraphs on one physical line and use relative Markdown links.
 
 Prefer this shape, adjusting when the idea needs it:
 
