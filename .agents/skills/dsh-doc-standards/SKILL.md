@@ -5,7 +5,7 @@ description: 'Use when writing, moving, reviewing, or auditing documentation in 
 
 # Applying the DeepSeek Harness Documentation Standard
 
-The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md). This workflow covers Markdown, JSDoc, and code comments; use judgment rather than treating length alone as a defect.
+The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md). This workflow covers placement, corpus audits, budgets, and validation across Markdown, JSDoc, and code comments. It is guidance, not a script; use [dsh-trim-prose](../dsh-trim-prose/SKILL.md) for editorial judgment and never treat length alone as a defect.
 
 ## Sources of truth (read, don't re-summarize)
 
@@ -27,12 +27,12 @@ Run the placement test in the standard's taxonomy table, then check the constrai
 
 The audit is a hunt for the standard's slop checklist, cheapest probes first. Establish the PR's current base first; after a retarget or base merge, repeat the audit for prose introduced by the new base rather than relying on the earlier result.
 
-1. Measure: `pnpm run verify-doc-budgets --list`, then `git ls-files '*.md' | grep -v '^vendor/' | xargs wc -w | sort -rn | head -30` to spot unbudgeted outliers.
-2. Hunt narrated history: `rg -n -g '!vendor' "no longer|used to|previously|was moved|renamed" --glob '*.md' --glob '*.ts'` and keep only contrasts against a live alternative.
+1. Measure: `pnpm run verify-doc-budgets --list`, then `git ls-files '*.md' ':(exclude)vendor/**' | xargs wc -w | sort -rn | head -30` to spot unbudgeted outliers.
+2. Hunt narrated history: `rg -n "no longer|used to|previously|was moved|renamed" --glob '*.md' --glob '*.ts' --glob '!vendor/**'` and keep only contrasts against a live alternative. Keep the vendor exclusion last so include globs cannot override it.
 3. Inspect long comments for reasoning transcripts: control-flow narration, test walkthroughs, proof of obvious branches, review findings, rejected local alternatives, and the same rationale repeated beside sibling methods. Preserve only a non-obvious contract or durable rationale; otherwise delete the comment.
 4. Hunt duplication by grepping distinctive phrases. Keep one home and replace other copies with links.
 5. Replace hand-written catalogs, test/status inventories, and JSDoc restatements with the authoritative tree, script, or generated reference.
-6. In `implemented/` RFCs, remove migration plans, test checklists, and future-tense spec language; keep the decision, rationale, and shipped constraints.
+6. In `implemented/` RFCs, remove migration plans, acceptance-task checklists, and future-tense spec language. Keep concise verification contracts that identify the behaviors and tiers pinning the shipped decision, plus named coverage gaps.
 7. If removing prose changes a promised behavior rather than its explanation, use a proposed RFC first (follow [dsh-find-simplifications](../dsh-find-simplifications/SKILL.md)).
 
 Keep every load-bearing rule, preferably as one to three lines plus a link to its rationale. Cut stories, duplicates, status notes, and the path used to derive the rule. Do not create a new explanation merely to relocate disposable reasoning.

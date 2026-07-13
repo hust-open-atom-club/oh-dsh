@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trim DSH Prose"
+  short_description: "Balance concise prose with complete contracts"
+  default_prompt: "Use $dsh-trim-prose to audit a specified repository scope and trim or restore prose without losing contract details."
