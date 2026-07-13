@@ -5,7 +5,7 @@ description: 'Use when writing, moving, reviewing, or auditing documentation in 
 
 # Applying the DeepSeek Harness Documentation Standard
 
-The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md). This workflow covers placement, corpus audits, budgets, and validation across Markdown, JSDoc, and code comments. It is guidance, not a script; use [dsh-trim-prose](../dsh-trim-prose/SKILL.md) for editorial judgment and never treat length alone as a defect.
+The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md). This workflow covers placement, corpus audits, budgets, and validation across Markdown, JSDoc, and code comments. It is guidance, not a script; use [dsh-prose-standard](../dsh-prose-standard/SKILL.md) for required coverage and editorial judgment, and never treat length alone as a defect.
 
 ## Sources of truth (read, don't re-summarize)
 

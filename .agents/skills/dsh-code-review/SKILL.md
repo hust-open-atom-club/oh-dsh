@@ -12,7 +12,7 @@ description: Use when reviewing a pull request in the deepseek-harness repo — 
 - [AGENTS.md](../../../AGENTS.md) and [packages/AGENTS.md](../../../packages/AGENTS.md): repository and package rules.
 - [docs/defensive-patterns.md](../../../docs/defensive-patterns.md): subprocess, callback, async-state, and disposal bug classes.
 - [docs/AGENTS.md](../../../docs/AGENTS.md): documentation placement and prose discipline.
-- [dsh-trim-prose](../dsh-trim-prose/SKILL.md): editorial judgment for comments, docs, prompts, and visible strings.
+- [dsh-prose-standard](../dsh-prose-standard/SKILL.md): required coverage and editorial judgment for comments, docs, prompts, and visible strings.
 - [docs/testing.md](../../../docs/testing.md) and the [quality-gates RFC](../../../docs/rfc/implemented/process/2026-06-11-quality-gates.md): required test tiers and gates.
 - [RFC index](../../../docs/rfc/README.md): design rationale. Treat disagreement with an RFC as a design discussion, not an automatic veto.
 - For bilingual changes, read [translation-rules.md](../../../docs/i18n/translation-rules.md), [terminology.md](../../../docs/i18n/terminology.md), and [dsh-translate-docs](../dsh-translate-docs/SKILL.md).
