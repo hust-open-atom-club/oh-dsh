@@ -135,3 +135,23 @@ Keep the consequence of order, a surprising scope rule, or a security boundary. 
 **Shorter but worse:** “The adapter normalizes provider errors.”
 
 **Balanced decision:** Keep the current sentence unless a link or surrounding contract already carries the failure categories. The shorter version loses the consequence and distinctions without improving structure.
+
+## Model-visible text follows ownership
+
+**Over-trimmed:** “The tool returns errors when a call fails.”
+
+**Over-detailed:** Copying another package's schema and renderer strings into this backend's README.
+
+**Balanced:** Quote stable prompt, result, and error text owned by this package. Link the generated tool catalog for schemas and the consumer README for text another package owns; state only this package's conditions or deltas locally.
+
+Wording that reaches a model is behavior, but duplication still drifts. Exactness belongs at the owner.
+
+## Limitations are contracts, not debt inventories
+
+**Over-trimmed:** Omitting a process-lifetime cache that makes configuration changes require plugin reload.
+
+**Over-detailed:** Listing private helper cleanup and unused test-only accessors with no caller or maintainer consequence.
+
+**Balanced:** “Provider selection is cached for the plugin lifetime; installing or repairing a provider requires reload.” Keep ordinary cleanup in its TODO or RFC.
+
+Retain gaps and non-obvious constraints that affect use or safe maintenance. A package README is not a backlog dump.
