@@ -42,8 +42,9 @@ Do not process every file the same way:
 - **Pass 1 — write, don't transpose.** Read a semantic unit, then restate it as a native technical author in the nearest [style sample's](../../../docs/i18n/style-samples.md) register. Preserve the required frame without forcing sentence-by-sentence correspondence.
 - **Pass 2 — verify against the source, clause by clause.** Fidelity is checked here, not written in: confirm nothing was added or dropped, every term follows the table, and each code span survived verbatim. Fix by rewriting the sentence natively, not by patching words into it.
 - Write only the final text to the file, never drafts or notes.
-- Every term in [terminology.md](../../../docs/i18n/terminology.md) renders exactly as specified, in both directions, including first-occurrence annotations. A term the table misses: translate only with a citable precedent from a major Chinese OSS/vendor doc; otherwise keep the English and add it to the PR's 「待定术语」 list with your suggested rendering. Never invent a rendering inline — that decision belongs to a human and then to the table.
+- Every term in [terminology.md](../../../docs/i18n/terminology.md) renders exactly as specified. For a Chinese target, use the Chinese and first-occurrence columns; an unlisted term needs a citable Chinese OSS/vendor precedent or stays English under 「待定术语」. For an English target, use the English column and an established English technical term; preserve an ambiguous source term with a short gloss and list it as pending. Never invent a rendering inline.
 - Code blocks are byte-identical across the pair, comments included. Relative links keep their `.md` targets; only the switcher line links `.zh.md`.
+- The pairing gate checks heading depths, fenced blocks, table column counts, list kinds, and link targets. In Pass 2, manually verify list item counts and numbering, table row counts and order, inline code, emphasis, meaning, terminology, and tone.
 
 ## Finish the pair
 
@@ -51,9 +52,9 @@ Do not process every file the same way:
 2. Record consistency: `pnpm run verify-translation-pairing --write` recomputes and records both sides' full blob hashes in `foo.i18n.yaml`. The yaml diff in your PR is the reviewable statement "I confirmed these two say the same thing" — only run it after you actually have.
 3. New batch landed? Add the `.md` paths to `required` in [scripts/translation-pairing.manifest.json](../../../scripts/translation-pairing.manifest.json) so the gate ratchets forward.
 
-## Verify — the gate, not your eyes
+## Verify the mechanical and human halves
 
-Run `pnpm run verify-translation-pairing`, then the rest of the Markdown gates (`pnpm run verify-md-wrap && pnpm run verify-md-links`, or full `pnpm run doc-sync` before the PR). Fix what they report; do not hand-check what they cover. What they can NOT check — whether the two sides truly say the same thing, terminology judgment calls, tone — is exactly what the PR reviewer will read for, so keep the PR reviewable: state which pairs are new vs minimally updated, and list 「待定术语」 prominently.
+Run `pnpm run verify-translation-pairing`, then the rest of the Markdown gates (`pnpm run verify-md-wrap && pnpm run verify-md-links`, or full `pnpm run doc-sync` before the PR). Fix what they report and manually verify the obligations listed in Pass 2 that the gates do not encode. Keep the PR reviewable: state which pairs are new versus minimally updated and list 「待定术语」 prominently.
 
 ## How to respond to translation review
 
