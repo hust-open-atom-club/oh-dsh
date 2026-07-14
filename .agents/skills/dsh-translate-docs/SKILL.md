@@ -57,4 +57,4 @@ Run `pnpm run verify-translation-pairing`, then the rest of the Markdown gates (
 
 ## How to respond to translation review
 
-Same discipline as any review in this repo (see [dsh-code-review](../dsh-code-review/SKILL.md) § How to respond): evaluate each comment on its merits, and for terminology comments, remember the table is the contract — a reviewer's rendering decision gets applied to [terminology.md](../../../docs/i18n/terminology.md) so it binds every future translation, not just patched into one file.
+Follow the [code-review reporting guidance](../dsh-code-review/SKILL.md#reporting-findings): evaluate each comment on its merits, and for terminology comments, remember the table is the contract — a reviewer's rendering decision gets applied to [terminology.md](../../../docs/i18n/terminology.md) so it binds every future translation, not just patched into one file.

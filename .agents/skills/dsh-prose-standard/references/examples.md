@@ -146,6 +146,16 @@ Keep the consequence of order, a surprising scope rule, or a security boundary. 
 
 Wording that reaches a model is behavior, but duplication still drifts. Exactness belongs at the owner.
 
+## Generated summaries must stand alone
+
+**Over-trimmed:** “Approval request and policy service.” The owner explains policy order and audit logging later, but the catalog exports only its first sentence.
+
+**Over-detailed:** Moving the service's full lifecycle and prompt-notice behavior into the extracted sentence.
+
+**Balanced:** “Approval service that applies session policy before answerers and logs every ask/outcome pair to the requesting session.” Keep non-catalog detail in later sentences.
+
+Know what the generator extracts. That fragment must preserve the contract needed on its generated surface.
+
 ## Limitations are contracts, not debt inventories
 
 **Over-trimmed:** Omitting a process-lifetime cache that makes configuration changes require plugin reload.

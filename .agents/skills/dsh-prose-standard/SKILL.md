@@ -13,9 +13,11 @@ Require an explicit `scope`. If it is missing, report the required input and sto
 
 Accept `mode: automatic | interactive`; default to `automatic`. Enter interactive mode only when the user explicitly requests questions or calibration.
 
+`mode` controls questions, not write authority. Review and audit tasks report findings without editing; explicitly requested write, fix, or trim tasks apply clear changes.
+
 Always exclude `vendor/` from discovery, review, and edits, even when the requested scope is the whole repository. Do not follow a symlink into it. Put exclusions after inclusion globs so a later include cannot re-admit it: for example, end ripgrep commands with `--glob '!vendor/**'`, and give Git commands an explicit `:(exclude)vendor/**` pathspec. If the requested scope contains only `vendor/`, report that no eligible files remain.
 
-Treat generated catalogs, translations, snapshots, and fixtures as derivative. Edit the owning source or scenario first, then regenerate or synchronize the derivative artifact. Follow the bilingual workflow when either side of a documentation pair changes.
+Treat generated catalogs, snapshots, and fixtures as derivative. Edit the owning source or scenario first, then regenerate the artifact. When a generator extracts a summary from owner prose, make the extracted sentence complete for that surface. Bilingual pairs have no permanent owner: either language may be the authored side for an update. Update the counterpart minimally and re-record the pair.
 
 ## Preserve the complete proposition
 
@@ -57,7 +59,7 @@ Preserve searchable mechanism names and meaningful modal, temporal, or negative 
 1. Confirm the scope, mode, current branch or PR base, and applicable `AGENTS.md` files. Do not inspect unrelated branches.
 2. Read [the documentation standard](../../../docs/AGENTS.md) and the owning code or document before judging a passage. For calibration or unfamiliar cases, read [the distilled examples](references/examples.md).
 3. Inspect the requested scope, not only the largest files. Use searches and word counts to find candidates, then judge passages semantically.
-4. Classify each candidate as keep, add, trim, restore, restructure, or defer. Apply clear changes; do not manufacture edits to satisfy a deletion target.
+4. Classify each candidate as keep, add, trim, restore, restructure, or defer. Apply clear changes only when the task authorizes edits; do not manufacture edits to satisfy a deletion target.
 5. Update the owner before derivative artifacts. Re-check analogous passages after learning a new rule.
 6. Run the narrow relevant checks, documentation gates, `git diff --check`, and behavior tests for visible strings. Verify the final diff contains no `vendor/` path and report any accidental vendor match rather than claiming a clean exclusion history.
 7. Report the inspected scope, clear changes, deliberate keeps, deferred cases, and checks actually run.
@@ -66,7 +68,7 @@ Preserve searchable mechanism names and meaningful modal, temporal, or negative 
 
 A case is borderline only when at least two versions satisfy the complete-proposition rule but trade accepted principles, and this skill does not already resolve the tradeoff. A new prose shape with one contract-preserving answer is not borderline.
 
-In automatic mode, apply clear edits and report genuine borderline cases without asking questions. Do not weaken a proposition to make progress.
+In automatic mode, apply clear edits when authorized and report genuine borderline cases without asking questions. Do not weaken a proposition to make progress.
 
 In interactive mode, group analogous passages under the governing principle. Present two or three viable versions, recommend one, and state the factual or structural difference. Do not offer inferior distractors. Use the user's requested channel; when calibrating a PR through inline comments, place the recommended provisional version in the diff and attach the alternatives to that exact line.
 
