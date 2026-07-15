@@ -54,7 +54,7 @@ pnpm run test:snapshot
 Run built-bin smoke tests after `pnpm run build` when app packages, app boot, package runtime imports, bin entries, loader behavior, or published artifact paths change.
 
 ```sh
-pnpm exec vitest run --config vitest.e2e.config.ts packages/ui/stdio-agent/tests/built-bin.e2e.ts packages/ui/acp-agent/tests/built-bin.e2e.ts
+pnpm exec vitest run --config vitest.e2e.config.ts packages/examples/stdio-demo/tests/built-bin.e2e.ts packages/examples/acp-demo/tests/built-bin.e2e.ts
 ```
 
 Run real e2e when behavior depends on a real model/API, tool-use loop, ACP integration, prompt injection, or end-to-end agent UX. If `.env` is available, use it; do not print secrets.
