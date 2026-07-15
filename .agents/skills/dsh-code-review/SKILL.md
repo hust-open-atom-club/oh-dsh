@@ -27,11 +27,17 @@ description: Use when reviewing a pull request in the deepseek-harness repo — 
 ## Manual checks
 
 - **Intent and seam contracts:** trace both sides of every changed interface. Confirm the implementation matches the PR and any RFC, including errors, cancellation, ownership, and disposal.
-- **Lifecycle and concurrency:** for async setup, callbacks, processes, or teardown, apply [defensive-patterns.md](../../../docs/defensive-patterns.md). Check races before publication, cancellation during awaits, independent error reporting, callback containment, and quiescent disposal.
+- **Lifecycle and concurrency:** for async setup, callbacks, processes, or teardown, apply [defensive-patterns.md](../../../docs/defensive-patterns.md). Check races before publication, cancellation during awaits, independent error reporting, callback containment, ownership before reentry, complete detach cleanup, and quiescent disposal.
 - **Capability shape:** a swappable capability follows the interface / implementation / consumer split. Consumers depend on the interface, not a backend.
+- **Scope, ownership, and necessity:** tie each abstraction, state machine, option, defensive copy, and compatibility path to a current contract or production consumer. Challenge unrelated features, speculative generality, and behavior placed outside its owning plugin or service.
 - **Configuration:** deployment-varying timeouts, caps, models, URLs, paths, and retry counts are validated `Config` fields, not literals or `DEFAULT_*` constants.
+- **Enforcement boundaries:** hidden schema fields, filtered prompts, facades, wrappers, and listener ordering are not authoritative enforcement when direct or alternate callers can bypass them. Exercise denial paths at the boundary that actually executes the operation.
+- **Borrowed and derived state:** snapshot caller-owned values retained after return or crossing queues, logs, processes, workers, and wire boundaries. Commit notifications and derived state only at the documented success boundary, and trace caches, prompts, UI echoes, replay, and query views to one authoritative source.
+- **Final artifact bounds:** verify byte, token, item, and time limits against the complete emitted or retained artifact, including wrappers and metadata. Probe tiny limits, threshold edges, oversized single chunks, and multibyte text.
 - **Real entry path:** tests exercise the shipped Loader, bin, worker, ACP bridge, or subprocess where relevant. A hand-mounted plugin does not catch Loader export-shape failures; a function plugin must named-export its namespace and have no default export.
 - **Test strength:** assertions fail on the intended regression and verify external state, logs, events, or disposal rather than restating the implementation or trusting an agent's report. Coverage is necessary but not evidence that the scenario is correct.
+- **Changed checks have a negative control:** a new or changed automated check includes a deliberately invalid fixture that fails through the real top-level runner; a green happy path does not prove the check is wired.
+- **Implemented RFCs match shipped reality:** when a PR implements a proposed RFC, move and rewrite it as present-tense shipped state in the same diff, then verify paths, names, and mechanisms against the implementation.
 - **Transcript changes:** editor-visible or model-visible changes update snapshots or explain why no snapshot applies. Review golden diffs as behavior changes, not formatting noise.
 - **Bilingual changes:** compare meaning and terminology on both sides; a green pairing hash does not prove translation quality.
 
