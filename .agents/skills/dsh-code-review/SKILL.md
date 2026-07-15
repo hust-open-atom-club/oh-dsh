@@ -19,10 +19,11 @@ description: Use when reviewing a pull request in the deepseek-harness repo — 
 
 ## Blocking requirements
 
-1. **Docs match the code.** Config, defaults, errors, wire fields, events, and public behavior update the package README and JSDoc in the same diff. Comments state non-obvious contracts; flag implementation narration, test walkthroughs, review history, and duplicated rationale for deletion or a link to their one home.
-2. **Core type docs match.** Changes to spine or seam vocabulary update the appropriate [core-data-structures](../../../docs/core-data-structures/core.md) page and any `type-equiv` entry. Internal types need no catalog entry.
-3. **Registrations clean up.** A new registry contribution has a test that disposes its owner and observes removal.
-4. **Required gates pass.** Trust the [current readiness sequence](../../../AGENTS.md#run-the-ci-gates-locally-before-marking-a-pr-ready) and `pnpm run check:pre-push` for their enforced inventory; review the semantic gaps they cannot detect.
+1. **New prose receives semantic review.** Use [dsh-prose-standard](../dsh-prose-standard/SKILL.md) to critically review every added or changed Markdown passage, JSDoc, comment, prompt, description, diagnostic, and visible string. Verify required coverage, accuracy, placement, and editorial quality against the owning code or behavior; automated checks do not establish those properties.
+2. **Docs match the code.** Config, defaults, errors, wire fields, events, and public behavior update the package README and JSDoc in the same diff. Comments state non-obvious contracts; flag implementation narration, test walkthroughs, review history, and duplicated rationale for deletion or a link to their one home.
+3. **Core type docs match.** Changes to spine or seam vocabulary update the appropriate [core-data-structures](../../../docs/core-data-structures/core.md) page and any `type-equiv` entry. Internal types need no catalog entry.
+4. **Registrations clean up.** A new registry contribution has a test that disposes its owner and observes removal.
+5. **Required gates pass.** Trust the [current readiness sequence](../../../AGENTS.md#run-the-ci-gates-locally-before-marking-a-pr-ready) and `pnpm run check:pre-push` for their enforced inventory; review the semantic gaps they cannot detect.
 
 ## Manual checks
 
