@@ -18,7 +18,7 @@ Status: implemented
 
 `@deepseek-ai/dsh-invariants` 是与产品无关的 Cordis 服务插件，注册 `ctx.invariants`。它只负责配置、注册唯一性、子 fiber 生命周期和带包归属的失败；不导入 session、agent、scope 或 agent-loop 包，也不包含这些包的检查。
 
-工作区内的每个包都发布 `./invariant` 伴随插件，并注册自己完整且准确的 npm 包名。没有关系检查的包使用生成的仅声明所有权 installer：它通过真实服务边界占用包名，但不安装监听器。包的根入口不会隐式导入或注册诊断，因此加载根包不会改变运行时检查，也不要求不变式服务存在。
+工作区内的每个包都发布 `./invariant` 伴随插件，注册自己完整且准确的 npm 包名，并安装可执行的包专属契约。后续的[运行时契约 Agent Note](2026-07-19-package-invariant-runtime-contracts.md) 禁止生成的仅声明所有权 installer。包的根入口不会隐式导入或注册诊断，因此加载根包不会改变运行时检查，也不要求不变式服务存在。
 
 ### 配置与选择
 
@@ -64,9 +64,9 @@ blocklist 匹配优先于 allowlist 匹配。每个条目都是区分大小写�
 | `@deepseek-ai/dsh-scope/invariant` | `@deepseek-ai/dsh-scope` | scoped event carrier 存在性与主体一致性 |
 | `@deepseek-ai/dsh-agent-loop/invariant` | `@deepseek-ai/dsh-agent-loop` | 模型请求重建 |
 
-这四个所有者保存有状态检查与聚焦测试。其他每个包在获得关系断言之前，都带有生成的基线伴随插件。每个伴随入口都是单独打包的 `./invariant` export，具有独立声明和对 Loader 安全的命名空间插件形态；服务包自身的伴随插件导入本地服务类型，避免形成自依赖。
+这四个所有者保存有状态检查与聚焦测试。其他所有者检查自己的插件 fiber 与 effect、结构化服务实现或稳定的纯库代数。每个伴随入口都是单独打包的 `./invariant` export，具有独立声明和对 Loader 安全的命名空间插件形态；服务包自身的伴随插件导入本地服务类型，避免形成自依赖。
 
-`verify-package-invariants` 会发现每个工作区包，并拒绝缺失或陈旧的伴随插件源码、外部或无法解析的注册名、缺失的 `./invariant` export 或发布文件、缺失的不变式对等依赖（peer dependency）、开发依赖及项目引用，以及遗漏伴随入口的自定义构建配置。生成器只写入缺失或带生成标记的所有权基线，因此绝不会替换包自行维护的实现。
+`verify-package-invariants` 会发现每个工作区包，并拒绝缺失的伴随插件源码、生成标记、空 installer、不使用失败报告器的 installer、外部或无法解析的注册名、缺失的 `./invariant` export 或发布文件、缺失的不变式对等依赖（peer dependency）、开发依赖及项目引用，以及遗漏伴随入口的自定义构建配置。
 
 ### Scoped event 语义映射
 
@@ -96,7 +96,7 @@ Workspace 约束识别独立的不变式 bundle；包 exports、项目引用、�
 ## 后果
 
 - 产品包拥有并测试自己的关系断言，服务保持与产品无关。
-- 每个包都要承担不变式伴随插件带来的少量发布与依赖成本，包括目前只安装生成基线、不添加监听器的包。
+- 每个包都要承担可执行不变式伴随插件带来的发布、依赖与运行时检查成本。
 - 标准组合无需改变插件树即可关闭全部检查或按包名选择。
 - 显式伴随条目让诊断成本和所有权在 Cordis 配置与包 export 中可见。
 - 每个选中贡献增加一个子 fiber 及其监听器和状态成本；被过滤注册只保留包名占用。
