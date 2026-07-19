@@ -33,9 +33,9 @@ The `architecture` / `process` line: **architecture** is about the source we shi
 
 ## When to write one
 
-Write an Agent Note when a decision is **durable** (it shapes the codebase beyond a single function or package), **contested** (there was a real alternative a reasonable engineer might have chosen), and **surprising** (a future reader would otherwise ask "why on earth is it done this way?"). A proposal for substantial future work starts in `proposed/`; a decision already made starts in `implemented/`. Pick the class folder that matches the decision (see [Classification](#classification)).
+Every non-trivial change MUST add or update at least one Agent Note in the same PR. A change is non-trivial when it alters behavior, architecture, a cross-file or cross-package contract, process or tooling, testing strategy, an on-disk, wire, or configuration format, or another decision a maintainer may reasonably revisit. A proposal for substantial future work starts in `proposed/`; a decision already made starts in `implemented/`. Pick the class folder that matches the decision (see [Classification](#classification)).
 
-Do NOT write one for a mechanical or local choice (a variable name, a one-file refactor), for anything already enforced and explained by a gate or a convention in AGENTS.md, or for a still-provisional decision tagged `TODO(...)` in the code — record those as TODOs and promote to an Agent Note only once they settle. An Agent Note is never edited into a *different decision*: supersede it with a new one and cross-link. (Editing an `implemented/` Agent Note to track where its already-made decision now *lives* — a moved file, a renamed package — is not a different decision and is required, not forbidden; see [implemented/AGENTS.md](implemented/AGENTS.md).)
+Updating the Agent Note that already owns the decision satisfies the rule; do not create a duplicate. Only a purely mechanical or local edit with no behavioral, contractual, structural, process, or rationale change is exempt. An Agent Note is never edited into a *different decision*: supersede it with a new one and cross-link. Editing an `implemented/` Agent Note to track where its existing decision lives is required, not forbidden; see [implemented/AGENTS.md](implemented/AGENTS.md).
 
 ## The file format
 
