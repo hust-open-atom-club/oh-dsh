@@ -1,17 +1,17 @@
 ---
 name: dsh-find-simplifications
-description: 'Use when working in the deepseek-harness repo to find non-obvious simplification candidates and write proposed RFCs or inline TODO/FIXME/XXX notes for dead, duplicated, speculative, or over-built code surfaces; especially for requests like "find simplification RFCs", "look for unnecessary complexity", "audit for removal-style cleanups", or "fold worthwhile simplification ideas from another PR".'
+description: 'Use when working in the deepseek-harness repo to find non-obvious simplification candidates and write proposed Agent Notes or inline TODO/FIXME/XXX notes for dead, duplicated, speculative, or over-built code surfaces; especially for requests like "find simplification Agent Notes", "look for unnecessary complexity", "audit for removal-style cleanups", or "fold worthwhile simplification ideas from another PR".'
 ---
 
 # Finding DeepSeek Harness Simplifications
 
-This skill helps turn a broad "find things to simplify" request into evidence-backed RFCs that remove or collapse existing harness surface area. It is guidance, not a checklist: follow the code, keep judgment active, and prefer a few well-proven candidates over a pile of thin guesses.
+This skill helps turn a broad "find things to simplify" request into evidence-backed Agent Notes that remove or collapse existing harness surface area. It is guidance, not a checklist: follow the code, keep judgment active, and prefer a few well-proven candidates over a pile of thin guesses.
 
 ## Start With Repo Context
 
-- Read `AGENTS.md`, especially the pre-release stance and the conventions (including the tests-are-not-golden-truth and RFCs-are-not-golden-truth doctrines), plus [docs/defensive-patterns.md](../../../docs/defensive-patterns.md) and [docs/testing.md](../../../docs/testing.md).
+- Read `AGENTS.md`, especially the pre-release stance and the conventions (including the tests-are-not-golden-truth and Agent Notes-are-not-golden-truth doctrines), plus [docs/defensive-patterns.md](../../../docs/defensive-patterns.md) and [docs/testing.md](../../../docs/testing.md).
 - Skim [docs/architecture.md](../../../docs/architecture.md) before judging anything under `packages/`; simplifications that fight the service map or event taxonomy need extra evidence.
-- Use the RFC index ([docs/rfc/README.md](../../../docs/rfc/README.md)) to understand intentional architecture. The most relevant implemented examples are [drop mutable session summary](../../../docs/rfc/implemented/simplification/2026-06-19-drop-mutable-session-summary.md), [shared persistence write coordinator](../../../docs/rfc/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.md), [capability seams](../../../docs/rfc/implemented/architecture/2026-06-13-capability-seams.md), and the twin adapter / dual persistence backend RFCs.
+- Use the Agent Note index ([.agents/notes/README.md](../../notes/README.md)) to understand intentional architecture. The most relevant implemented examples are [drop mutable session summary](../../notes/implemented/simplification/2026-06-19-drop-mutable-session-summary.md), [shared persistence write coordinator](../../notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.md), [capability seams](../../notes/implemented/architecture/2026-06-13-capability-seams.md), and the twin adapter / dual persistence backend Agent Notes.
 - Treat dual LLM adapters and dual persistence backends as intentional by default. Do not propose deleting either twin/backend as "low effort" unless the user explicitly overrides that constraint. Removing an unused method or hook inside a protected seam can still be valid if it does not collapse the protected design.
 
 ## What Counts As A Strong Candidate
@@ -27,7 +27,7 @@ A strong simplification removes, folds, or demotes something real and has clear 
 - An invariant, rollback path, set of expected outputs, or special-case test exists only to protect an unused surface.
 - The simplified behavior may differ slightly, but the new behavior is still reasonable and easier to explain.
 
-Thin candidates are usually not enough for an RFC: deleting one typo, running `knip` once, removing an intentionally documented backend/adapter, or flagging "this looks complex" without call-site proof.
+Thin candidates are usually not enough for an Agent Note: deleting one typo, running `knip` once, removing an intentionally documented backend/adapter, or flagging "this looks complex" without call-site proof.
 
 ## Survey Broadly
 
@@ -54,7 +54,7 @@ For complex asynchronous code, draw the ownership graph and map each sentinel, r
 For every symbol or behavior, classify consumers before writing:
 
 - Production corpus: `packages/*/src`, `examples/*/src`, `examples/**/*.yml`, runtime scripts, and loader/config paths.
-- Non-production corpus: tests, README/docs, RFCs, snapshots, generated expected outputs, and comments.
+- Non-production corpus: tests, README/docs, Agent Notes, snapshots, generated expected outputs, and comments.
 - Ambiguous corpus: examples and scripts that may be product smoke paths. Inspect usage before classifying.
 
 Use `rg` first. Good searches include the exact symbol, event name, package name, config key, method name with both `.name(` and `name(`, and any wire strings. Then read the call sites. `knip` can help, but it is not a substitute for understanding public interfaces, dynamic event names, tests, docs, and Cordis loader paths.
@@ -62,17 +62,17 @@ Use `rg` first. Good searches include the exact symbol, event name, package name
 Reject or downgrade a candidate when:
 
 - A production caller exists and the simplification would be a feature decision rather than a cleanup.
-- The surface is explicitly justified by an implemented RFC or a hard-won defensive pattern, and the new evidence does not beat that reason.
+- The surface is explicitly justified by an implemented Agent Note or a hard-won defensive pattern, and the new evidence does not beat that reason.
 - The removal would force unrelated churn without actually making the contract smaller.
 - The idea is correct but tiny. Add a targeted TODO/FIXME/XXX instead, using the urgency semantics in [docs/development.md](../../../docs/development.md).
 
-## Write The RFC
+## Write The Agent Note
 
-Create one file per durable proposal under `docs/rfc/<lifecycle>/<class>/yyyy-mm-dd-topic.md`, following the lifecycle/classification contract in `docs/rfc/README.md`. Regenerate `docs/rfc/INDEX.md`; never add a manual RFC table to the README. Keep prose paragraphs on one physical line and use relative Markdown links.
+Create one file per durable proposal under `.agents/notes/<lifecycle>/<class>/yyyy-mm-dd-topic.md`, following the lifecycle/classification contract in `.agents/notes/README.md`. Regenerate `.agents/notes/INDEX.md`; never add a manual Agent Note table to the README. Keep prose paragraphs on one physical line and use relative Markdown links.
 
 Prefer this shape, adjusting when the idea needs it:
 
-- `# RFC: <action-oriented title>`
+- `# Agent Note: <action-oriented title>`
 - `Status: proposed`
 - `## Problem`: name the current surface, cite the relevant files, and state the consumer evidence. Separate production callers from tests/docs.
 - `## Proposal`: say exactly what to remove, fold, demote, or rehome. Include tests, docs, READMEs, JSDoc, event-taxonomy, snapshot, and generated-file cleanup when relevant.
@@ -80,7 +80,7 @@ Prefer this shape, adjusting when the idea needs it:
 - `## Acceptance criteria`: observable end state and gates.
 - `## Risks`: public API changes, behavior changes, future product wants, and why the tradeoff is still reasonable.
 
-Be concrete enough that an implementing PR can follow the trail. Avoid vague "simplify this package" RFCs. When a proposal overlaps an existing RFC, consolidate the useful details into the existing one rather than creating a duplicate.
+Be concrete enough that an implementing PR can follow the trail. Avoid vague "simplify this package" Agent Notes. When a proposal overlaps an existing Agent Note, consolidate the useful details into the existing one rather than creating a duplicate.
 
 ## Inline TODO Notes
 
@@ -88,25 +88,25 @@ Use inline TODO/FIXME/XXX only for small, local cleanups that are clearly useful
 
 - Name the smell with a stable tag, e.g. `TODO(double-default)` or `XXX(unused-default)`.
 - Explain why it is safe to revisit and what action would simplify it.
-- Do not add TODOs for speculative complaints or for behavior that needs an RFC-level decision.
+- Do not add TODOs for speculative complaints or for behavior that needs an Agent Note-level decision.
 
 ## When Folding Another PR Or Branch
 
 Diff the sibling branch against `origin/master`, not against the current PR branch, so you see its independent contribution. For each item:
 
-- Port non-overlapping RFCs or TODOs that meet the quality bar.
-- Consolidate overlapping material into the existing RFC that owns the topic.
+- Port non-overlapping Agent Notes or TODOs that meet the quality bar.
+- Consolidate overlapping material into the existing Agent Note that owns the topic.
 - Do not port duplicate or lower-confidence proposals just to preserve the count.
 - Update the PR body so reviewers see the true candidate count and scope.
 - Close the duplicate PR only when the user asked you to, or when you clearly own that housekeeping.
 
 ## Validation And PR Hygiene
 
-For docs-only RFC work, run at least `pnpm run doc-sync`, `pnpm run lint`, and `git diff --check`. For code comments or skill changes, also run the relevant validator when one exists. Before pushing, expect the pre-push hook to run module graph freshness, unit tests, snapshots, doc-sync, and hygiene.
+For docs-only Agent Note work, run at least `pnpm run doc-sync`, `pnpm run lint`, and `git diff --check`. For code comments or skill changes, also run the relevant validator when one exists. Before pushing, expect the pre-push hook to run module graph freshness, unit tests, snapshots, doc-sync, and hygiene.
 
 When opening or updating a PR, summarize:
 
-- How many RFCs and inline notes were added.
+- How many Agent Notes and inline notes were added.
 - The main areas surveyed.
 - What was intentionally excluded.
 - Which checks passed.

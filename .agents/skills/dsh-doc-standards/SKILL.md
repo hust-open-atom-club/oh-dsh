@@ -10,7 +10,7 @@ The contract lives in [docs/AGENTS.md](../../../docs/AGENTS.md). This workflow c
 ## Sources of truth (read, don't re-summarize)
 
 - [docs/AGENTS.md](../../../docs/AGENTS.md) — the taxonomy ("one home per fact"), budgets, slop checklist.
-- [docs/rfc/README.md](../../../docs/rfc/README.md) — when a decision earns an RFC, how to file it, and what goes inside one (the header block, per-lifecycle skeleton, and Alternatives-considered mandate, gated by `verify-rfc-format`); [docs/postmortem/README.md](../../../docs/postmortem/README.md) — when an incident earns a postmortem.
+- [.agents/notes/README.md](../../notes/README.md) — when a decision earns an Agent Note, how to file it, and what goes inside one (the header block, per-lifecycle skeleton, and Alternatives-considered mandate, gated by `verify-agent-note-format`); [docs/postmortem/README.md](../../../docs/postmortem/README.md) — when an incident earns a postmortem.
 - [docs/i18n/README.md](../../../docs/i18n/README.md) — the bilingual pairing contract; editing either side of a pair obligates the counterpart in the same change.
 - Root [AGENTS.md](../../../AGENTS.md) — the standing orders whose budget discipline this skill protects.
 
@@ -32,8 +32,8 @@ The audit is a hunt for the standard's slop checklist, cheapest probes first. Es
 3. Inspect long comments for reasoning transcripts: control-flow narration, test walkthroughs, proof of obvious branches, review findings, rejected local alternatives, and the same rationale repeated beside sibling methods. Preserve only a non-obvious contract or durable rationale; otherwise delete the comment.
 4. Hunt duplication by grepping distinctive phrases. Keep one home and replace other copies with links.
 5. Replace hand-written catalogs, test/status inventories, and JSDoc restatements with the authoritative tree, script, or generated reference.
-6. In `implemented/` RFCs, remove migration plans, acceptance-task checklists, and future-tense spec language. Keep concise verification contracts that identify the behaviors and tiers pinning the shipped decision, plus named coverage gaps.
-7. If removing prose changes a promised behavior rather than its explanation, use a proposed RFC first (follow [dsh-find-simplifications](../dsh-find-simplifications/SKILL.md)).
+6. In `implemented/` Agent Notes, remove migration plans, acceptance-task checklists, and future-tense spec language. Keep concise verification contracts that identify the behaviors and tiers pinning the shipped decision, plus named coverage gaps.
+7. If removing prose changes a promised behavior rather than its explanation, use a proposed Agent Note first (follow [dsh-find-simplifications](../dsh-find-simplifications/SKILL.md)).
 
 Keep every load-bearing rule, preferably as one to three lines plus a link to its rationale. Cut stories, duplicates, status notes, and the path used to derive the rule. Do not create a new explanation merely to relocate disposable reasoning.
 

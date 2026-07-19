@@ -56,7 +56,7 @@ Event order and its current-request consequence are caller-visible behavior, not
 
 **Over-trimmed:** “Worker realm support.”
 
-**Balanced:** “Owns the worker realm and its host bridge. Realm initialization is single-shot; disposal terminates the worker and rejects later calls. See the worker-isolation RFC for the protocol rationale.”
+**Balanced:** “Owns the worker realm and its host bridge. Realm initialization is single-shot; disposal terminates the worker and rejects later calls. See the worker-isolation Agent Note for the protocol rationale.”
 
 **Over-detailed:** A paragraph-by-paragraph preview of the classes and helper functions below.
 
@@ -84,17 +84,17 @@ Keep mapping details that explain an abstraction boundary or intentional informa
 
 ## Link rationale while keeping the local contract
 
-**Over-trimmed:** “Disposal is documented in the lifecycle RFC.”
+**Over-trimmed:** “Disposal is documented in the lifecycle Agent Note.”
 
-**Balanced:** “Disposal aborts the run and waits for provider quiescence. See the lifecycle RFC for ownership and race handling.”
+**Balanced:** “Disposal aborts the run and waits for provider quiescence. See the lifecycle Agent Note for ownership and race handling.”
 
-**Over-detailed:** Repeating the RFC's promise choreography and rejected ownership models beside every disposer.
+**Over-detailed:** Repeating the Agent Note's promise choreography and rejected ownership models beside every disposer.
 
 Keep the behavior and completion guarantee where callers need them. Link aggressively for the algorithm and rationale; a link cannot replace the local contract.
 
-## Implemented RFCs retain verification contracts
+## Implemented Agent Notes retain verification contracts
 
-**Over-trimmed:** Deleting the entire Testing section because the RFC has already shipped.
+**Over-trimmed:** Deleting the entire Testing section because the Agent Note has already shipped.
 
 **Balanced:** “Unit tests cover cancellation before and after publication, disposal quiescence, and provider reload. A built-entry smoke covers the real loader path; snapshot coverage is deferred because the transport is process-specific.”
 
@@ -162,6 +162,6 @@ Know what the generator extracts. That fragment must preserve the contract neede
 
 **Over-detailed:** Listing private helper cleanup and unused test-only accessors with no caller or maintainer consequence.
 
-**Balanced:** “Provider selection is cached for the plugin lifetime; installing or repairing a provider requires reload.” Keep ordinary cleanup in its TODO or RFC.
+**Balanced:** “Provider selection is cached for the plugin lifetime; installing or repairing a provider requires reload.” Keep ordinary cleanup in its TODO or Agent Note.
 
 Retain gaps and non-obvious constraints that affect use or safe maintenance. A package README is not a backlog dump.

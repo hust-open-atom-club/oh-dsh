@@ -41,7 +41,7 @@ Why `test:coverage`, not only `test`: CI enforces per-file 100% coverage. A bran
 
 ## Add Gates By Touched Surface
 
-Run `pnpm run doc-sync` and `pnpm run verify-module-graph` when the diff touches Markdown docs, package manifests, package imports/exports, generated catalogs, RFCs, architecture docs, translation pairs, Mermaid diagrams, or comments that cite docs/packages.
+Run `pnpm run doc-sync` and `pnpm run verify-module-graph` when the diff touches Markdown docs, package manifests, package imports/exports, generated catalogs, Agent Notes, architecture docs, translation pairs, Mermaid diagrams, or comments that cite docs/packages.
 
 Run `pnpm run build` and `pnpm run hygiene` when the diff touches any package `package.json`, dependency graph, public exports, build config, declaration surface, bundled runtime path, or code that will be consumed from built `lib/`.
 

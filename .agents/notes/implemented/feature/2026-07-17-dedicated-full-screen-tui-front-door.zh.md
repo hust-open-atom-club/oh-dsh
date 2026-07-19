@@ -1,0 +1,48 @@
+# Agent Note: 独立的全屏 TUI 入口
+
+Status: implemented
+
+[English](2026-07-17-dedicated-full-screen-tui-front-door.md) | 中文
+
+## 问题
+
+逐行输出的 `@deepseek-ai/dsh-stdio` 入口适用于管道和普通终端，但全屏编码界面必须负责原始输入、差分绘制、光标状态、浮层和终端恢复。把这两类契约合并到一个 UI 插件中，会迫使管道安全路径依赖仅适用于 TTY 的生命周期，也使组合无法明确表达所选终端行为。
+
+交互通道必须继续作为 Cordis 插件，使用与其他入口相同的 agent（智能体）、会话、工具和用户交互服务。它需要恢复持久历史、跟随压缩替换、显示工具自有的呈现内容，并在启动失败和资源释放时恢复终端。独立聊天应用或第二套 agent 组合会在插件图之外重复实现这些行为。
+
+## 决策
+
+DeepSeek Harness 将 [`@deepseek-ai/dsh-tui`](../../../../packages/ui/tui/README.md) 作为独立的 Cordis 插件交付。该插件只负责终端输入与呈现；agent 生命周期、会话持久化、工具执行以及模型可见的提问工具仍由不同组合项负责。插件要求 stdin 和 stdout 均为 TTY；条件不满足时会失败，不会静默切换为逐行输出。
+
+应用组合层在挂载前选择具体的终端入口。`@deepseek-ai/dsh-stdio-demo` 可以根据两个进程流通过 `auto` 作出选择，`repl-agent` 和 `tui-agent` 叶节点则分别明确选择 readline 与 TUI。TUI 叶节点通过带断言的 include patch 复用 repl-agent 的后端和工具组合，使三个可运行的 agent 叶节点保持对称，同时避免重复部署选项。
+
+所选入口接收预创建 agent 使用的同一个新建或恢复 `SessionId`。入口先于 agent 组合挂载，等待相符的根 agent 出现，然后才进入全屏模式。因此，相符的 `agent-loop/config-start-failed` 事件会在接管屏幕前报告，并以状态码 1 退出。
+
+### 会话投影与交互
+
+TUI 从活跃的 `session.surface` 重建 transcript（文本记录），并在事件携带 `surfaceOp` 时重新投影，因此恢复或压缩后的历史与模型可见会话保持一致。TUI 渲染 Markdown 文本与推理、token 用量、最新 `todo/write` 计划，以及各工具定义通过 `presentCall` 和 `presentResult` 方法生成的工具卡片。进行中的分片与工具调用会更新同一组组件，随后由完成事件收束状态。
+
+agent 空闲时，编辑器输入调用 `agent.send()`；轮次运行中则调用 `agent.steer()`。取消、推理显隐、工具卡片展开、重绘、清空 transcript 和退出都只是终端控制。插件注册共享的 `userInteraction` 提供方，以排队的键盘浮层呈现问题；agent 行为和答案日志仍由既有服务负责。
+
+### 终端所有权
+
+在模型输出、会话数据、工具呈现、问题、配置或诊断信息进入 pi-tui 或终端标题前，`displayText()` 会把换行之外的 C0 和 C1 控制字符显示为十六进制转义文本。只有 TUI 和 pi-tui 可以生成 ANSI 控制序列。
+
+内置配色仅使用标准 16 色 ANSI 前景色和 SGR 属性，正文文字和背景沿用终端默认值，选中项使用反显。因此，宿主终端可以直接按浅色或深色主题重映射界面，无需 TUI 专用主题设置；`color: false` 会移除样式。
+
+## 验证
+
+已实现的 [TUI 终端状态快照 Agent Note](../testing/2026-07-18-tui-terminal-state-snapshots.md) 规定四层验证契约：直接行为测试、瞬态语义终端快照、通过生产工具执行的已录制 JSONL 流程，以及 Loader/PTY 冒烟测试。包（package）README 负责记录配置、命令、模型可见效果和当前限制。
+
+## 曾考虑的替代方案
+
+- **把 readline 与全屏模式都保留在 `@deepseek-ai/dsh-stdio` 中**：不予采纳，因为逐行输出和差分 TTY 渲染具有不同的依赖、输入规则、日志所有权和资源清理义务。拆分为独立包可以让管道安全契约保持精简、明确。
+- **当任一进程流不是 TTY 时，让 TUI 插件静默降级**：不予采纳，因为回退会掩盖部署错误并改变交互语义。应用包可以通过 `auto` 选择入口；明确挂载的 TUI 会快速失败。
+- **把 TUI 接线与测试保留在 readline `repl-agent` 叶节点下**：不予采纳，因为一个叶节点会代表两个不同入口，也会破坏它与 `acp-agent` 的对称性。独立的 `tui-agent` 叶节点负责 TUI 浮层和测试，同时复用 repl-agent 的后端组合。
+
+## 后果
+
+- 交互式终端获得带状态的 Markdown、卡片、计划和提问界面，同时不会改变管道与自动化使用的逐行协议。
+- TUI 会引入 pi-tui 依赖并严格要求 TTY；非 TTY 部署在组合时选择 `@deepseek-ai/dsh-stdio`。
+- 会话投影使恢复和压缩与持久会话保持一致，但只有一个已配置会话拥有 transcript 和编辑器。
+- 工具包通过既有呈现方法扩展终端卡片，无需在 TUI 中增加工具专用分支。
