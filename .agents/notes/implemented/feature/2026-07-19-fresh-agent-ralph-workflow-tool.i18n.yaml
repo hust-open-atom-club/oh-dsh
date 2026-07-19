@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-07-19-fresh-agent-ralph-workflow-tool.md: b00f433db62ed1a44a14baab056b2fd64a2695c4
-2026-07-19-fresh-agent-ralph-workflow-tool.zh.md: f6b5ceb960b021ab50c65bdc3a492bdb3745570f
+2026-07-19-fresh-agent-ralph-workflow-tool.zh.md: 4c5de168ad3a1c05b318078394f6eb1d253d4c74

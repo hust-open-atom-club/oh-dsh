@@ -1,4 +1,4 @@
-# Agent Note：全新 agent Ralph 工作流工具
+# Agent Note: 全新 agent Ralph 工作流工具
 
 Status: implemented
 
