@@ -1,4 +1,4 @@
-# Agent Note：面向人类的 `/goal` 命令
+# Agent Note: 面向人类的 `/goal` 命令
 
 Status: implemented
 
