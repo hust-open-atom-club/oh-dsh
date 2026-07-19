@@ -18,7 +18,7 @@ Package ownership must also be exhaustive. Without a mechanical repository rule,
 
 `@deepseek-ai/dsh-invariants` is a product-independent Cordis service plugin that registers `ctx.invariants`. It owns configuration, registration uniqueness, child-fiber lifecycle, and package-attributed failures. It imports no session, agent, scope, or agent-loop package and contains none of their checks.
 
-Every workspace package publishes a `./invariant` companion plugin that registers its exact full npm name. A package with no relational check uses a generated ownership-only installer: it reserves the name through the real service boundary but installs no listeners. Package root entrypoints do not import or register diagnostics implicitly, so loading a root package does not change runtime checking or require the invariant service.
+Every workspace package publishes a `./invariant` companion plugin that registers its exact full npm name and installs an executable package-specific contract. Generated ownership-only installers are forbidden by the follow-up [runtime-contract Agent Note](2026-07-19-package-invariant-runtime-contracts.md). Package root entrypoints do not import or register diagnostics implicitly, so loading a root package does not change runtime checking or require the invariant service.
 
 ### Configuration and selection
 
@@ -49,7 +49,7 @@ Blocklist matches override allowlist matches. Each list entry is a case-sensitiv
 
 The public registration boundary is `ctx.invariants.register(packageName, installer)`. It reserves one active registration per full npm package name even when filters disable installation, and returns the effect disposer. Disposing the companion or service releases the reservation and all contribution state.
 
-An enabled installer runs in a dedicated child Cordis fiber owned by the service. `InvariantInstaller.inject` declares the child fiber's service surface explicitly; the registry carries no product-specific dependency metadata. The installer receives a bound `fail(message)` reporter. Calling it throws an `Error` subclass named `InvariantError` with stable code `INVARIANT` and the registering `packageName`; it does not extend a product-package error base.
+An enabled installer runs in a dedicated child Cordis fiber owned by the service. `InvariantInstaller.inject` declares the child fiber's service surface explicitly; the registry carries no product-specific dependency metadata. The service joins a returned installer promise before registration succeeds, so asynchronous startup checks remain transactional. The installer receives a bound `fail(message)` reporter. Calling it throws an `Error` subclass named `InvariantError` with stable code `INVARIANT` and the registering `packageName`; it does not extend a product-package error base.
 
 Registration setup is transactional. If an installer fails after registering listeners, the child fiber is disposed completely and the name reservation is released before the failure escapes. Filtered registrations create no child but retain their reservation until disposal. Reloading a companion therefore begins with one clean installer state; stateful contributions rebuild baselines from their owning services.
 
@@ -64,9 +64,9 @@ The former functional-plugin entrypoint and one-argument `InvariantError` constr
 | `@deepseek-ai/dsh-scope/invariant` | `@deepseek-ai/dsh-scope` | scoped-event carrier presence and subject consistency |
 | `@deepseek-ai/dsh-agent-loop/invariant` | `@deepseek-ai/dsh-agent-loop` | model-request reconstruction |
 
-These four owners contain stateful checks and focused tests. Every other package carries a generated baseline companion until it gains a relational assertion. Every companion is a separately bundled `./invariant` export with its own declarations and Loader-safe namespace plugin shape; the service package's own companion imports its local service type to avoid a self-dependency.
+These four owners contain stateful checks and focused tests. Other owners check their plugin fibers and effects, structural service implementations, or stable pure-library algebra. Every companion is a separately bundled `./invariant` export with its own declarations and Loader-safe namespace plugin shape; the service package's own companion imports its local service type to avoid a self-dependency.
 
-`verify-package-invariants` discovers every workspace package and rejects missing or stale companion source, foreign or unresolved registration names, missing `./invariant` exports or published files, missing invariant peer/development dependencies and project references, and bundle overrides that omit the companion entry. The generator writes only missing or marked ownership baselines, so a package-owned implementation is never replaced.
+`verify-package-invariants` discovers every workspace package and rejects missing companion source, generated markers, empty or reporter-free installers, foreign or unresolved registration names, missing `./invariant` exports or published files, missing invariant peer/development dependencies and project references, and bundle overrides that omit the companion entry.
 
 ### Scoped-event semantic map
 
@@ -84,7 +84,7 @@ Service tests cover defaults, global disablement, allow/block selection, blockli
 
 Composition tests cover standard-spine forwarding and generated SDK entries. Loader tests preserve each companion namespace, while built plain-Node smokes exercise the compiled subpath exports. The scoped-event freshness gate reruns its semantic Program analysis.
 
-Every Vitest configuration loads a test host that mounts an explicitly enabled service before an ordinary Cordis root's first plugin. Package tests add their owner's companion, one exhaustive topology mounts every companion, and focused service and owner tests construct their own invariant topology so they can exercise disablement, filtering, rollback, and reload without duplicate ownership. Gate tests also execute every companion's `apply` function and verify that it calls `register` with its manifest name, rather than accepting source text alone.
+Every Vitest configuration loads a test host that mounts an explicitly enabled service before an ordinary Cordis root's first plugin and adds the current test package's companion. One exhaustive topology mounts all package companions once; focused service and owner tests construct their own invariant topology so they can exercise disablement, filtering, rollback, and reload without duplicate ownership. Gate tests also execute every companion's `apply` function and verify that it calls `register` with its manifest name, rather than accepting source text alone.
 
 ## Alternatives considered
 
@@ -96,10 +96,10 @@ Every Vitest configuration loads a test host that mounts an explicitly enabled s
 ## Consequences
 
 - Product packages own and test their relational assertions while the service stays product-independent.
-- Every package pays the small publication and dependency cost of an invariant companion, including packages whose generated baseline currently installs no listeners.
+- Every package pays the publication, dependency, and runtime-check cost of an executable invariant companion.
 - Standard compositions can disable all checks or select package names without changing their plugin tree.
 - Explicit companion entries make diagnostic cost and ownership visible in Cordis config and package exports.
 - One selected contribution adds one child fiber and its listener/state cost; filtered registrations retain only name ownership.
 - Regex sources are deployment configuration and remain fixed until the service reloads.
-- Ordinary Vitest roots install the current test package's companion; one exhaustive topology retains repository-wide registration coverage without multiplying every child fiber across every test root.
+- Ordinary Vitest roots install the owning test package's selected companion; one exhaustive topology pays the full child-fiber cost once for repository-wide registration coverage.
 - Session storage validation, snapshotting, freezing, provenance, and surface acceptance remain always on and are not affected by invariant selection.

@@ -10,7 +10,7 @@ The package-owned invariant seam made registration and publication exhaustive, b
 
 Every package shape cannot use the same invariant. Cordis plugins own fibers, injections, effects, and services; service seams admit structural third-party implementations; stateful domains need event relations; pure libraries and bin packages expose algebra, parsing, normalization, or entrypoint constraints. The repository needs one enforceable obligation without moving those contracts back into a central product-aware package.
 
-Vitest also mounts every companion globally. Companion modules therefore cannot eagerly import every product entrypoint before a test module establishes its hoisted mocks, and a name-based observer cannot mistake an anonymous child fiber that inherits its parent's display name for the package plugin itself.
+Vitest mounts each package test's owning companion globally, and one exhaustive topology mounts every companion. Companion modules therefore cannot eagerly import every product entrypoint before a test module establishes its hoisted mocks, and a name-based observer cannot mistake an anonymous child fiber that inherits its parent's display name for the package plugin itself.
 
 ## Decision
 
@@ -31,17 +31,17 @@ At implementation time this covers all 91 workspace packages: four stateful comp
 
 ### Product-independent observers
 
-`observePluginInvariant` checks existing fibers immediately and future active fibers through global Cordis lifecycle events. A contract may supply an exact callback when that import is safe. Otherwise it matches `fiber.runtime.name`, the name declared by that fiber's own plugin runtime, rather than the inherited `fiber.name`; anonymous `ctx.inject()` children are therefore not misidentified as their parent package. The observer checks required injection keys, recursively collected effect labels, services provided by that exact fiber, and an optional owner validator. Config-dependent packages encode symmetric relations, such as automatic compaction owning both listeners or neither when disabled.
+`observePluginInvariant` checks existing fibers immediately and future active fibers through a callback/name index behind one root-shared Cordis lifecycle listener pair. A contract may supply an exact callback when that import is safe. Otherwise it matches `fiber.runtime.name`, the name declared by that fiber's own plugin runtime, rather than the inherited `fiber.name`; anonymous `ctx.inject()` children are therefore not misidentified as their parent package. The observer checks required injection keys, recursively collected effect labels, services provided by that exact fiber, and an optional owner validator. Config-dependent packages encode symmetric relations, such as automatic compaction owning both listeners or neither when disabled.
 
 `observeServiceInvariant` checks the current service and every later binding. `serviceShapeViolation` validates callable members and non-empty string descriptors structurally instead of using `instanceof`, so conforming third-party backends and complete test doubles remain valid while incomplete stand-ins fail.
 
-`assertInvariant` handles synchronous package algebra. Pure-package companions register an asynchronous child effect and dynamically import their owner inside that effect. This preserves atomic service-owned rollback while allowing the test module, Loader, or deployment to establish mocks and module resolution before the invariant samples the owner.
+`assertInvariant` handles package algebra. Pure-package companions return an asynchronous installer promise and dynamically import their owner during child startup. The service joins that promise for atomic rollback while allowing the test module, Loader, or deployment to establish mocks and module resolution before the invariant samples the owner.
 
 ### Gate and test execution
 
 `verify-package-invariants` discovers every workspace package and retains the publication checks for the exact registration name, `./invariant` export, published files, invariant peer and development dependencies, TypeScript reference, and bundle entry. Its source check additionally parses the local `install` function, rejects a generated marker or empty body, requires a second failure-reporter parameter and its use, and rejects duplicate name-based plugin observers across packages. These AST checks are a minimum acceptance rule, not a claim that source shape proves semantic quality.
 
-The Vitest setup host mounts `InvariantService` with `{ enabled: true }` and all 91 companions before an ordinary Cordis root's first plugin. The host joins companion startup to the test's root-level composition boundary, so asynchronous pure checks and plugin-observer setup fail the test rather than becoming background diagnostics. Focused selection, lifecycle, and owner suites build their own enabled topology to avoid duplicate registrations while still testing invariants.
+The Vitest setup host mounts `InvariantService` with `{ enabled: true }` before an ordinary Cordis root's first plugin and adds the current test package's companion. The host joins companion startup to the test's root-level composition boundary, so asynchronous pure checks and plugin-observer setup fail the test rather than becoming background diagnostics. One exhaustive topology mounts all 91 companions once to prove runtime registration and coverage; focused selection, lifecycle, and owner suites build their own enabled topology to avoid duplicate registrations while still testing invariants.
 
 Helper tests reject invalid plugin names, missing injections, effects, services, custom relations, malformed service shapes, and failed assertions. Package suites then activate real plugins across their existing config and HMR paths. Test-only service stand-ins must implement the complete checked seam rather than bypass global invariants.
 
@@ -50,7 +50,7 @@ Helper tests reject invalid plugin names, missing injections, effects, services,
 - **Keep generated ownership-only companions.** Rejected because registration without an executable assertion cannot reject a broken package and makes the exhaustive gate misleading.
 - **Generate one synthetic assertion into every package.** Rejected because a universal assertion would again optimize for satisfying the gate instead of protecting an owner-specific contract.
 - **Move the per-package contract matrix into `dsh-invariants`.** Rejected because product imports, vocabulary, and change ownership would return to the central service.
-- **Import every owner entrypoint statically from its companion.** Rejected because the global test host would preload packages before hoisted mocks and shipped compositions would pay unrelated module initialization costs.
+- **Import every owner entrypoint statically from its companion.** Rejected because owning and exhaustive test hosts would preload packages before hoisted mocks and shipped compositions would pay unrelated module initialization costs.
 - **Require first-party service-class identity.** Rejected because service seams are structural extension boundaries; `instanceof` would reject valid external implementations and test doubles.
 - **Register invariants implicitly from package root entrypoints.** Rejected for the composition-order and hidden-effect reasons in the package-owned service RFC.
 
@@ -58,8 +58,8 @@ Helper tests reject invalid plugin names, missing injections, effects, services,
 
 - Every package contributes an executable check; adding a package without one fails the top-level gate.
 - The invariant service remains product-independent while providing reusable lifecycle and shape observers.
-- Ordinary unit, snapshot, and e2e tests run with global invariant enablement and every companion registered.
+- Ordinary unit, snapshot, and e2e roots run with global invariant enablement and the test package's companion; one exhaustive topology registers every companion.
 - Plugin names used for name-based observation must be unique within one Cordis root; packages may opt into exact callback identity when safe.
 - Pure-package checks sample stable startup contracts. Mutable behavior must use an event, service, or plugin-fiber observer.
-- More companion work runs during tests and selected deployments, trading small startup cost for immediate package-attributed failures.
+- Relevant companion work runs during package tests and selected deployments, trading bounded startup cost for immediate package-attributed failures.
 - The original regex selection, blocklist precedence, registration uniqueness, rollback, disposal, and HMR contracts remain unchanged.

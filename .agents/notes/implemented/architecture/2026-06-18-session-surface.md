@@ -47,7 +47,7 @@ The `repair.ts` module synthesizes `tool/result` closers for orphaned tool calls
 
 ### Invariants
 
-The dev-mode invariants plugin validates: `sourceEventSeqs` references (only `assistant/message` may use an empty list; otherwise no duplicates, references earlier events, and references known seqs) and `surfaceOp` (replace `start ≤ end`, both endpoints are on the tracked surface, the range is non-reversed in surface position, and `sourceEventSeqs` includes every node the range shadows).
+`Session` validates `sourceEventSeqs` and `surfaceOp` at the always-on seed/append boundary: only `assistant/message` may use an empty provenance list; references are unique, earlier, and known; replacement endpoints exist in surface order; and provenance covers every shadowed node. These are single-record acceptance and storage-projection rules, not optional invariant-service contributions.
 
 Every surface-eligible event must carry `surfaceOp` or it would disappear from derived history. Typed `append` overloads enforce this for literal event types; runtime checks in `append` and the seed constructor cover widened unions and loaded logs. Invalid seeds are rejected rather than upgraded under the pre-release format policy.
 
@@ -63,7 +63,6 @@ Every surface-eligible event must carry `surfaceOp` or it would disappear from d
 - **`packages/core/session`**: `surface.ts` (`SurfaceManager`) maintains one ordered seq array for candidate acceptance and live projection; `SessionSurface` is its readonly public view. `SurfaceOp`/`SurfaceIntent` and the top-level session-event fields record how entries join it. `append()` requires a `SurfaceIntent` for surface events, `deriveMessages()` walks the surface as the sole derivation path, and `repair.ts` emits surface-aware closers. The seed constructor rejects a surface-eligible seed event missing its `surfaceOp` marker (see § Invariants).
 - **`packages/core/agent-loop`**: All surface-capable appends pass surface opts. Chunk seqs are collected for `assistant/message` provenance; `tool/call` seqs are captured for `tool/result` provenance.
 - **`packages/session-persistence/session-persistence-sqlite`**: Two new nullable TEXT columns (`source_event_seqs`, `surface_op`) on the `events` table; `SCHEMA_VERSION` bumped (bump-and-reject, no migration).
-- **`packages/support/invariants`**: Surface-related validation rules.
 - **`packages/session-persistence/session-persistence-jsonl`**: No changes required.
 - **`packages/session-persistence/session-persistence`**: Abstract interface unchanged.
 
