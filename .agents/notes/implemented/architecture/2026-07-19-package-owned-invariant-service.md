@@ -10,13 +10,15 @@ Runtime invariant checks span session traces, agent state, scoped dispatch, and 
 
 Deployments also need more than presence or absence of one plugin. A standard composition should carry the known invariant contributions while permitting a global off switch and package-selective diagnostics. Selection must remain stable when a package loads later or reloads under HMR, and disabled contributions must not allow two plugins to claim the same package name silently.
 
+Package ownership must also be exhaustive. Without a mechanical repository rule, a new package can omit the companion, dependency, or publication wiring and remain invisible to diagnostics until a maintainer notices the gap.
+
 ## Decision
 
 ### One registry service, package-owned contributions
 
 `@deepseek-ai/dsh-invariants` is a product-independent Cordis service plugin that registers `ctx.invariants`. It owns configuration, registration uniqueness, child-fiber lifecycle, and package-attributed failures. It imports no session, agent, scope, or agent-loop package and contains none of their checks.
 
-Packages expose diagnostics through optional `./invariant` companion plugins. Their root entrypoints do not import or register diagnostics implicitly, so loading a product package does not change runtime checking or require the invariant service.
+Every workspace package publishes a `./invariant` companion plugin that registers its exact full npm name. A package with no relational check uses a generated ownership-only installer: it reserves the name through the real service boundary but installs no listeners. Package root entrypoints do not import or register diagnostics implicitly, so loading a root package does not change runtime checking or require the invariant service.
 
 ### Configuration and selection
 
@@ -53,7 +55,7 @@ Registration setup is transactional. If an installer fails after registering lis
 
 The former functional-plugin entrypoint and one-argument `InvariantError` constructor are not retained as compatibility surfaces. The repository is pre-release and all call sites move to the service and package-attributed error together.
 
-### Shipped companions
+### Stateful companions and exhaustive ownership
 
 | Companion entry | Registration name | Owned checks |
 |---|---|---|
@@ -62,7 +64,9 @@ The former functional-plugin entrypoint and one-argument `InvariantError` constr
 | `@deepseek-ai/dsh-scope/invariant` | `@deepseek-ai/dsh-scope` | scoped-event carrier presence and subject consistency |
 | `@deepseek-ai/dsh-agent-loop/invariant` | `@deepseek-ai/dsh-agent-loop` | model-request reconstruction |
 
-Each owner contains its source and focused tests. Every companion is a separately bundled `./invariant` export with its own declarations and Loader-safe namespace plugin shape. The service package retains only registry tests.
+These four owners contain stateful checks and focused tests. Every other package carries a generated baseline companion until it gains a relational assertion. Every companion is a separately bundled `./invariant` export with its own declarations and Loader-safe namespace plugin shape; the service package's own companion imports its local service type to avoid a self-dependency.
+
+`verify-package-invariants` discovers every workspace package and rejects missing or stale companion source, foreign or unresolved registration names, missing `./invariant` exports or published files, missing invariant peer/development dependencies and project references, and bundle overrides that omit the companion entry. The generator writes only missing or marked ownership baselines, so a package-owned implementation is never replaced.
 
 ### Scoped-event semantic map
 
@@ -70,7 +74,7 @@ The generated scoped-event subject resolver lives in `dsh-scope`, beside the con
 
 ### Standard composition and SDK output
 
-The standard agent spine mounts the service and all four companion subpaths, forwarding `enabled`, `package_allowlist`, and `package_blocklist` to the service. Generated SDK Cordis composition emits the same entries. A subpath entry adds its installable root npm package rather than treating the subpath as a package name.
+The standard agent spine mounts the service and all four stateful companion subpaths, forwarding `enabled`, `package_allowlist`, and `package_blocklist` to the service. Generated SDK Cordis composition emits the same entries. A subpath entry adds its installable root npm package rather than treating the subpath as a package name.
 
 Workspace constraints recognize the separate invariant bundle, and package exports, project references, build configuration, dependency declarations, and the lockfile describe the same publication surface. Generated config catalogs, module graphs, and API documentation derive from those sources.
 
@@ -80,18 +84,22 @@ Service tests cover defaults, global disablement, allow/block selection, blockli
 
 Composition tests cover standard-spine forwarding and generated SDK entries. Loader tests preserve each companion namespace, while built plain-Node smokes exercise the compiled subpath exports. The scoped-event freshness gate reruns its semantic Program analysis.
 
+Every Vitest configuration loads a test host that mounts an explicitly enabled service and all package companions before an ordinary Cordis root's first plugin. Focused service and owner tests construct their own invariant topology so they can exercise disablement, filtering, rollback, and reload without duplicate ownership. Gate tests also execute every companion's `apply` function and verify that it calls `register` with its manifest name, rather than accepting source text alone.
+
 ## Alternatives considered
 
 - **Keep all checks in `dsh-invariants`.** Rejected because the registry would continue importing every checked product domain, owner changes would require central edits, and package tests would remain detached from the contracts they protect.
 - **Let root package entrypoints register checks implicitly when `ctx.invariants` happens to exist.** Rejected because root behavior would depend on composition order and optional service presence, diagnostics could not be selected independently, and package loading would hide a registration effect outside an explicit companion.
-- **Discover every `invariant.ts` file automatically.** Rejected because filesystem/package discovery is not a runtime ownership contract, makes bundled publication ambiguous, and cannot express explicit Cordis load order or dependency installation.
+- **Discover every `invariant.ts` file automatically at runtime.** Rejected because filesystem/package discovery is not a runtime ownership contract, makes bundled publication ambiguous, and cannot express explicit Cordis load order or dependency installation. Build-time generation, verification, and the test host may enumerate the source tree because they validate repository completeness rather than composing a shipped deployment.
 - **Validate allow/block entries against the currently loaded package set.** Rejected because a zero-match pattern can intentionally target a later or HMR-loaded contribution; current load order must not determine config validity.
 
 ## Consequences
 
 - Product packages own and test their relational assertions while the service stays product-independent.
+- Every package pays the small publication and dependency cost of an invariant companion, including packages whose generated baseline currently installs no listeners.
 - Standard compositions can disable all checks or select package names without changing their plugin tree.
 - Explicit companion entries make diagnostic cost and ownership visible in Cordis config and package exports.
 - One selected contribution adds one child fiber and its listener/state cost; filtered registrations retain only name ownership.
 - Regex sources are deployment configuration and remain fixed until the service reloads.
+- Ordinary Vitest roots install every selected companion, trading extra child fibers during tests for repository-wide invariant coverage and immediate fixture failures.
 - Session storage validation, snapshotting, freezing, provenance, and surface acceptance remain always on and are not affected by invariant selection.
