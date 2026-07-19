@@ -18,10 +18,10 @@ The whole corpus was normalized in the same change that defined the format — t
 - **Header-only normalization** (H1 and Status, bodies untouched) — rejected: the debt markers flagged the *body* genre split, and leaving `Context`/`Decision` beside `Problem`/`Proposal` indefinitely resolves nothing.
 - **No Status line** (the folder already is the status; the three newest pre-format Agent Notes (and the zh counterpart of one) omitted the line) — rejected in favor of keeping a self-describing file: the drift risk that motivated dropping it is neutralized by gating the line against the folder instead.
 - **Dated status** (`Status: implemented (accepted YYYY-MM-DD)`) — rejected: the acceptance date is narrated history the writing rules keep out of docs; the filename carries first-proposed, git carries the rest, and the gate could check a date's format but never its truth.
-- **A bare `# <title>` H1** — rejected: the `Agent Note: ` prefix is the corpus-majority form and self-describes the genre when a file is read outside its tree; the index generator strips it, so index rows are identical either way.
+- **A bare `# <title>` H1** — rejected: the `Agent Note: ` prefix self-describes the genre when a file is read outside its tree, and the format gate prevents it from drifting.
 - **`## What we give up` as the implemented closer** (the README's own phrase for what an Agent Note records) — rejected: it names only costs, and an honest consequences section records what the trade-off bought as well.
 - **Convention without a gate** (write the contract down, enforce by review) — rejected: the slop checklist already outlawed spec-speak in `implemented/` by convention, and nineteen files show what convention alone achieves here.
-- **A standalone `FORMAT.md` contract file** — the first landed home; folded into README.md once the generated index moved out to [INDEX.md](../../INDEX.md): with the tables gone the README regained the room, and one front door carrying layout, classification, and format beats splitting the contract across two files.
+- **A standalone `FORMAT.md` contract file** — rejected because one front door carrying layout, classification, and format is easier to discover and maintain than two contract files.
 
 ## Consequences
 

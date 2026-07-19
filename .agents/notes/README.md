@@ -1,6 +1,6 @@
 # Agent Notes
 
-One kind of design doc lives here. An **Agent Note** records a decision or proposal that shapes this codebase — the *why* and *what we gave up*, the parts code and docs can't carry. The full list is the generated [INDEX.md](INDEX.md); this file is the contract — where Agent Notes live, when to write one, and [the in-file format](#the-file-format).
+One kind of design doc lives here. An **Agent Note** records a decision or proposal that shapes this codebase — the *why* and *what we gave up*, the parts code and docs can't carry. This file is the front door and contract: where Agent Notes live, when to write one, and [the in-file format](#the-file-format).
 
 ## Layout and naming
 
@@ -14,9 +14,11 @@ Every Agent Note has two axes, both encoded in its **path** — `{lifecycle}/{cl
 
 The date in the filename is when the topic was **first proposed** (per git history). Cross-references between Agent Notes use relative markdown links (`[topic](../../implemented/architecture/2026-…-….md)`) — never bare prose or numbers — so they are mechanically checkable and survive moves between folders.
 
+The tree is the inventory: browse its lifecycle/class folders or search the repository. Do not add a centralized `INDEX.md`; the [no-index Agent Note](implemented/process/2026-07-19-remove-generated-agent-note-index.md) owns the rationale.
+
 ## Classification
 
-Each Agent Note belongs to one path-encoded class from the closed set in `scripts/agent-note-index.ts`; the classification gate rejects other folders. [INDEX.md](INDEX.md) is generated from paths, titles, and filename dates, and its freshness is gated. Adding a class requires updating the canonical set and this section. See the [classification](implemented/process/2026-06-20-agent-note-classification.md) and [index-generation](implemented/process/2026-07-04-generate-agent-note-index-tables.md) Agent Notes.
+Each Agent Note belongs to one path-encoded class from the closed set in `scripts/agent-note-tree.ts`; the classification gate rejects other folders. Adding a class requires updating the canonical set and this section. See the [classification Agent Note](implemented/process/2026-06-20-agent-note-classification.md).
 
 | Class | What it covers |
 |---|---|
