@@ -24,7 +24,7 @@ A strong simplification removes, folds, or demotes something real and has clear 
 - A seam has methods every implementation must support but no consumer uses.
 - A package boundary exists only for test/demo/support code and adds publish or dependency overhead.
 - A feature implements speculative product generality: multi-session/session-load, background task rosters, live registry invalidation, mid-turn steering, tool-owned UI rendering, and similar shapes with no product owner.
-- An invariant, rollback path, goldens set, or special-case test exists only to protect an unused surface.
+- An invariant, rollback path, set of expected outputs, or special-case test exists only to protect an unused surface.
 - The simplified behavior may differ slightly, but the new behavior is still reasonable and easier to explain.
 
 Thin candidates are usually not enough for an RFC: deleting one typo, running `knip` once, removing an intentionally documented backend/adapter, or flagging "this looks complex" without call-site proof.
@@ -37,7 +37,7 @@ Use parallel subagents when the user asks for breadth or many candidates. Give e
 - ACP and UI surfaces: `session/*` methods, terminal `_meta`, transcript rendering, single vs multi-session state.
 - LLM/tools/system prompt: stream/generate surfaces, assemblers, registries, tool schema defaults, presentation hooks.
 - Bash and tool execution: foreground/background split, task ownership, output spill files, executor methods.
-- Packages/examples/scripts/tests: package boundaries, static inventories, redundant snapshot goldens, support packages.
+- Packages/examples/scripts/tests: package boundaries, static inventories, redundant snapshot expected outputs, support packages.
 
 If subagents are unavailable, simulate the same breadth yourself. Do not let the first good candidate stop the survey.
 
@@ -54,7 +54,7 @@ For complex asynchronous code, draw the ownership graph and map each sentinel, r
 For every symbol or behavior, classify consumers before writing:
 
 - Production corpus: `packages/*/src`, `examples/*/src`, `examples/**/*.yml`, runtime scripts, and loader/config paths.
-- Non-production corpus: tests, README/docs, RFCs, snapshots, generated goldens, and comments.
+- Non-production corpus: tests, README/docs, RFCs, snapshots, generated expected outputs, and comments.
 - Ambiguous corpus: examples and scripts that may be product smoke paths. Inspect usage before classifying.
 
 Use `rg` first. Good searches include the exact symbol, event name, package name, config key, method name with both `.name(` and `name(`, and any wire strings. Then read the call sites. `knip` can help, but it is not a substitute for understanding public interfaces, dynamic event names, tests, docs, and Cordis loader paths.
