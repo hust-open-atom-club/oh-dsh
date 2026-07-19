@@ -18,7 +18,7 @@ Each new external-process or network tool re-derived the same four things — cl
 
 ### The library surface
 
-Three functions plus one reason type:
+Four functions, one watchdog interface, and one reason type:
 
 ```ts ignore-check
 /** The internal reason attached to a timeout abort, so consumers can classify it after the fact. */
@@ -51,19 +51,34 @@ export function deadline(
   code: string,
 ): { signal: AbortSignal; [Symbol.dispose](): void }
 
+/** A stable signal plus one-at-a-time, timer-guarded async-iterator demand. */
+export interface IdleWatchdog {
+  readonly signal: AbortSignal
+  next<T>(iterator: AsyncIterator<T>): Promise<IteratorResult<T>>
+  [Symbol.dispose](): void
+}
+
+/** Arm only while one iterator `next()` is outstanding, then rearm on later demand. */
+export function idleWatchdog(
+  upstream: AbortSignal | undefined,
+  timeoutMs: number,
+  code: string,
+): IdleWatchdog
+
 /** Recover the TimeoutReason from an aborted signal (or error); `code` scopes the match to this deadline's timer. */
 export function timeoutOf(x: AbortSignal | { reason?: unknown }, code?: string): TimeoutReason | undefined
 ```
 
-`deadline` fuses an upstream signal with a timer through `AbortSignal.any`, adds a typed `TimeoutReason`, and exposes disposable timer cleanup. Non-positive timeouts are an internal no-timeout sentinel for backend-owned background work; external hints pass through `clampTimeout` and must be positive and finite. Without a timer or upstream signal, the function returns a never-aborting signal with the same disposal shape. Providers translate timeout reasons into seam-specific results. `timeoutOf(signal, code)` scopes classification so an outer nested deadline is treated as upstream cancellation rather than the inner capability's timeout.
+`deadline` fuses an upstream signal with a one-shot timer through `AbortSignal.any`, adds a typed `TimeoutReason`, and exposes disposable timer cleanup. Non-positive timeouts are an internal no-timeout sentinel for backend-owned background work; external hints pass through `clampTimeout` and must be positive and finite. Without a timer or upstream signal, the function returns a never-aborting signal with the same disposal shape. `idleWatchdog` instead requires a positive finite interval, keeps one stable fused signal for the entire stream, and arms its timer only while one iterator `next()` is outstanding; resolution disarms it, later demand rearms it, concurrent demand fails, and disposal clears the active arm. Providers translate timeout reasons into seam-specific results. `timeoutOf(signal, code)` scopes classification so an outer nested deadline is treated as upstream cancellation rather than the inner capability's timeout.
 
 ### The division of labor
 
 | Concern | Owner |
 |---|---|
 | Validate request hint and clamp default/max | `dsh-timeout` (`clampTimeout`) — pure arithmetic plus the shared positive-finite request contract |
-| Arm timer, abort on deadline, carry reason, fuse with upstream cancel | `dsh-timeout` (`deadline`) |
-| Clear the timer | `dsh-timeout` (`[Symbol.dispose]`) |
+| Arm one-shot timer, abort on deadline, carry reason, fuse with upstream cancel | `dsh-timeout` (`deadline`) |
+| Arm and rearm only around outstanding iterator demand | `dsh-timeout` (`idleWatchdog`) |
+| Clear the timer | `dsh-timeout` (`[Symbol.dispose]` on either primitive) |
 | Classify the first abort reason after abort | `dsh-timeout` (`timeoutOf`) |
 | **Actually terminate the work** | the capability's implementation |
 | The default/max *values* | the capability's config |
@@ -75,6 +90,7 @@ The signal only *notifies*; termination is always the listener's job, and the li
 
 - **web_fetch** — the tool stays validate-and-forward; the provider's hand-rolled controller + `setTimeout` + manual listener + `finally` + `signal.reason` recovery is replaced by provider-owned `deadline`/`timeoutOf`. A pre-aborted upstream signal still throws `WEB_ABORTED` up front; otherwise `fetch` runs against the fused `d.signal`, and `translateAbortOrNetwork` classifies a thrown error by the signal (`timeoutOf` → `WEB_FETCH_TIMEOUT`, else aborted → `WEB_ABORTED`, else network → `WEB_PROVIDER_ERROR`). The public error-code contract is unchanged, and `TimeoutReason` never crosses the web seam as the public error.
 - **bash** — `resolve()` clamps the request into an explicit spec. Foreground `run()` creates the deadline and passes its signal to process execution, whose existing abort listener performs the process-group kill. The executor classifies the first abort as timeout or cancellation. Background starts remain timeout-free and forward only upstream cancellation.
+- **LLM adapters** — `dsh-llm-deepseek` and `dsh-llm-pi-ai` wrap actual transport iteration with `idleWatchdog`. The five-minute configured interval covers only outstanding provider demand, not time the downstream consumer spends between chunks. The stable signal reaches `fetch` or the SDK for the whole call, so timeout closes the underlying request and maps to `TIMEOUT`, while an earlier caller abort maps to `ABORTED`.
 
 ## Consequences
 
@@ -82,6 +98,7 @@ The signal only *notifies*; termination is always the listener's job, and the li
 - `SpawnSpec.timeoutMs` and `SpawnOutcome.timedOut`/`aborted` were removed rather than kept as always-zero/always-false vestiges: with `runBash` owning no timer and the executor owning classification, they were read nowhere. This is the one deviation from the literal proposal shape (which passed `timeoutMs: 0` into `runBash`); an always-0 field read by nothing is dead weight under the per-file coverage gate.
 - web_fetch shed its bespoke controller/timer/listener/reason-recovery; the classifier now keys off the deadline signal (`timeoutOf` + `aborted`) rather than the thrown error's shape, which is robust across both the request-phase reject-with-reason and the read-phase bare-`AbortError`.
 - `AbortSignal.any` and `using`/`Symbol.dispose` enter the repo for the first time here (Node ≥ 24 baseline, already met).
+- Model streams now share one rearmable timer contract without turning a sliding idle interval into a total-call deadline or charging consumer think time. The primitive still only notifies; adapter tests prove their transports observe its stable signal and terminate.
 
 Out of scope, named to mark the boundary: `web_search` can gain an optional model-facing `timeout_ms` once its tool-schema/snapshot coverage is planned; future ripgrep-backed fs discovery tools can consume the same provider-owned deadline shape once they exist; a `tools/execute` waterfall middleware could arm a default deadline for every tool call by driving `exec.signal` — that would be a plugin that *consumes* this library and still only notifies, the hard kill remaining each capability's job.
 
