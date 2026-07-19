@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-14-typescript-program-backed-semantic-gates.md: 43a7b9b5369feb199721f5f1348c03cde66ee411
-2026-07-14-typescript-program-backed-semantic-gates.zh.md: 1ab027d723e30007e6675ae1f3589fb594d10afc
+2026-07-19-package-owned-invariant-service.md: e8d1f337da3deb1304a97c17850584d864b12536
+2026-07-19-package-owned-invariant-service.zh.md: 988854507828c5df0cbc0fd874d11437de36ca1c

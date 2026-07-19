@@ -1,0 +1,97 @@
+# Agent Note: 包拥有的不变式服务接缝
+
+Status: implemented
+
+[English](2026-07-19-package-owned-invariant-service.md) | 中文
+
+## 问题
+
+运行时不变式检查跨越会话轨迹、agent 状态、作用域 dispatch 和请求重建。如果所有检查都放在一个诊断包中，该包就必须导入彼此无关的产品领域词汇，测试也会离开真正的所有者；任何产品包新增或移除检查时，都要修改中央包。
+
+部署还需要比“是否加载一个插件”更细的控制。标准组合应携带已知的不变式贡献，同时允许全局关闭或按包选择诊断。包稍后加载或在 HMR 下重载时，选择结果必须保持稳定；被过滤的贡献也不能让两个插件静默占用同一个包名。
+
+## 决策
+
+### 一个注册服务，贡献归包所有
+
+`@deepseek-ai/dsh-invariants` 是与产品无关的 Cordis 服务插件，注册 `ctx.invariants`。它只负责配置、注册唯一性、子 fiber 生命周期和带包归属的失败；不导入 session、agent、scope 或 agent-loop 包，也不包含这些包的检查。
+
+各包通过可选的 `./invariant` 伴随插件公开诊断。根入口不会隐式导入或注册诊断，因此加载产品包本身不会改变运行时检查，也不要求不变式服务存在。
+
+### 配置与选择
+
+```ts
+interface Config {
+  enabled?: boolean
+  package_allowlist?: string[]
+  package_blocklist?: string[]
+}
+```
+
+默认值为 `enabled: true`、`package_allowlist: []` 和 `package_blocklist: []`。对完整注册名的选择规则为：
+
+```ts
+export function selected(enabled: boolean, package_allowlist: RegExp[], package_blocklist: RegExp[], packageName: string): boolean {
+  return enabled
+    && (
+      package_allowlist.length === 0
+      || package_allowlist.some(pattern => pattern.test(packageName))
+    )
+    && !package_blocklist.some(pattern => pattern.test(packageName))
+}
+```
+
+blocklist 匹配优先于 allowlist 匹配。每个条目都是区分大小写的 JavaScript 正则表达式源，通过 `new RegExp(pattern)` 编译。除非调用方提供 `^` 与 `$`，否则匹配不锚定；系统不会解析斜杠包围语法或 flags。服务启动会拒绝空白、首尾带空白、无效或同一列表内重复的源。没有匹配当前已加载包的有效源仍然合法，因为注册顺序、稍后加载和 HMR 不应改变配置有效性。
+
+### 注册与失败归属
+
+公开注册边界是 `ctx.invariants.register(packageName, installer)`。即使过滤器禁止安装，它也会为每个完整 npm 包名保留唯一的活跃注册，并返回 effect disposer。卸载伴随插件或服务都会释放注册名及全部贡献状态。
+
+启用的 installer 在服务拥有的独立 Cordis 子 fiber 中运行。`InvariantInstaller.inject` 显式声明该子 fiber 的服务表面；注册服务不携带产品专用依赖元数据。installer 接收绑定后的 `fail(message)` 报告器。调用它会抛出名为 `InvariantError` 的 `Error` 子类，保留稳定代码 `INVARIANT` 并记录注册方 `packageName`；该错误不继承产品包中的错误基类。
+
+注册启动是事务性的。如果 installer 在注册监听器后失败，子 fiber 会完整释放，并在失败向外传播前解除包名占用。被过滤的注册不创建子 fiber，但会保留占用直到 dispose。伴随插件重载时总会从干净的 installer 状态开始；有状态贡献从其所属服务重建基线。
+
+原有函数式插件入口与单参数 `InvariantError` 构造函数不作为兼容表面保留。仓库尚未发布，所有调用方会一起迁移到服务和带包归属的错误。
+
+### 已提供的伴随插件
+
+| 伴随入口 | 注册名 | 所属检查 |
+|---|---|---|
+| `@deepseek-ai/dsh-session/invariant` | `@deepseek-ai/dsh-session` | 会话序号、turn/step 包围关系和同 step 的 call/result 轨迹 |
+| `@deepseek-ai/dsh-agent/invariant` | `@deepseek-ai/dsh-agent` | agent 状态转换 |
+| `@deepseek-ai/dsh-scope/invariant` | `@deepseek-ai/dsh-scope` | scoped event carrier 存在性与主体一致性 |
+| `@deepseek-ai/dsh-agent-loop/invariant` | `@deepseek-ai/dsh-agent-loop` | 模型请求重建 |
+
+每个所有者都保存自己的源码与聚焦测试。每个伴随入口都是单独打包的 `./invariant` export，具有独立声明和对 Loader 安全的命名空间插件形态。服务包只保留注册服务测试。
+
+### Scoped event 语义映射
+
+生成的 scoped event 主体解析表位于 `dsh-scope`，与消费它的契约和不变式相邻。`gen-scoped-events` 使用根 TypeScript Program 枚举 `this: Scoped<Base>` 声明，从真实 `scopeTarget(base, key)` 调用推断路由键类型，并要求唯一、无歧义的 payload 主体或显式 unsupported 标记。提交的运行时映射不导入事件所有者包，因此语义完整性不会扩大服务包或 scope 包的运行时依赖闭包。
+
+### 标准组合与 SDK 输出
+
+标准 agent spine 会挂载服务和四个伴随子路径，并把 `enabled`、`package_allowlist` 与 `package_blocklist` 转发给服务。生成的 SDK Cordis 组合输出相同条目。子路径条目添加可安装的根 npm 包，而不会把子路径误当成包名。
+
+Workspace 约束识别独立的不变式 bundle；包 exports、项目引用、构建配置、依赖声明和 lockfile 描述同一发布表面。生成的配置目录、模块图和 API 文档都从这些源派生。
+
+## 测试
+
+服务测试覆盖默认值、全局关闭、allow/block 选择、blocklist 优先级、锚定与非锚定匹配、大小写敏感、无效配置、零匹配模式、延迟注册、重复所有权、dispose、回滚和 HMR 重新注册。所有者测试把各不变式的正向与负向行为保留在其源码旁边。
+
+组合测试覆盖标准 spine 转发和生成的 SDK 条目。Loader 测试固定每个伴随命名空间，构建后的纯 Node smoke 覆盖编译子路径 export。scoped event 新鲜度门禁会重新执行语义 Program 分析。
+
+## 考虑过的替代方案
+
+- **把所有检查保留在 `dsh-invariants`。** 不予采纳，因为注册包仍要导入所有被检查的产品领域，所有者变更仍需中央编辑，测试也继续远离被保护的契约。
+- **当 `ctx.invariants` 恰好存在时，让根包入口隐式注册检查。** 不予采纳，因为根入口行为会依赖组合顺序与可选服务是否存在，诊断无法独立选择，而且包加载会隐藏一个不在显式伴随插件中的注册 effect。
+- **自动发现所有 `invariant.ts` 文件。** 不予采纳，因为文件系统或包发现不是运行时所有权契约，会让 bundle 发布含义不清，也无法表达显式 Cordis 加载顺序或依赖安装。
+- **根据当前已加载包集合验证 allow/block 条目。** 不予采纳，因为零匹配模式可能有意指向稍后加载或 HMR 加载的贡献；当前加载顺序不能决定配置有效性。
+
+## 后果
+
+- 产品包拥有并测试自己的关系断言，服务保持与产品无关。
+- 标准组合无需改变插件树即可关闭全部检查或按包名选择。
+- 显式伴随条目让诊断成本和所有权在 Cordis 配置与包 export 中可见。
+- 每个选中贡献增加一个子 fiber 及其监听器和状态成本；被过滤注册只保留包名占用。
+- 正则表达式源属于部署配置，在服务重载前保持固定。
+- 会话存储验证、快照、冻结、provenance 与 surface 接受规则始终启用，不受不变式选择影响。
