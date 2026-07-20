@@ -20,7 +20,7 @@ The plugin has no configuration. `maxGoalRounds` is resolved and persisted by `d
 
 ### Reservation and admission
 
-When an agent is idle, has no competing queued work, and its current goal is `active` plus `armed`, the driver checkpoints pending goal mutations and rechecks every predicate after the await. If `roundsStarted` already equals `maxGoalRounds`, it records `budget-limited`. Otherwise it reserves the exact identity `{ goalId, revision, round: roundsStarted + 1 }` and the complete rendered prompt before calling `Agent.send()` with `GoalMessageSource`. The prompt JSON-quotes the objective so multiline or tag-like text remains an unambiguous data value inside the familiar frame.
+When an agent is idle, has no competing queued work, and its current goal is `active` plus `armed`, the driver checkpoints pending goal mutations and rechecks every predicate after the await. If `roundsStarted` already equals `maxGoalRounds`, it records `blocked` with code `round-limit`. Otherwise it reserves the exact identity `{ goalId, revision, round: roundsStarted + 1 }` and the complete rendered prompt before calling `Agent.send()` with `GoalMessageSource`. The prompt JSON-quotes the objective so multiline or tag-like text remains an unambiguous data value inside the familiar frame.
 
 The `agent/prompt-submit` waterfall is the admission fence. A positive goal source is allowed only when it exactly matches the driver's pending identity and content, the live goal still has that id and revision, activation remains armed, and the round is still the next number. The plugin checks once before delegating and again after downstream hooks return. This second check prevents an async hook from editing or pausing the goal while still admitting the old prompt.
 
@@ -40,10 +40,10 @@ The driver classifies one closed goal-owned turn as follows:
 |---|---|
 | durable `completed` | continue while active/armed and under cap |
 | cancellation of a reserved/admitted goal round, or its `aborted` result | pause and disarm |
-| `error` with code `RATE_LIMIT` | mark `usage-limited` |
-| other `error` | block |
-| `max-tokens` | block |
-| non-stale `rejected` | block |
+| `error` with code `RATE_LIMIT` | block with code `usage-limited` |
+| other `error` | block with code `turn-error` |
+| `max-tokens` | block with code `max-tokens` |
+| non-stale `rejected` | block with code `prompt-rejected` |
 | failed durability checkpoint | disarm without changing durable phase |
 | `disposed` or `interrupted` | disarm |
 | plugin-added unknown result | block for inspection |
@@ -70,7 +70,7 @@ An inbox acceptance can win the microtask race immediately before plugin unload 
 
 The unit suite uses the real agent loop and session service with only the model scripted. It covers exact sequential admission and cap enforcement, load/resume inertness, every outcome classification, rate limiting, request errors, max tokens, downstream prompt veto, pre-admission and in-flight cancellation, unrelated-human cancellation, failed-pause fallback, human-input ordering, queued and downstream revision races, forged goal attribution, failed mutation and turn checkpoints including a later one-shot injection, scheduler and custom-agent failures, session-start reset, exact lifecycle retirement, and queued/running plugin teardown. The new driver source has per-file 100% statement, branch, function, and line coverage.
 
-A keyless Loader/stdio process test mounts the real goal domain, goal tools, goal driver, agent loop, persistence, and deterministic adapter through `cordis.yml`. One human turn creates a two-round goal; round one stops normally; round two reads the exact ref and completes it. The external JSONL assertion proves one session, round sources `1, 2`, unchanged round revision, final complete revision, five model steps, and no extra request after the terminal completion tool.
+A keyless ACP snapshot mounts the shipped editor app with the real goal domain, goal tools, goal driver, agent loop, persistence, and replay adapter through `cordis.yml`. One human turn creates and inspects a two-round goal, the first automatic turn stops normally, and ACP cancellation of a deliberately stalled second round records a durable pause. The normalized wire transcript and external JSONL assertions prove one session, round sources `1, 2`, the lifecycle mutation, and exact replay accounting without using `echo-agent` as an application surrogate.
 
 The core cancellation test proves notification order and containment: observers run only for effective cancellation, can queue replacement work before the inbox clear, cannot veto later observers by throwing, and an idle call emits nothing.
 

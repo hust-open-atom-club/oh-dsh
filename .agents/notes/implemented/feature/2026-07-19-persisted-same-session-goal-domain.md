@@ -28,7 +28,7 @@ When `Agent.inject()` defers a mutation inside an active tool batch, the service
 
 At most one goal is current. Create requires no current non-complete goal and always generates a revision-one id not used earlier in the session; a completed goal may be replaced. Every other mutation carries the expected `GoalRef`, and stale ids or revisions reject. Resume accepts a paused or blocked phase, or a disarmed active goal, only when the round cap has remaining capacity. The domain validates blocker reason shape but deliberately leaves reason codes and the decision to block to policy consumers.
 
-A cache built from any seed starts disarmed, and every `agent/session-start` edge disarms it again. Resume and fork therefore preserve the durable objective and history but never initiate work on their own. A later human prompt can be interpreted by the model, whose policy surface may explicitly call resume and arm the goal.
+A cache built from any seed starts disarmed, and every `agent/session-start` edge disarms it again. `GoalService.disarm(agent)` also lets a lifecycle owner remove process-local authority without a session event, revision change, or `goal/changed` notification. Resume, fork, and continuation-driver replacement therefore preserve the durable objective and history but never initiate work on their own. A later human prompt can be interpreted by the model, whose policy surface may explicitly call resume and arm the goal.
 
 ### Service boundary
 
@@ -36,7 +36,7 @@ The service accepts only the exact live `Agent` object registered under its id. 
 
 ## Testing
 
-Unit coverage pins creation defaults, exact-live-agent checks, compare-and-set rejection, every lifecycle transition, blocker reason validation and retention, cap enforcement on resume, clear/replacement, seeded replay and `SessionStore.fork()` inheritance, session-start disarming and active-goal rearming, FIFO deferred mutation reconciliation, reentrant append observation, rejected-injection rollback, stable corrupt-event replay, service/listener disposal, listener containment, backward-clock clamping, strict record decoding, lifecycle continuity, source/content agreement, and sequential round attribution. A keyless Loader/stdio process test mounts the service and a lifecycle consumer through test-only `cordis.yml`, then reads the persisted JSONL externally to verify the model-visible snapshot and absence of an unrequested goal round. The package source is held to the repository's per-file 100% coverage gate.
+Unit coverage pins creation defaults, exact-live-agent checks, compare-and-set rejection, every lifecycle transition, blocker reason validation and retention, cap enforcement on resume, clear/replacement, seeded replay and `SessionStore.fork()` inheritance, session-start and lifecycle-owner disarming, active-goal rearming, FIFO deferred mutation reconciliation, reentrant append observation, rejected-injection rollback, stable corrupt-event replay, service/listener disposal, listener containment, backward-clock clamping, strict record decoding, lifecycle continuity, source/content agreement, and sequential round attribution. A keyless Loader/stdio process test mounts the service and a lifecycle consumer through test-only `cordis.yml`, then reads the persisted JSONL externally to verify the model-visible snapshot and absence of an unrequested goal round. The package source is held to the repository's per-file 100% coverage gate.
 
 ## Alternatives considered
 
