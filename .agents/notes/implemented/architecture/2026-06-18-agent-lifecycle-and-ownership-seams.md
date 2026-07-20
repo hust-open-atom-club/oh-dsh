@@ -12,7 +12,7 @@ Three seams: the queue-aware cancel, the `AgentHandle` disposer, and the bash ow
 
 ### 1. Queue-aware `Agent.cancel(reason?)`
 
-A new `cancel()` verb on the `Agent` interface — the single public stop primitive. (It originally shipped alongside a narrower step-only `abort()`; that verb was later removed as unused, leaving `cancel()` the only public way to stop work.) It clears the inbox's queued + steering FIFOs, aborts the in-flight step if any, and drives a **turn-scoped cancellation marker** the driver loop checks at every turn-decision point — so a prompt that is queued-but-not-yet-started never runs, a cancel landing in the pre-step / continuation window drops the about-to-run turn (ending it `aborted`), and a later prompt cannot be batched into the cancelled turn. `whenIdle()` reaches post-cancel quiescence. ACP `session/cancel` maps to `cancel()`. The marker is armed ONLY when there is something to cancel, so an idle no-op cancel cannot strand the next prompt.
+A new `cancel()` verb on the `Agent` interface — the single public stop primitive. (It originally shipped alongside a narrower step-only `abort()`; that verb was later removed as unused, leaving `cancel()` the only public way to stop work.) It clears the inbox's queued + steering FIFOs, aborts the in-flight step if any, and drives a **turn-scoped cancellation marker** the driver loop checks at every turn-decision point — so a prompt that is queued-but-not-yet-started never runs, a cancel landing in the pre-step / continuation window drops the about-to-run turn (ending it `aborted`), and a later accepted prompt remains an independent queued turn. `whenIdle()` reaches post-cancel quiescence. ACP `session/cancel` maps to `cancel()`. The marker is armed ONLY when there is something to cancel, so an idle no-op cancel cannot strand the next prompt.
 
 ### 2. `AgentHandle` async disposer
 
@@ -29,7 +29,7 @@ Background-task ownership moved from a `tool-bash` plugin-local `Map<string, Age
 These invariants hold and are pinned by tests:
 
 - ACP disconnect/session close leaves no registered agent AND no session-store entry for that session, even when `session/load` races teardown.
-- `session/cancel` before a queued prompt starts prevents that prompt from running and cannot batch the next prompt into the cancelled turn.
+- `session/cancel` before a queued prompt starts prevents that prompt from running; a later accepted prompt remains an independent queued turn.
 - A `tool-bash` HMR reload does NOT make an existing background task readable or killable by a different session (ownership survives on the executor).
 - Existing non-ACP demos still work without managing handles explicitly; config-created agents remain owned by the `AgentLoop` plugin fiber.
 
