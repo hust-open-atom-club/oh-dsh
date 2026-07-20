@@ -1,0 +1,55 @@
+# Agent Note: Explicit turn cancellation capability
+
+Status: implemented
+
+English | [中文](2026-07-16-explicit-turn-cancellation.zh.md)
+
+## Problem
+
+Cancellation is a control capability with a shorter lifetime than an Agent driver. A free-form string cannot distinguish callers exhaustively, and a step-local controller cannot interrupt prompt submission, prompt assembly, continuation, or terminal turn policy. Storing `Error`, `AbortSignal.reason`, or backend-private objects would also expose unstable runtime details to durable replay.
+
+The [initiating Agent scope decision](2026-07-15-agent-initiator-scope.md) intentionally carries only the exact Agent through AsyncLocalStorage. Adding turn, step, or signal state to that driver-lifetime boundary would make stale asynchronous descendants appear to retain authority over later turns. Cancellation therefore needs one turn owner and explicit propagation without creating another ambient context or public turn wrapper.
+
+## Decision
+
+Agent owns the runtime-only `AgentCancelCause` union `{ kind: 'user' } | { kind: 'parent' }`; `agent.cancel()` defaults to `user`. The normalization boundary accepts only an exact ordinary or null-prototype object with one supported `kind`, then returns a detached frozen value for the current turn signal. Strings, extra or symbol fields, unknown kinds, arrays, class instances, `Error`, and `AbortSignal` are rejected synchronously even when the Agent is idle.
+
+An interrupted live turn ends with the coarse durable `{ kind: 'aborted' }` outcome. The terminal event records what happened to the turn, while the runtime signal identifies who requested cancellation; it does not duplicate `user` or `parent` into replay. A future audit requirement uses a separate control-request event so a request and its eventual outcome remain distinct. Durable events contain no stack, signal, error object, free-form cancellation text, or backend-private detail.
+
+AgentLoop privately owns one `TurnCancellation` per prospective turn. It installs the holder before notifying `agent/status = running`, retains its single `AbortController` through prompt processing, prompt assembly, every step, model and tool execution, continuation, `agent/turn-stop`, `turn/end`, and durability flush, then clears it. Every participating method, event, and request value receives that same explicit signal; the next turn receives a fresh signal.
+
+The driver keeps only a cause-less pre-run marker for queued work cancelled before a turn is claimed. It clears the queued and steering work that existed when `cancel()` ran without arming cancellation for future prompts. If a `running` listener synchronously cancels old work and sends a replacement, the driver discards the aborted holder and creates a fresh one for the replacement. Repeated cancellation is first-wins for the active holder, while later calls may still clear newly queued pending work.
+
+The explicit event signatures keep their positional form and place `signal` immediately before a waterfall's final `next`. Prompt submission, request configuration, step-result processing, continuation, and terminal stop join the pre-existing explicit signal seams for pre-step, session prefix, model generation, tool execution, approval, and subagent or workflow requests. `SystemPrompt.assemble()` carries `signal?: AbortSignal` in `AssembleContext` because that object is an explicit request value. Listeners may cooperate with the signal but must not retain it to control another turn.
+
+`ctx.agents` continues to carry only the initiating Agent. Ambient Agent presence does not imply liveness, a current turn, or cancellation authority, and `agentInterruptReasonOf(signal)` reads only its explicit argument. Concurrent Agents isolate both their initiator identities and their turn signals; a child driver shadows the parent initiator while its parent request signal still travels through the subagent seam.
+
+Agent disposal requests the runtime-only `{ kind: 'disposed' }` interruption on the active holder. If cancellation already won the controller reason, the reason cannot be rewritten, so terminal classification first checks lifecycle state: disposed wins, then a supported `user` or `parent` cause becomes the coarse aborted outcome, and unrelated exceptions retain the existing error path. ACP cancellation maps to `user`; in-process spawn and fork propagation map to `parent`. Remote ACP subagents retain their existing wire protocol.
+
+Cancellation remains cooperative. The loop checks interruption before and after awaited boundaries but does not use `Promise.race` to abandon an in-process listener, adapter, or tool Promise. Work that ignores the signal must settle before `whenIdle()`, handle disposal, and scope teardown report quiescence.
+
+## Verification
+
+Contract tests verify strict runtime cause validation, frozen detachment, default and first-wins behavior, the coarse Session JSON round trip, ACP `user`, in-process subagent `parent`, and disposal precedence. Loop tests make cooperative listeners wait on the signal at prompt submission, system-prompt assembly, session prefix, pre-step, request, model stream, step result, tool execution, continuation, and terminal stop; they assert one signal within a turn and a fresh signal across turns.
+
+Initiator-scope tests assert that every hook still observes the exact Agent and no ambient turn signal, concurrent Agents retain independent identities and signals, and a nested child driver shadows only identity. Race tests cover idle cancellation, pre-run cancellation, replacement submission from a `running` listener, repeated cancellation, and cancel-versus-dispose quiescence.
+
+## Alternatives considered
+
+**Store the signal in ALS.** ALS follows asynchronous descendants for the entire driver lifetime, while cancellation authority ends with one turn. A leaked callback could observe a stale signal or require mutable ambient state, so the initiator scope continues to carry only the Agent and control remains explicit.
+
+**Persist a free-form string reason.** Strings admit spelling drift, prevent exhaustive switching, and encourage consumers to parse presentation text. The runtime uses a closed discriminated union, while the terminal record needs only the stable aborted outcome.
+
+**Persist the typed caller cause in `turn/end`.** No production replay, UI, ACP, telemetry, or workflow consumer distinguishes `user` from `parent`. Copying the request source into the terminal result would conflate two facts and add Session-specific validation without a consumer; a future audit surface can record a separate cancellation-request event.
+
+**Define speculative `superseded`, `timeout`, and `shutdown` variants now.** No current Agent cancellation producer implements those semantics. `shutdown` is already lifecycle disposal, and timeout or supersession should enter the union only with an owning policy and unique terminal meaning.
+
+**Expose public turn or step context wrappers.** Existing positional seams already identify Agent, turn, and step. A wrapper would widen every API, duplicate ownership, and tempt callers to treat a captured object as durable authority.
+
+**Abandon uncooperative work after a grace period.** Returning idle while same-process work still runs breaks teardown and resource-ownership guarantees. Hard termination requires a worker or process isolation boundary and is outside this control seam.
+
+## Consequences
+
+Cancellation has one runtime owner, one signal per turn, and one typed runtime caller vocabulary. Session retains the coarse `aborted` outcome that its consumers actually use, stays isolated from runtime objects, and no longer needs cancellation-specific canonicalization. Cooperative cancellation reaches every asynchronous turn seam, including work before the first step and after the last one.
+
+The explicit signal adds parameters to several public events and requires plugins to forward cancellation deliberately. This is intentional: authority is visible at the call boundary, lifetime matches the turn, and stale ambient descendants cannot acquire control. Uncooperative in-process work may delay cancellation, but the reported quiescent state remains truthful.

@@ -14,7 +14,7 @@ The canonical surface separates transformable policy, around-dispatch control, a
 
 **Agent events** (`dsh-agent`):
 - `agent/session-start(agent, source)` — emit, once before turn 1, carrying a `SessionStartSource` (`startup` for a fresh/forked create, `resume` for a reloaded persisted session; `clear`/`compact` reserved). A pure notification — it CANNOT block startup (a deliberate gap: a bridge logs/injects, it does not gate startup). A listener seeds context via `agent.inject()`.
-- `agent/prompt-submit(agent, content, source, next) → PromptDecision` — waterfall, fired for the turn's single claimed queued message before the `user/message` append. `allow` optionally rewrites the prompt `content` or attaches separately sourced `additionalContexts[]`; `block` appends a durable `prompt/blocked` and rejects that zero-step turn.
+- `agent/prompt-submit(agent, content, source, signal, next) → PromptDecision` — waterfall, fired for the turn's single claimed queued message before the `user/message` append. The explicit turn signal is placed before the final `next`; `allow` optionally rewrites the prompt `content` or attaches separately sourced `additionalContexts[]`, while `block` appends a durable `prompt/blocked` and rejects that zero-step turn.
 
 **`agent/turn-continuation`** receives and returns a `ContinuationDecision`. A `{action:'continue', reason?}` may carry model-facing content and source recorded as next-step steering in the same turn — the typed twin of the `/goal` step-end-steer pattern. It is not a `context/message`, so its type does not offer durable context metadata.
 
