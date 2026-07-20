@@ -27,7 +27,7 @@ The central `dsh-invariants` service owns only configuration, registration uniqu
 
 ### Implemented checks
 
-The current 94-package workspace has 18 executable companions and 76 justified empty companions.
+The current 93-package workspace has 18 executable companions and 75 justified empty companions.
 
 | Owner | Runtime relationship |
 |---|---|
