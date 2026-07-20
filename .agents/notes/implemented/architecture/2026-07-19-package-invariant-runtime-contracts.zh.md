@@ -34,9 +34,9 @@ Status: implemented
 | `dsh-session` | 序号严格递增、turn/step 包围关系，以及同一 step 内的工具调用/结果配对。 |
 | `dsh-agent` | agent 状态不得重复，并且不能离开终态 disposed。 |
 | `dsh-scope` | scoped event 必须携带 carrier，且路由 subject 保持一致。 |
-| `dsh-agent-loop` | 从 session 事件日志重建冻结的 loop 请求。 |
+| `dsh-agent-loop` | 从 session 事件日志重建带显式标记的冻结 loop 请求。 |
 | `dsh-llm` | stream block 文法、delta 类型/索引匹配、单次 usage、block 闭合和终止 finish。 |
-| `dsh-llm-retry` | 持久化重试记录指向当前打开 turn 中最近关闭的 step；每个 step 的记录保持唯一，重试次数单调递增，并且重试次数和定时器延迟均保持在边界内。 |
+| `dsh-llm-retry` | 持久化重试记录指向当前打开 turn 中最近关闭的 step；每个 step 的记录保持唯一，重试次数单调递增，并且重试次数和非负的定时器延迟均保持在边界内。 |
 | `dsh-tools` | pre/execute/post 阶段单调推进，以及最终 execution/result 快照不可变。 |
 | `dsh-system-prompt` | 权威 assembly 中 section、tool 和 variable 的数据约束。 |
 | `dsh-compact` | compaction start/summary/end 配对、范围端点、token 数量和成功时必须存在 summary。 |
@@ -49,15 +49,15 @@ Status: implemented
 | `dsh-workflow` | workflow 和 child-agent start/end 事件保持 run metadata、身份、outcome、数量和 error 关系。 |
 | `dsh-tasks` | 当前与终态 task snapshot 保持 id/kind、owner、status 和 timestamp 关系。 |
 | `dsh-tool-todo` | 持久化全量 snapshot 使用唯一且已 trim 的条目、封闭 status，并且最多有一个活动条目。 |
-| `dsh-time-context` | 标注插件来源的时钟 reading 必须匹配 session 当前打开的 turn 和下一个 step 开始前的位置，并在 elapsed baseline、渲染时间和事件时间之间保持一致。 |
+| `dsh-time-context` | 标注插件来源的时钟 reading 必须匹配 session 当前打开的 turn、下一个 step 开始前的位置和 elapsed baseline；渲染时间必须可解析，且不得晚于对应事件。 |
 
 基于 session 的 companion 在加载时从已有持久化事件重建 trace。其他检查观测权威 live event 边界或可变服务结果。如果接受无效事件会提交错误状态，验证就在发布前执行。
 
 ### 仓库门禁与测试
 
-`verify-package-invariants` 发现每个 workspace 包，并强制 companion 源文件、完整名称注册、`./invariant` export、发布文件、依赖、TypeScript reference 和 bundle entry 完整。其 AST 规则拒绝生成标记和没有解释的空安装器。非空安装器必须接收并使用失败报告器，注册时还必须传入该经检查的本地 `install` 函数。门禁不会通过方法名或 helper 调用推断语义质量。
+`verify-package-invariants` 发现每个 workspace 包，并强制 companion 源文件、完整名称注册、仅含具名 export 的 Loader 形状、`./invariant` export、发布文件、依赖、TypeScript reference 和 bundle entry 完整。其 AST 规则拒绝生成标记、默认导出和没有解释的空安装器。非空安装器必须接收并使用失败报告器，注册时还必须传入该经检查的本地 `install` 函数。门禁不会通过方法名或 helper 调用推断语义质量。
 
-Vitest 为每个包测试拓扑使用 `{ enabled: true }` 挂载 `InvariantService`，并加载所有者 companion。不变量 subpath 的 path mapping 会解析源 companion，而不是陈旧的构建输出。聚焦 suite 覆盖每个可执行 companion 的有效和无效观测；穷举拓扑加载全部 companion，以证明注册和释放 wiring。合成事件流的测试必须构造有效的外围生命周期，除非测试本身就是在断言违规。
+Vitest 为每个包测试拓扑使用 `{ enabled: true }` 挂载 `InvariantService`，并加载所有者 companion。不变量 subpath 的 path mapping 会解析源 companion，而不是陈旧的构建输出。聚焦 suite 覆盖每个可执行 companion 的有效和无效观测；穷举拓扑通过真实 Loader 命名空间归一化运行每个源 companion。产物门禁在 plain Node 下导入每个已编译的 `./invariant` 自引用，并重复执行该 Loader 形状检查。合成事件流的测试必须构造有效的外围生命周期，除非测试本身就是在断言违规。
 
 ## 考虑过的替代方案
 
