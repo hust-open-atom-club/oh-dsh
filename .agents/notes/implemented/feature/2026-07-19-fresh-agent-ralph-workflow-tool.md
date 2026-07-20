@@ -40,7 +40,7 @@ The workflow language maps a normally settled but unsuccessful child to `null`. 
 
 The model may supply only `objective` and optional `maxRounds`; provider selection, report schema, handoff cap, and script are deployment-owned. A fixed prompt section says to use `ralph` only when the direct human explicitly asks for Ralph or fresh-agent iteration, and distinguishes it from same-session goals, bounded delegation, and general fan-out workflows. This is guidance rather than a new goal UX state machine.
 
-ACP and terminal presentation use a generic `ralph` card whose raw input is the objective. Successful completion and blocker envelopes say that a worker reported the outcome rather than presenting it as independent certification. The parent transcript retains the original tool call and one bounded successful terminal report or an error, not intermediate child messages. Shipped headless, REPL/TUI, and ACP compositions load the plugin beside the existing workflow engine; JSON-RPC remains unchanged because its default composition does not expose workflows.
+ACP and terminal presentation use a generic `ralph` card whose raw input is the objective. Successful completion and blocker envelopes say that a worker reported the outcome rather than presenting it as independent certification. The parent transcript retains the original tool call and one bounded successful terminal report or an error, not intermediate child messages. Shipped headless, TUI, and ACP compositions load the plugin beside the existing workflow engine; JSON-RPC remains unchanged because its default composition does not expose workflows.
 
 ## Testing
 
