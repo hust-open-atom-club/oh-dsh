@@ -16,9 +16,9 @@ A shared mechanism must remain a UI concern rather than a model tool or agent-lo
 
 ### Registry contract
 
-A `CommandDefinition` contains a lowercase name without `/`, a non-empty description, an optional unstructured-input hint, an optional non-empty surface list, and an abortable handler. Omitted surfaces resolve to `tui` plus `acp`. Registration validates and detaches the metadata, freezes the effective definition, and returns the exact Cordis effect disposer. Duplicate names fail within one layer.
+A `CommandDefinition` contains a lowercase name without `/`, a non-empty description, an optional unstructured-input hint, and an abortable handler. Registration validates and detaches the metadata, freezes the effective definition, and returns the exact Cordis effect disposer. Duplicate names fail within one layer. Every adapter consuming the registry sees every effective definition; a command plugin that cannot operate in a deployment omits its registration there instead of encoding adapter identities in the shared domain.
 
-`list(agent, surface)` returns immutable name-sorted descriptors after surface filtering and scoped shadowing. `find(agent, surface, name)` resolves the effective definition. `execute(agent, surface, line, signal)` parses and runs a visible definition, returning a detached `success` or `error` result; invalid syntax, unknown names, and hidden definitions return `undefined` so the adapter owns its direct error text.
+`list(agent)` returns immutable name-sorted descriptors after scoped shadowing. `find(agent, name)` resolves the effective definition. `execute(agent, line, signal)` parses and runs a known definition, returning a detached `success` or `error` result; invalid syntax and unknown names return `undefined` so the adapter owns its direct error text.
 
 `parseCommand(line)` requires `/` at byte zero, a lowercase ASCII name containing letters, digits, `_`, or `-`, then whitespace or end-of-input. It preserves the complete adapter-delivered suffix as `rawInput`, including separator whitespace. Command-specific plugins own every further grammar decision.
 
@@ -30,13 +30,13 @@ Registration and removal emit the unfiltered, non-vetoing `commands/change` regi
 
 ### Direct dispatch and cancellation
 
-Commands run in a human-only command plane. Their input does not become `user/message`, their output does not become a session event, and neither is sent to the model. A handler receives the exact target agent, surface, raw input, and request-owned `AbortSignal`. The registry stops awaiting an uncooperative handler when the signal aborts; the handler remains responsible for stopping external side effects already started.
+Commands run in a human-only command plane. Their input does not become `user/message`, their output does not become a session event, and neither is sent to the model. A handler receives the exact target agent, raw input, and request-owned `AbortSignal`. The registry stops awaiting an uncooperative handler when the signal aborts; the handler remains responsible for stopping external side effects already started.
 
 Expected handler failures return `CommandResult.error`. Thrown or malformed results remain adapter-visible command failures, not model messages. This boundary deliberately separates UI output from durable domain mutation: a goal command may change `ctx.goals`, for example, but the goal service owns that persisted state.
 
 ### TUI mapping
 
-The TUI registers `help`, `clear`, `cancel`, `reasoning`, `tools`, `redraw`, and `exit` as agent-scoped command definitions instead of switching on strings. Its autocomplete and help view read the live `tui` catalog, so plugin commands appear and disappear with their effects. Any submitted line beginning with `/` stays in the command plane; unknown input produces a terminal warning rather than falling through to `Agent.send()` or `Agent.steer()`.
+The TUI registers `help`, `clear`, `cancel`, `reasoning`, `tools`, `redraw`, and `exit` as agent-scoped command definitions instead of switching on strings. Its autocomplete and help view read the live catalog, so plugin commands appear and disappear with their effects. Any submitted line beginning with `/` stays in the command plane; unknown input produces a terminal warning rather than falling through to `Agent.send()` or `Agent.steer()`.
 
 Each submitted command owns an `AbortController`. TUI disposal aborts outstanding dispatches, removes the local definitions, and waits for the command-producing fiber before completing teardown.
 
@@ -50,7 +50,7 @@ One model prompt or direct command may be in flight per ACP session, independent
 
 ## Testing
 
-The registry suite covers syntax boundaries, immutable normalization, runtime metadata validation, default and explicit surfaces, deterministic sorting, global and scoped shadowing, duplicate rejection, exact disposal, contained change-notification failures, direct invocation, expected and malformed results, synchronous and asynchronous failure, and every abort timing edge at per-file 100% statement, branch, function, and line coverage.
+The registry suite covers syntax boundaries, immutable normalization, runtime metadata validation, deterministic sorting, global and scoped shadowing, duplicate rejection, exact disposal, contained change-notification failures, direct invocation, expected and malformed results, synchronous and asynchronous failure, and every abort timing edge at per-file 100% statement, branch, function, and line coverage.
 
 TUI tests exercise all migrated built-ins, live plugin discovery, help/autocomplete refresh, direct results, unknown-command rejection, raw-input delivery, definition removal, startup rollback, and disposal cancellation. ACP tests use the real SDK connection, agent factory, loop, and JSONL persistence to verify create/load snapshots, dynamic updates, scoped multi-session catalogs, supported-block flattening, direct success/error/failure, unknown-command isolation, cancellation, and the absence of model requests or session messages. The SDK helper suite pins direct-ACP composition. Keyless ACP and terminal snapshots pin the new protocol and rendered transcript shapes.
 
@@ -60,6 +60,7 @@ TUI tests exercise all migrated built-ins, live plugin discovery, help/autocompl
 - **Represent human commands as model tools** — rejected because discovery and direct invocation are human UI behavior; routing through the model adds latency, token cost, and reinterpretation.
 - **Put the registry in the core agent spine** — rejected because headless and JSON-RPC agents do not consume it, while the two UI app bundles can compose it explicitly.
 - **Make `dsh-agent-loop` inject commands** — rejected because the loop does not execute or discover human commands. Agent-scoped producers declare the UI dependency in a child plugin instead.
+- **Attach adapter masks to each definition** — rejected because support is a composition fact, not command-domain state. Every composed adapter exposes a registered command; an incompatible plugin omits registration in that deployment.
 - **Send unknown slash input to the model** — rejected because typoed or unavailable direct actions must fail predictably rather than change execution planes.
 - **Persist generic command input and output** — rejected because adapter notices are not model-visible state. A handler that changes durable behavior calls the owning domain API, which records its own events.
 - **Restrict ACP commands to one text block** — rejected because ACP v1 permits accompanying content; the bridge already has a lossless accepted-block translation.
