@@ -1,13 +1,13 @@
 ---
 name: dsh-translate-docs
-description: Use when creating or updating the bilingual counterpart of a doc in this repo (English ↔ Chinese pairs) — orients the translator to the pairing contract, the terminology source of truth, the translation rules, and the consistency gate that verifies the result
+description: Use when creating or updating the bilingual counterpart of a doc in this repo (English ↔ Chinese pairs) — tells the orchestrating agent when to delegate translation to a subagent, and orients the translator to the pairing contract, the terminology source of truth, the translation rules, and the consistency gate that verifies the result
 ---
 
 # Translating DeepSeek-Harness docs
 
 ## Delegate to a subagent in a worktree
 
-When this skill fires and translations need to be written, do not translate on your current branch: spawn a subagent to do the translation work, give it a dedicated worktree under `.worktrees/` on a fresh branch, and have it open a **draft PR** so a human reviews the translation before it lands. The subagent reads this skill and follows everything below; the sections from here on address the agent actually writing the translation. Exception: a counterpart update owed to an in-flight PR belongs on that PR's branch ([same-PR rule](../../../docs/i18n/README.md)) — the subagent works in that branch's worktree instead of opening a separate PR.
+When this skill fires and translations need to be written, do not translate on your current branch: spawn a subagent to do the translation work, give it a dedicated worktree under `.worktrees/` on a fresh branch, and have it open a **draft PR** so a human reviews the translation before it lands. If you are that delegated subagent — or the counterpart update is owed to an in-flight PR whose branch you already own ([same-PR rule](../../../docs/i18n/README.md#the-gate-verify-translation-pairing)) — skip this section and translate on your current branch; the sections from here on address the agent actually writing the translation.
 
 **This skill is guidance, not a translation memory.** It is the workflow map for keeping `foo.md ↔ foo.zh.md` pairs consistent and natural in both languages. Both languages carry equal authority — a change is authored in either one, and that side is the source for that update. You are the translator: the rules below say what must hold, not how to phrase any particular sentence — phrasing judgment is yours, terminology is not.
 
