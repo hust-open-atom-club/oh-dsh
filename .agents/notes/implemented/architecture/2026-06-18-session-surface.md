@@ -68,3 +68,5 @@ Every surface-eligible event must carry `surfaceOp` or it would disappear from d
 - **`packages/session-persistence/session-persistence`**: Abstract interface unchanged.
 
 The surface is the foundation for future history manipulation. A compaction or tool-result-prune plugin appends one of the existing message-producing event types (a `user/message` carrying the summary, say) with `surfaceOp: { op: 'replace', start, end }` and `sourceEventSeqs` covering the shadowed entries — the new event takes the range's place on the surface while the plugin's own trace events (e.g. `compaction/start`, `compaction/end`) stay off it. Replay preserves the decision deterministically.
+
+A `tool/result` replacement may rewrite exactly one current `tool/result` and must preserve every data field except `content`. Session acceptance enforces this rule together with positional range and provenance validation, independent of optional diagnostic plugins.
