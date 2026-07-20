@@ -10,7 +10,7 @@ The harness needs one internal language for messages that the loop, session log,
 
 Own the vocabulary: messages are arrays of typed content blocks (`text`, `reasoning`, `tool-call`, `tool-result`), with the union derived from the merge-extensible `ContentBlockMap` so plugins add block types via declaration merging. The same merge-extensible-map pattern types every "stringly" field (`MessageSource`, `FinishReason`, `TurnTrigger`, `TurnEndReason`). Streaming is a raw chunk protocol; `BlockAssembler` is the single shared assembly implementation. Adapters translate to provider wire formats — mapping cost lives in adapters, where it belongs.
 
-In-session context injection (`context/message`, `steering/message`) renders as tagged user-role envelopes (the system-reminder pattern) rather than a new role, so adapters carry zero burden. Live-adapter validation confirms this rendering for current DeepSeek behavior; a future provider-specific mismatch belongs in that adapter rather than a new canonical role.
+In-session context injection (`context/message`) renders as a tagged user-role envelope (the system-reminder pattern) rather than a new role, so adapters carry zero burden. Live-adapter validation confirms this rendering for current DeepSeek behavior; a future provider-specific mismatch belongs in that adapter rather than a new canonical role. `steering/message` originally shared the envelope but now projects as plain user content; see [the steering-unwrap Agent Note](../simplification/2026-07-20-unwrap-steering-message-projection.md).
 
 ## Alternatives considered
 
