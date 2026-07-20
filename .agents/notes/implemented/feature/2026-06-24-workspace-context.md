@@ -40,7 +40,7 @@ After a successful first-party `read`, `write`, or `edit` call, the `tools/post-
 
 A content edit appends `Updated instructions from: <path>`, states that the new content replaces the previous content, and includes the complete current file. If precedence changes from one candidate to another, the message also names the previous path and says it no longer applies. If no candidate remains, the plugin appends `Instructions removed: <path>` and states that the previously loaded instructions no longer apply.
 
-Dynamic messages use a raw `context/message` envelope because the plugin owns the complete system-reminder framing. Core context injection therefore supports `envelope: 'raw'`; callers that omit it retain the canonical `<context source="...">` wrapper. `context/message.meta` carries opaque JSON state that is persisted but never rendered to the model.
+Dynamic messages carry their complete system-reminder framing in `content`, and every `context/message` reaches the model verbatim as a user-role message (there is no core wrapper to opt out of). `context/message.meta` carries opaque JSON state that is persisted but never rendered to the model.
 
 Shell commands are not discovery triggers. Local bash calls start fresh shells, and inferring reached paths from arbitrary command strings would require shell semantics the prompt plugin does not own.
 
@@ -76,7 +76,7 @@ There is intentionally no watcher. Detection occurs at the next successful struc
 
 ## Consequences
 
-Workspace guidance is isolated per session and shared by both product front doors and every tool presentation mode. Initial instructions benefit from stable prefix caching, while nested and changed content remains durable and replayable. The generic session/agent context contract includes optional raw framing and JSON metadata, both propagated through prompt-submit and post-tool `additionalContexts` arrays without flattening entries.
+Workspace guidance is isolated per session and shared by both product front doors and every tool presentation mode. Initial instructions benefit from stable prefix caching, while nested and changed content remains durable and replayable. The generic session/agent context contract carries JSON metadata propagated through prompt-submit and post-tool `additionalContexts` arrays without flattening entries.
 
 Repository text remains untrusted input. Lower-authority user-role framing, explicit precedence language, delimiter escaping, and symlink rejection reduce risk but do not eliminate prompt injection. Permission and sandbox layers treat workspace files as data rather than authority.
 
