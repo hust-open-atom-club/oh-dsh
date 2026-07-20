@@ -8,7 +8,7 @@ The assembled system prompt had four defects, all of one family: facts the harne
 
 **The model could not know its own name.** `AgentOptions.model` drives every request, but no prompt text carried it — and nothing COULD carry it: sections in `dsh-system-prompt` were context-global while the model name is per-agent, and `assemble()` took no per-agent input at all.
 
-**Tool guidance was hand-written prose in leaf YAML.** The bash/subagent/todo_write usage guidance lived in the `systemPrompt` strings of `examples/repl-agent/cordis.yml` and `examples/acp-agent/cordis.yml` — two drifting copies (the ACP one was already abridged) — while `dsh-tool-fs` and `dsh-tool-web` owned their guidance as `ctx.systemPrompt.section()` contributions. Loading or dropping a tool plugin meant editing every deployment's persona by hand; both YAMLs carried a `FIXME(config-comments)` apologizing for a symptom of the split, and the stdio welcome banner hand-enumerated the tool set too.
+**Tool guidance was hand-written prose in leaf YAML.** The bash/subagent/todo_write usage guidance lived in the coding-agent and ACP persona strings — two drifting copies (the ACP one was already abridged) — while `dsh-tool-fs` and `dsh-tool-web` owned their guidance as `ctx.systemPrompt.section()` contributions. Loading or dropping a tool plugin meant editing every deployment's persona by hand; both YAMLs carried a `FIXME(config-comments)` apologizing for a symptom of the split, and the old terminal welcome banner hand-enumerated the tool set too.
 
 **The persona rendered after tool guidance.** The loop string-joined `agent.options.systemPrompt` AFTER the assembled sections, so the model read "Use the read tool…" before "You are a coding agent" — backwards relative to the identity-first convention (Claude Code, Codex) and a second composition path besides the section pipeline.
 
@@ -56,7 +56,7 @@ Per-tool semantics and selection guidance live in tool descriptions. Prompt sect
 
 ## Shipped invariants
 
-- The repl-agent prompt renders identity, persona with the interpolated model, then fs/bash/web guidance through one assembly path.
+- The tui-agent prompt renders identity, persona with the interpolated model, then fs/bash/web guidance through one assembly path.
 - Fork and fresh subagent descriptions reflect whether the provider inherits completed conversation turns; the tool appears, disappears, and is reworded with provider lifecycle changes.
 - Unknown, valueless, malformed, or unbalanced variable references name the section and throw; duplicate section, variable, and tool registrations also throw.
 - Snapshot replay is prompt-independent: it keys recorded chunk streams by turn and step without comparing the outgoing request.
