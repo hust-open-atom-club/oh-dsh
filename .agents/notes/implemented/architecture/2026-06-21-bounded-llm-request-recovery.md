@@ -29,7 +29,7 @@ interface LlmFailure {
   message: string
   code: string
   status?: number
-  retryAfterMs?: number
+  providerRetryAfterMs?: number
   requestId?: ProviderRequestId
 }
 ```
@@ -64,7 +64,7 @@ interface Config {
 
 The defaults are two transient retries, a 500 millisecond initial delay, a 10 second delay cap, 10 percent jitter, and the four transient codes above. The count and delay bounds match the conservative edge of the inspected implementations: [OpenCode uses two request retries with 500 ms/10 s bounds](https://github.com/anomalyco/opencode/blob/9976269ab1accfc9f9dc98a4a688c516934de422/%70ackages/llm/src/route/executor.ts#L36-L39), [Pi separates three agent-level retries from provider retries and defaults provider retries to zero](https://github.com/earendil-works/pi/blob/3da591ab74ab9ab407e72ed882600b2c851fae21/%70ackages/coding-agent/docs/settings.md#L139-L147), and [Codex uses finite request/stream budgets plus a five-minute idle timeout](https://github.com/openai/codex/blob/0fb559f0f6e231a88ac02ea002d3ecd248e2b515/codex-rs/model-provider-info/src/lib.rs#L25-L33). Ten percent follows [Codex's bounded jitter](https://github.com/openai/codex/blob/0fb559f0f6e231a88ac02ea002d3ecd248e2b515/codex-rs/codex-client/src/retry.rs#L40-L47). Two retries mean at most three provider requests when no other recovery policy applies. `maxTransientRetries` is a non-negative integer, delays are positive finite numbers with `initialDelayMs <= maxDelayMs`, `jitterRatio` is in `[0, 1]`, and codes are non-empty and unique. These are Cordis config fields rather than hidden constants so deployments can choose different cost and latency budgets.
 
-For an eligible failure with budget remaining, the one-based transient retry count uses bounded exponential backoff. A valid provider `retryAfterMs` replaces exponential backoff only when it does not exceed `maxDelayMs`; a longer provider delay causes delegation instead of an earlier retry that violates the provider instruction. Local backoff multiplies by an injected random factor in `[1 - jitterRatio, 1 + jitterRatio]` and clamps the final value to `maxDelayMs`; provider delay is not jittered.
+For an eligible failure with budget remaining, the one-based transient retry count uses bounded exponential backoff. A valid `providerRetryAfterMs` replaces exponential backoff only when it does not exceed `maxDelayMs`; a longer provider delay causes delegation instead of an earlier retry that violates the provider instruction. Local backoff multiplies by an injected random factor in `[1 - jitterRatio, 1 + jitterRatio]` and clamps the final value to `maxDelayMs`; provider delay is not jittered.
 
 The plugin owns a lifetime `AbortController` and tracks every active backoff callback. Each wait fuses the waterfall's turn signal with that lifetime signal. Effect cleanup first unregisters the listener, then aborts and awaits the active callbacks; a captured callback whose lifetime signal aborts returns `fail` and can neither retry nor enter the rest of its captured waterfall after disposal. This makes HMR disposal quiescent even though Cordis has already captured the listener.
 
