@@ -62,5 +62,5 @@ Unit coverage pins registration and disposal, exclusive scheduling, generated pr
 - Semantic classification of a substantial goal, a request to continue, objective completion, and the same blocking condition remains model judgment. An independent evaluator or completion certificate is deferred.
 - These tools mutate goal state but do not schedule goal rounds, classify abnormal driver stops, or cancel an active turn; the same-session driver owns those behaviors.
 - Goal-round authority is dormant unless a separately mounted continuation driver admits goal-sourced user turns; this tool package never manufactures that authority itself.
-- Human slash-command discovery and rendering are deferred to the command-surface layer.
+- Human slash-command discovery and rendering are owned by the separate [`dsh-command-goal`](../../../../packages/goal/command-goal/README.md) plugin.
 - A scope can hide tool registrations while leaving the independently registered prompt section visible unless the deployment scopes both together.
