@@ -49,9 +49,11 @@ The global registry remains live. A deny-only filter admits a later global name 
 
 The depth limit bounds recursive delegation independently of tool visibility. A top-level agent has depth zero; an in-process child has its parent's validated depth plus one. `maxDepth` is an absolute non-negative safe integer, and a start rejects before child ownership begins when the derived child depth is greater than the cap.
 
-Every public entry validates the domain rather than relying on one model-facing configuration path. Negative values, fractions, negative zero, non-finite values, unsafe integers, malformed stored parent depth, and derived overflow all reject. Omitting the cap leaves depth unbounded by this mechanism.
+The effective parent depth is the greater of durable `SessionHeader.delegationDepth` and runtime `AgentOptions.subagentDepth`. An in-process child records its derived depth in the session header, and resume restores that header, so a restart cannot lower the recursion count.
 
-A deployment can combine depth and filtering. For example, it may keep the delegation tool visible at depth one but set `maxDepth: 1`, or deny the delegation tool entirely in children. Neither choice changes the provider's conversation-history behavior.
+Every public entry validates the domain rather than relying on one model-facing configuration path. Negative values, fractions, negative zero, non-finite values, unsafe integers, malformed stored parent depth, and derived overflow all reject. A direct `SubagentStartRequest` may omit the cap to leave depth unbounded; loader-resolved `dsh-tool-subagent` configuration instead defaults to `3`, accepts a numeric override, and uses explicit `'provider-managed'` to omit the cap for an out-of-process provider whose deployment owns its recursion budget. A numeric tool cap fails at provider mount when the provider lacks `depthLimit`.
+
+A deployment can combine depth and filtering. When a numeric tool cap and `toolFilter` are supported, `dsh-tool-subagent` denies its configured tool name in a child whose derived depth is at the cap; the provider's independent depth check still rejects direct or alternate starts beyond it. A deployment may also deny delegation tools entirely in children. Neither choice changes the provider's conversation-history behavior.
 
 ### Capability gating keeps providers honest
 
