@@ -1,0 +1,39 @@
+# Agent Note: Project canonical documentation into the website
+
+Status: implemented
+
+## Problem
+
+The repository needs a navigable documentation website without turning the website directory into a second documentation source. Copying package guides, architecture pages, or generated catalogs into a site-specific tree allows the two copies to drift, while pointing VitePress directly at the repository root couples public URLs and navigation to the internal file layout. Repository-relative links also need different destinations on the website: published pages stay inside the site, but source files and unpublished contributor documents belong on GitHub.
+
+## Decision
+
+Canonical Markdown remains in the repository tier that owns it. Product-facing guides live under `docs/user/`, generated reference remains in the existing generated catalogs, and architectural and cookbook pages remain at their existing `docs/` paths.
+
+`website/docs.ts` is an explicit publication manifest. Each entry maps one canonical source file to a stable public route, sidebar, section, and order. Adding or removing a published page is therefore a reviewable manifest change rather than an implicit directory crawl.
+
+`scripts/project-doc-site.ts` projects the manifest into the ignored `website/.generated/` directory before VitePress starts or builds. The generated tree follows public routes so VitePress navigation, locale detection, and local search share the same route vocabulary. Each page receives an `editSource` frontmatter field pointing to its canonical repository file; the edit-link callback reads only that page data, so public URLs remain independent of the source layout.
+
+The projector parses Markdown links without reserializing the document. A link to another published source becomes a site-relative route; a link to an unpublished repository file becomes a GitHub source link; a repository image becomes a raw GitHub URL. Missing relative targets fail projection. Unit tests pin these transformations, and `docs:check` runs the projector tests plus a production VitePress build as part of `doc-sync` and the parallel documentation gates.
+
+Mermaid renders the canonical diagrams. The website workspace explicitly declares the five packages that `vitepress-plugin-mermaid` asks Vite to prebundle because pnpm's strict dependency isolation otherwise makes those transitive packages unavailable to the local development server; Knip records this runtime-only use as an intentional dependency exception.
+
+Site publication is separate from site construction. The repository contains local development and build commands, but no hosting or deployment workflow until a public destination is chosen.
+
+## Alternatives considered
+
+**Commit copied Markdown under `website/`.** This makes VitePress setup direct, but every copied guide or API table gains two owners and requires a synchronization convention that cannot identify which copy is authoritative.
+
+**Make `website/` the canonical home for every published page.** This keeps one copy but moves architecture, generated reference, and contributor-facing material away from their repository ownership tiers merely to satisfy a renderer.
+
+**Discover every Markdown file automatically.** This minimizes manifest maintenance but publishes internal documents accidentally, exposes source moves as URL changes, and produces navigation from incidental directory order.
+
+**Use filesystem symlinks.** Symlinks preserve a single source but do not solve public routing or repository-relative links, and their behavior is less predictable across local development, package tooling, and hosted CI environments.
+
+**Build only in a deployment workflow.** A deployment job can reveal rendering failures after merge. Keeping the production build in `doc-sync` makes the same failure visible locally and in ordinary CI even when no public deployment exists.
+
+## Consequences
+
+Documentation facts have one editable home, public routes remain stable across source moves, and the site can include generated references without committing another generated copy. Local development watches canonical inputs and regenerates the disposable projection.
+
+The publication manifest is a maintained allowlist, and link projection adds a small repository-specific build adapter. A new kind of Markdown link behavior needs a projector test. Mermaid support also increases the client bundle size, but preserves diagrams already used by the canonical documentation.
