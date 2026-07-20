@@ -12,9 +12,9 @@ The boundary bought package metadata, workspace and tsconfig references, module-
 
 ## Decision
 
-The helper lives in `@deepseek-ai/dsh-stdio` as the terminal-channel plugin (`packages/ui/stdio/src/index.ts`): `createStdioChat`, its `StdioRuntime` test seam, and its unit tests (`packages/ui/stdio/tests/stdio.spec.ts`, `readline.spec.ts`) moved with it, so EOF handling, rendering, disposal, and piped-vs-TTY behavior stay unit-covered under the per-file coverage gate without hijacking process globals. The module keeps the named `name`/`inject`/`Config`/`apply` export shape — the contract the app's `ctx.plugin(uiStdio, …)` mount consumes — and the keyless Loader-path smokes in `examples/echo-agent` and `examples/repl-agent` keep proving the composed tree boots through the real Loader (the stdio package's plugin-shape unit suite pins the explicit `unwrapExports` assertion, since a bundle without `inject` would boot past a stray default rather than crash).
+At the time, the helper moved into `@deepseek-ai/dsh-stdio` as the terminal-channel plugin. `createStdioChat`, its `StdioRuntime` test seam, and its unit tests moved with it, keeping EOF handling, rendering, disposal, and piped-vs-TTY behavior under the per-file coverage gate without hijacking process globals. The module kept the named `name`/`inject`/`Config`/`apply` export shape consumed by the app mount, while the then-current Echo and REPL Loader smokes proved the composed tree and the plugin-shape suite pinned explicit `unwrapExports` behavior. The superseding removal note above owns the current package and example state.
 
-The `packages/support/ui-stdio` package is gone: manifest, tsconfig references, module-graph rows, and README rows deleted; the doc comments that named the package (the example e2e module docs, `packages/README.md`, the support and todo READMEs, [the ui group README](../../../../packages/ui/README.md)) describe the in-package module.
+The earlier support helper package was removed: its manifest, tsconfig references, module-graph rows, and README rows disappeared, while the remaining documentation described the in-package module.
 
 ## Alternatives considered
 
