@@ -21,7 +21,7 @@ TUI coverage has four complementary layers:
 3. `examples/tui-agent/tests/tui.snapshot.ts` replays committed JSONL session logs through the production agent loop and real tools, then compares the resulting semantic terminal state.
 4. `examples/tui-agent/tests/tui-keyless-smoke.e2e.ts` boots the real Loader composition in a PTY, drives a scripted conversation through streaming and `ask_user_question`, and verifies startup, input, exit, failure reporting, and terminal restoration.
 
-The runnable TUI has its own `examples/tui-agent` leaf beside the readline `repl-agent` and `acp-agent` leaves. It reuses the repl-agent backend and tool composition through an asserted include patch while fixing the shared terminal app to `ui.mode: tui`; TUI snapshots and PTY tests live with that leaf.
+The runnable TUI has its own `examples/tui-agent` leaf beside the Headless and ACP leaves. It owns the interactive coding backends and tools directly and loads `@deepseek-ai/dsh-tui-demo`; TUI snapshots and PTY tests live with that leaf. The [redundant-agent removal](../simplification/2026-07-20-remove-stdio-and-echo-agents.md) owns this consolidation.
 
 ### Recorded-session replay
 
