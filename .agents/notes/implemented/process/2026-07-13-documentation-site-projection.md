@@ -14,6 +14,8 @@ Canonical Markdown remains in the repository tier that owns it. Product-facing g
 
 `scripts/project-doc-site.ts` projects the manifest into the ignored `website/.generated/` directory before VitePress starts or builds. The generated tree follows public routes so VitePress navigation, locale detection, and local search share the same route vocabulary. Each page receives an `editSource` frontmatter field pointing to its canonical repository file; the edit-link callback reads only that page data, so public URLs remain independent of the source layout.
 
+Locale home projections retain only the canonical YAML frontmatter. The repository-facing body can keep its H1 and bilingual source links, while the VitePress home theme owns the rendered hero and features and the site navigation owns locale switching.
+
 The projector parses Markdown links without reserializing the document. A link to another published source becomes a site-relative route; a link to an unpublished repository file becomes a GitHub source link; a repository image becomes a raw GitHub URL. Missing relative targets fail projection. Unit tests pin these transformations, and `docs:check` runs the projector tests plus a production VitePress build as part of `doc-sync` and the parallel documentation gates.
 
 Mermaid renders the canonical diagrams. The website workspace explicitly declares the five packages that `vitepress-plugin-mermaid` asks Vite to prebundle because pnpm's strict dependency isolation otherwise makes those transitive packages unavailable to the local development server; Knip records this runtime-only use as an intentional dependency exception.
