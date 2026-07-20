@@ -27,7 +27,7 @@
 
 ### 已实施的检查
 
-当前 91 个包的 workspace 包含 18 个可执行 companion 和 73 个有理由的空 companion。
+当前 94 个包的 workspace 包含 18 个可执行 companion 和 76 个有理由的空 companion。
 
 | 所有者 | 运行时关系 |
 |---|---|
@@ -40,7 +40,7 @@
 | `dsh-system-prompt` | 权威 assembly 中 section、tool 和 variable 的数据约束。 |
 | `dsh-compact` | compaction start/summary/end 配对、范围端点、token 数量和成功时必须存在 summary。 |
 | `dsh-hook-protocol` | hook invocation/result 的关联、dialect、身份和 duration 约束。 |
-| `dsh-bash` | 持久化 sandbox-mode 事件必须使用封闭的 sandbox-mode 词表。 |
+| `dsh-sandbox-policy` | 持久化 `sandbox/mode` 事件必须使用封闭的 sandbox-mode 词表。 |
 | `dsh-fs` | 文件系统决策/观测事件必须携带可用的 target 和 version 身份。 |
 | `dsh-subagent` | provider add/remove 和 child start/end 事件必须保持身份与配对。 |
 | `dsh-permission` | 持久化 permission 决策必须引用当前 permission 表中的 preset。 |
