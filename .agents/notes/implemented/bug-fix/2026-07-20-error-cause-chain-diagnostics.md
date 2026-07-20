@@ -14,7 +14,7 @@ A TUI run against an unreachable DeepSeek endpoint failed with the single notice
 ## Decision
 
 - `dsh-llm` exports `errorChain(value)`: renders a thrown value with its full `cause` chain (`outer: inner: …`) and AggregateError members (`msg [m1; m2]`), with circular-cause and hostile-coercion containment. It is a diagnostic-surface renderer only; routing stays on `HarnessError.code`.
-- The DeepSeek adapter wraps a pre-response transport failure in `LlmError('NETWORK')` naming the configured `baseURL` and chaining the original `TypeError` as `cause`. An aborted request keeps its `DOMException` so the loop still classifies it as cancellation, not a provider failure.
+- The DeepSeek adapter wraps a pre-response transport failure in `LlmError('TRANSPORT')` naming the configured `baseURL` and chaining the original rejection as `cause`. An aborted request becomes `LlmError('ABORTED')`; because the turn signal is already aborted, the loop still classifies the turn as cancellation rather than recovery.
 - Every diagnostic seam renders through `errorChain` instead of `error.message`/`String(error)`: the agent-loop's durable `turn/end` error message (`errorData`), its logger warnings, the TUI's `agent/error` notice and startup-failure line, and `dsh-stdio`'s startup-failure log lines. The per-package `renderThrown` copies in `dsh-agent-loop`, `dsh-stdio`, and `dsh-tui` are deleted in favor of the one shared renderer.
 - `dsh-stdio` renders failure `turn/end` reasons: `[turn failed <code>] <message>`, `[turn aborted] <reason>`, `[turn rejected] <reason>`, `[turn interrupted by a previous process exit]`, and the output-token-limit notice. Unknown merge-extended kinds fall through as ordinary turn ends.
 
