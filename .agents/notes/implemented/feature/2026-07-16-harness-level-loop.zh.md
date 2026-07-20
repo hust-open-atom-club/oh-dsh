@@ -62,7 +62,7 @@ fork 会话会继承持久目标前缀，因为这是自然的重放结果。for
 
 只有持久的目标来源 `user/message` 会计入一个 Round。过时预留会成为未消耗上限的零 Step 拒绝 Turn。并发目标修订会胜过旧 Round 的结算。
 
-普通 Turn 完成后，只有目标仍活跃、已激活且低于上限时才会安排另一个 Round。取消会暂停。速率限制以代码 `usage-limited` 阻塞；上限耗尽使用 `round-limit`；队列失败使用 `queue-failed`；Turn 错误、max-token 停止、策略拒绝与未知终止结果使用各自对应的阻塞代码。驱动器绝不会在异常结果后凭空发起自动重试。人类随后可以通过普通语言或 `/goal resume` 授权恢复。
+普通 Turn 完成后，只有目标仍活跃、已激活且低于上限时才会安排另一个 Round。取消会暂停。速率限制或配额耗尽以代码 `usage-limited` 阻塞；上限耗尽使用 `round-limit`；队列失败使用 `queue-failed`；Turn 错误、max-token 停止、策略拒绝与未知终止结果使用各自对应的阻塞代码。独立组合的请求恢复插件可以在同一个 Turn 内重试暂时性 provider 失败；目标驱动器绝不会在异常终止结果后凭空发起另一个 Round。人类随后可以通过普通语言或 `/goal resume` 授权恢复。
 
 ### 人类与模型表面
 

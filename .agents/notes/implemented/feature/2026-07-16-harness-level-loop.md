@@ -62,7 +62,7 @@ The goal-round driver owns at most one pending reservation per exact live agent.
 
 Only the durable goal-sourced `user/message` charges a round. Stale reservations become rejected zero-step turns without consuming the cap. A concurrent goal revision wins over settlement from an older round.
 
-Normal turn completion schedules another round only while the goal remains active, armed, and below its cap. Cancellation pauses. Rate limiting blocks with code `usage-limited`; cap exhaustion blocks with `round-limit`; queue failure uses `queue-failed`; turn errors, max-token stops, policy rejection, and unknown terminal results use their corresponding blocker codes. The driver never invents an automatic retry after an abnormal outcome. A human can later authorize resume through ordinary language or `/goal resume`.
+Normal turn completion schedules another round only while the goal remains active, armed, and below its cap. Cancellation pauses. Rate limiting or quota exhaustion blocks with code `usage-limited`; cap exhaustion blocks with `round-limit`; queue failure uses `queue-failed`; turn errors, max-token stops, policy rejection, and unknown terminal results use their corresponding blocker codes. An independently composed request-recovery plugin may retry transient provider failures within that same turn; the goal driver never invents another round after an abnormal terminal outcome. A human can later authorize resume through ordinary language or `/goal resume`.
 
 ### Human and model surfaces
 
