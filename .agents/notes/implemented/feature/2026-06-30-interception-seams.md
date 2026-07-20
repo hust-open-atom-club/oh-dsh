@@ -16,7 +16,7 @@ The canonical surface separates transformable policy, around-dispatch control, a
 - `agent/session-start(agent, source)` — emit, once before turn 1, carrying a `SessionStartSource` (`startup` for a fresh/forked create, `resume` for a reloaded persisted session; `clear`/`compact` reserved). A pure notification — it CANNOT block startup (a deliberate gap: a bridge logs/injects, it does not gate startup). A listener seeds context via `agent.inject()`.
 - `agent/prompt-submit(agent, content, source, next) → PromptDecision` — waterfall, fired per drained queued message inside the open turn, before the `user/message` append. `allow` (optionally rewriting the prompt `content` or attaching separately sourced `additionalContexts[]`) or `block` (dropping the prompt; the loop appends a durable `prompt/blocked` in its place — see the dispatch note below).
 
-**`agent/turn-continuation`** receives and returns a `ContinuationDecision`. A `{action:'continue', reason?}` may carry model-facing content and source recorded as next-step steering in the same turn — the typed twin of the `/goal` step-end-steer pattern. It is not a `context/message`, so its type does not offer a context envelope or durable context metadata.
+**`agent/turn-continuation`** receives and returns a `ContinuationDecision`. A `{action:'continue', reason?}` may carry model-facing content and source recorded as next-step steering in the same turn — the typed twin of the `/goal` step-end-steer pattern. It is not a `context/message`, so its type does not offer durable context metadata.
 
 ### The tool pipeline gives each phase one kind of authority
 
