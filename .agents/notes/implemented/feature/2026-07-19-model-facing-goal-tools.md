@@ -22,13 +22,13 @@ The prompt tells the model that it may infer goal intent from a direct human req
 
 All three tools use exclusive execution so a model-ordered batch observes prior mutations and their new revisions. Results are compact JSON. ACP presentation is a pure function of arguments and uses generic read or mutation cards; activation is reported only as live observation and is never written into replay state.
 
-A successful update that leaves the goal stopped contributes the existing terminal `agent/turn-stop` decision for that physical turn, preventing an unnecessary follow-up request after pause, block, or completion. A later successful resume in the same turn removes that contribution.
+An autonomous goal round that successfully reports completion or blocking contributes the existing terminal `agent/turn-stop` decision for that physical turn, preventing an unnecessary follow-up request. Direct-human mutations do not contribute a terminal stop: the assistant can acknowledge the change, and concurrent human steering remains available to ordinary continuation folding.
 
 ### Execution authority
 
 Every call requires an `exec.agent` that is the exact running object in `AgentRegistry`, is the current inherited driver initiator, and has an open turn. These are execution-time checks and cannot be bypassed by prompt injection or hand-authored tool arguments.
 
-Create, edit, pause, and resume additionally require an accepted user message or user steering event in the current turn of a runtime-root agent. Root ownership is derived from the live agent graph rather than durable fork ancestry: a resumed fork can receive direct human authority, while a live child remains a subagent and cannot mutate these states. The runtime proves provenance, not whether the human's wording semantically warrants creation or resumption; that interpretation remains with the model.
+Create, edit, pause, and resume additionally require an accepted user message or user steering event in the current turn of a runtime-root agent. Root ownership is derived from the live agent graph rather than durable fork ancestry: a resumed fork can receive direct human authority, while a live child remains a subagent and cannot mutate these states. User source is a host attestation: `Agent.send()` and `steer()` default an omitted source to `{ kind: 'user' }`, so non-human producers must label their own content. The runtime proves provenance, not whether the human's wording semantically warrants creation or resumption; that interpretation remains with the model.
 
 Complete and blocked accept either direct-human authority or the exact current goal round. Goal-round authority requires a goal-sourced `user/message` whose goal id, revision, and round all equal the folded current goal. It grants only the two terminal reports. Direct human authority may stop a goal immediately.
 
@@ -38,7 +38,7 @@ Complete and blocked accept either direct-human authority or the exact current g
 
 ## Testing
 
-Unit coverage pins registration and disposal, exclusive scheduling, generated prompt policy, generic presentation, direct-human creation in a non-English turn, exact live-agent and driver checks, root-versus-child authority, steering, mismatched initiators, read/create/edit/pause/resume behavior, rearming after a session-start edge, compare-and-set and argument failures, exact goal-round completion, the configured blocking threshold, and immediate human blocking. A keyless Loader/stdio process test mounts the real goal, tool, loop, and persistence plugins through `cordis.yml`, drives scripted model tool calls, and reads the JSONL externally to verify the model-visible create/pause snapshots, structured tool results, and configured prompt text.
+Unit coverage pins registration and disposal, exclusive scheduling, generated prompt policy, generic presentation, direct-human creation in a non-English turn, exact/stale/non-running agent and driver checks, live-child rejection, resumed-fork root authority, steering, mismatched initiators, read/create/edit/pause/resume behavior, rearming after a session-start edge, authority-before-conditional-argument failures, exact goal-round completion, autonomous-only terminal stopping, the configured blocking threshold, and immediate human blocking. A keyless Loader/stdio process test mounts the real goal, tool, loop, and persistence plugins through `cordis.yml`, drives scripted model tool calls through a human pause and assistant acknowledgment, and reads the JSONL externally to verify the model-visible create/pause snapshots, structured tool results, and configured prompt text.
 
 ## Alternatives considered
 
@@ -61,5 +61,6 @@ Unit coverage pins registration and disposal, exclusive scheduling, generated pr
 
 - Semantic classification of a substantial goal, a request to continue, objective completion, and the same blocking condition remains model judgment. An independent evaluator or completion certificate is deferred.
 - These tools mutate goal state but do not schedule goal rounds, classify abnormal driver stops, or cancel an active turn; the same-session driver owns those behaviors.
+- Goal-round authority is dormant unless a separately mounted continuation driver admits goal-sourced user turns; this tool package never manufactures that authority itself.
 - Human slash-command discovery and rendering are deferred to the command-surface layer.
 - A scope can hide tool registrations while leaving the independently registered prompt section visible unless the deployment scopes both together.
