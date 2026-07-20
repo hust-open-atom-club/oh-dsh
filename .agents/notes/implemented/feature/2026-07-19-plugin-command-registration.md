@@ -26,7 +26,7 @@ A `CommandDefinition` contains a lowercase name without `/`, a non-empty descrip
 
 An unscoped registration is global. A command-injected plugin mounted beneath an agent context inherits that agent's scope key and lifetime, so its definition shadows a same-named global only for that exact agent. The child declares its own `commands` injection because `agent.ctx` intentionally inherits the core agent-loop dependency surface; adding a UI service to the loop merely to enable scoped registration would invert the dependency graph.
 
-Registration and removal emit the unfiltered `commands/change` registry notification. Adapters recompute each live agent's effective view rather than trying to infer which sessions a change affects. Cordis ownership removes definitions when their producer, UI instance, or agent scope unloads, so HMR cannot leave stale discovery entries or handlers.
+Registration and removal emit the unfiltered, non-vetoing `commands/change` registry notification. Adapters recompute each live agent's effective view rather than trying to infer which sessions a change affects. The registry contains and logs each observer failure independently, so a broken UI refresh cannot roll back another plugin's mutation or starve a later observer. Cordis ownership removes definitions when their producer, UI instance, or agent scope unloads, so HMR cannot leave stale discovery entries or handlers.
 
 ### Direct dispatch and cancellation
 
@@ -42,7 +42,7 @@ Each submitted command owns an `AbortController`. TUI disposal aborts outstandin
 
 ### ACP mapping
 
-The bridge follows the current [ACP v1 slash-command contract](https://agentclientprotocol.com/protocol/v1/slash-commands). `session/new` and `session/load` emit the exact agent's full `available_commands_update` snapshot; every registry change emits a replacement snapshot for each live session. Names, descriptions, and optional unstructured-input hints map directly to `AvailableCommand`.
+The bridge follows the current [ACP v1 slash-command contract](https://agentclientprotocol.com/protocol/v1/slash-commands). `session/new` and `session/load` emit the exact agent's full `available_commands_update` snapshot; a new session's RPC response introduces its server-generated id before the snapshot is enqueued. Every registry change emits a replacement snapshot for each live session. Names, descriptions, and optional unstructured-input hints map directly to `AvailableCommand`.
 
 ACP permits a command prompt to contain additional supported content blocks. The bridge applies its ordinary lossless `text` and `resource_link` flattening, then enters the command plane when the result starts with `/`. Unsupported prompt blocks are rejected by the existing capability boundary. Known commands execute directly; unknown or malformed slash input returns a direct error and never reaches the model. Successful text, expected errors, and thrown-failure diagnostics stream as live `agent_message_chunk` output and settle `end_turn`.
 
@@ -50,7 +50,7 @@ One model prompt or direct command may be in flight per ACP session, independent
 
 ## Testing
 
-The registry suite covers syntax boundaries, immutable normalization, default and explicit surfaces, deterministic sorting, global and scoped shadowing, duplicate rejection, exact disposal, change-notification rollback, direct invocation, expected and malformed results, synchronous and asynchronous failure, and every abort timing edge at per-file 100% statement, branch, function, and line coverage.
+The registry suite covers syntax boundaries, immutable normalization, runtime metadata validation, default and explicit surfaces, deterministic sorting, global and scoped shadowing, duplicate rejection, exact disposal, contained change-notification failures, direct invocation, expected and malformed results, synchronous and asynchronous failure, and every abort timing edge at per-file 100% statement, branch, function, and line coverage.
 
 TUI tests exercise all migrated built-ins, live plugin discovery, help/autocomplete refresh, direct results, unknown-command rejection, raw-input delivery, definition removal, startup rollback, and disposal cancellation. ACP tests use the real SDK connection, agent factory, loop, and JSONL persistence to verify create/load snapshots, dynamic updates, scoped multi-session catalogs, supported-block flattening, direct success/error/failure, unknown-command isolation, cancellation, and the absence of model requests or session messages. The SDK helper suite pins direct-ACP composition. Keyless ACP and terminal snapshots pin the new protocol and rendered transcript shapes.
 
