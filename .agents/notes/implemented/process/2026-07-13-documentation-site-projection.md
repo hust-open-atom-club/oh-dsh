@@ -20,7 +20,7 @@ The projector parses Markdown links without reserializing the document. A link t
 
 Mermaid renders the canonical diagrams. The website workspace explicitly declares the five packages that `vitepress-plugin-mermaid` asks Vite to prebundle because pnpm's strict dependency isolation otherwise makes those transitive packages unavailable to the local development server; Knip records this runtime-only use as an intentional dependency exception.
 
-Site publication is separate from site construction. The repository contains local development and build commands, but no hosting or deployment workflow until a public destination is chosen.
+Site publication remains separate from site construction. A dedicated GitHub Actions workflow runs the existing documentation gates, uploads `website/.dist` as a Pages artifact, and deploys only after the build succeeds. `actions/configure-pages` supplies the destination's base path to VitePress at build time, so the private Pages origin, a later public project path, and a custom domain do not require distinct checked-in configurations. Pages visibility remains a repository hosting setting rather than a workflow permission.
 
 ## Alternatives considered
 
@@ -34,8 +34,10 @@ Site publication is separate from site construction. The repository contains loc
 
 **Build only in a deployment workflow.** A deployment job can reveal rendering failures after merge. Keeping the production build in `doc-sync` makes the same failure visible locally and in ordinary CI even when no public deployment exists.
 
+**Hard-code the public project path.** A fixed `/deepseek-harness/` base works for the public project URL but not for the unique origin assigned to a private Pages site or for a future custom domain. Consuming Pages metadata keeps one build contract across those destinations.
+
 ## Consequences
 
-Documentation facts have one editable home, public routes remain stable across source moves, and the site can include generated references without committing another generated copy. Local development watches canonical inputs and regenerates the disposable projection.
+Documentation facts have one editable home, public routes remain stable across source moves, and the site can include generated references without committing another generated copy. Local development watches canonical inputs and regenerates the disposable projection. Merges that affect the documentation site deploy the checked result to Pages, while manual dispatch provides a recovery and validation entry point.
 
 The publication manifest is a maintained allowlist, and link projection adds a small repository-specific build adapter. A new kind of Markdown link behavior needs a projector test. Mermaid support also increases the client bundle size, but preserves diagrams already used by the canonical documentation.
