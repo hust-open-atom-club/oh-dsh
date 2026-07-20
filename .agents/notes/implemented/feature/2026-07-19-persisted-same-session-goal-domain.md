@@ -22,13 +22,13 @@ Every non-clear mutation uses `Agent.inject()` to append a raw, model-visible `c
 
 The replay fold validates JSON shape, source attribution, rendered content, fresh ids, revision continuity, lifecycle transitions, counters, and monotonic per-goal timestamps. Goal rounds are positive sequential `user/message` source numbers for the current active revision and cannot exceed `maxGoalRounds`; ordinary session turns do not affect the counter. A malformed current-format record fails replay rather than being ignored or repaired.
 
-When `Agent.inject()` defers a mutation inside an active tool batch, the service overlays the accepted payload in process memory so a later mutation can use its new revision. Reconciliation removes only an exact matching payload when the FIFO append becomes visible; the durable log remains authoritative after restart.
+When `Agent.inject()` defers a mutation inside an active tool batch, the service overlays the accepted payload in process memory so a later mutation can use its new revision. Reconciliation removes only an exact matching payload when the FIFO append becomes visible; reentrant append observers project each mutation exactly once. Incremental replay advances its cursor after each valid event and remains positioned at the first corrupt event, so later reads report the same durable fault. The durable log remains authoritative after restart.
 
 ### Lifecycle and live activation
 
 At most one goal is current. Create requires no current non-complete goal and always generates a revision-one id not used earlier in the session; a completed goal may be replaced. Every other mutation carries the expected `GoalRef`, and stale ids or revisions reject. Resume accepts a stopped phase or a disarmed active goal only when the round cap has remaining capacity; budget limiting requires the admitted count to have reached the cap.
 
-A cache built from any seed starts disarmed, and every `agent/session-start` edge disarms it again. `GoalService.disarm(agent)` also lets a lifecycle owner remove process-local authority without a session event, revision change, or `goal/changed` notification. Resume, fork, and continuation-driver replacement therefore preserve the durable objective and history but never initiate work on their own. A later human prompt can be interpreted by the model, whose policy surface may explicitly call resume and arm the goal.
+A cache built from any seed starts disarmed, and every `agent/session-start` edge disarms it again. Resume and fork therefore preserve the durable objective and history but never initiate work on their own. A later human prompt can be interpreted by the model, whose policy surface may explicitly call resume and arm the goal.
 
 ### Service boundary
 
@@ -36,7 +36,7 @@ The service accepts only the exact live `Agent` object registered under its id. 
 
 ## Testing
 
-Unit coverage pins creation defaults, exact-live-agent checks, compare-and-set rejection, every lifecycle transition, cap enforcement, clear/replacement, seeded replay and `SessionStore.fork()` inheritance, session-start and lifecycle-owner disarming, active-goal rearming, FIFO deferred mutation reconciliation, listener containment, backward-clock clamping, strict record decoding, lifecycle continuity, source/content agreement, and sequential round attribution. A keyless Loader/stdio process test mounts the service and a lifecycle consumer through test-only `cordis.yml`, then reads the persisted JSONL externally to verify the model-visible snapshot and absence of an unrequested goal round. The package source is held to the repository's per-file 100% coverage gate.
+Unit coverage pins creation defaults, exact-live-agent checks, compare-and-set rejection, every lifecycle transition, cap enforcement, clear/replacement, seeded replay and `SessionStore.fork()` inheritance, session-start disarming and active-goal rearming, FIFO deferred mutation reconciliation, reentrant append observation, rejected-injection rollback, stable corrupt-event replay, service/listener disposal, listener containment, backward-clock clamping, strict record decoding, lifecycle continuity, source/content agreement, and sequential round attribution. A keyless Loader/stdio process test mounts the service and a lifecycle consumer through test-only `cordis.yml`, then reads the persisted JSONL externally to verify the model-visible snapshot and absence of an unrequested goal round. The package source is held to the repository's per-file 100% coverage gate.
 
 ## Alternatives considered
 
@@ -59,4 +59,5 @@ Unit coverage pins creation defaults, exact-live-agent checks, compare-and-set r
 - This domain records state but does not schedule goal rounds, cancel active turns, or classify abnormal stops.
 - The actor that records `complete` or `blocked` is authoritative; an independent evaluator or completion certificate is deferred to a policy consumer.
 - There is one current goal per session; parallel objective graphs and cross-session goal storage are absent.
+- Plugins share one trusted process boundary. Direct session writers can counterfeit goal records; strict replay detects inconsistency and fails goal access at the offending record, but does not isolate plugins or repair the log.
 - `GOAL_CHANGE_VERSION` has no pre-release compatibility promise or migration path.
