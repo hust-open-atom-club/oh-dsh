@@ -1,4 +1,4 @@
-# Agent Note: Give each ordinary send its own turn
+# Agent Note: Remove implicit batching from ordinary sends
 
 Status: implemented
 
@@ -27,6 +27,7 @@ Running `steer()` appends to the active turn's steering FIFO. Idle `steer()` del
 ## Verification
 
 - Unit and property coverage pins same-stack, neighboring-microtask, differently sourced, and reentrant sends as one FIFO-ordered message per turn.
+- A real-composition test pipes two lines through the built stdio binary and observes two model requests and two turn boundaries.
 - A deferred first-turn flush proves the next queued turn cannot start before the checkpoint settles and that its request sees the preceding assistant result; a rejected flush still settles before the next turn starts.
 - Prompt veto and listener failure, broad cancellation, disposal, and pre-commit `turn/start` failure preserve balanced recorded turns and do not merge or strand surviving queued work.
 - Running and idle `steer()`, `inject()`, whole-agent status, and `whenIdle()` retain their existing coverage.
