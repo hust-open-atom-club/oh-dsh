@@ -116,7 +116,7 @@ Two failure paths, both documented:
 - **`SessionEventMap`** gains `compact/start` / `compact/summary` / `compact/end` by declaration merging (merge-extensible); `SurfaceEventType` is **not** touched. These are session events, not cordis `Events`, so the event-taxonomy gate needs no entry.
 - **`dsh-compact`** owns `toolPairingBalancedBefore(session, seq)` and `toolPairingBalancedAfter(session, seq)`, the cached surface-edge checks that `compactRegion` and `compactIfNeeded` use to avoid splitting a tool-call/result pair. The cache validates current membership by seq and answers both edges from one per-cut balance sequence; stale or missing seqs and orphan results reject.
 - **`dsh-session`** validates positional replacement, complete provenance, and content-only single-node `tool/result` rewrites through its one surface manager. `dsh-invariants` treats fresh appended tool results as executions that require an open step and pending call; validated replacements remain turn-enclosed rewrites.
-- **Wiring**: `examples/repl-agent/cordis.yml` loads zero-config `dsh-token-meter`, `dsh-compact-tool-result-prune`, then `dsh-compact-basic`; service-wide defaults make the composition usable without repeated numeric policy.
+- **Wiring**: `examples/tui-agent/cordis.yml` loads zero-config `dsh-token-meter`, `dsh-compact-tool-result-prune`, then `dsh-compact-basic`; service-wide defaults make the composition usable without repeated numeric policy.
 
 ## Testing
 
