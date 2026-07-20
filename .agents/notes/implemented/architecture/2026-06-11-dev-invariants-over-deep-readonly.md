@@ -28,11 +28,11 @@ This guarantee belongs in `Session`, not in an optional listener, because every 
 
 `deriveMessages()` projects logged surface events into detached, deep-frozen `Message` objects and returns a fresh array snapshot. Request assembly can therefore combine derived history with other inputs without exposing a path back into the log. The cache reuses safe immutable projections rather than recloning the complete history for each model call.
 
-### The invariants plugin checks relationships
+### Package-owned invariant companions check relationships
 
-`dsh-invariants` is a pure-listener development plugin. It does not freeze records and has no configuration; disposal removes only its assertions. It checks rules that require trace state or observation of another seam, including monotonic sequence numbers, turn and step nesting, tool-call/result pairing, legal agent-status transitions, subject-correct scoped dispatch, and equality between a loop-built request and the request reconstructed from its session-log prefix.
+`dsh-invariants` registers the configurable `ctx.invariants` service and contains no product checks. Every package publishes a `./invariant` ownership companion; `dsh-session`, `dsh-agent`, `dsh-scope`, and `dsh-agent-loop` currently add the rules that require trace state or observation of another seam: monotonic sequence numbers, turn and step nesting, tool-call/result pairing, legal agent-status transitions, subject-correct scoped dispatch, and equality between a loop-built request and the request reconstructed from its session-log prefix. Global enablement and package-name regex filters belong to the service ([package-owned invariant service](2026-07-19-package-owned-invariant-service.md)).
 
-When the plugin attaches to an existing or seeded session, it replays the immutable log to rebuild trace state. This makes hot reload safe in the middle of a turn without giving the plugin ownership of session storage.
+When the session companion attaches to an existing or seeded session, it replays the immutable log to rebuild trace state. The service gives each contribution a disposable child fiber, so hot reload is safe in the middle of a turn without giving diagnostics ownership of session storage.
 
 ## Alternatives considered
 
@@ -53,6 +53,6 @@ Detaching `deriveMessages()` would protect the most common request path but leav
 - Every accepted live or seeded session event is detached from caller-owned inputs and deeply immutable before any observer can receive it.
 - `session.events` exposes stable immutable snapshots instead of the private growing array.
 - Request-side mutation cannot reach stored history through derived messages.
-- Development builds can enable relational assertions without changing storage behavior, and disposing or omitting the plugin does not weaken log immutability.
-- `dsh-invariants` has no `Config` surface because it has no behavior to tune.
+- Development builds can enable relational assertions without changing storage behavior, and disposing or filtering a companion does not weaken log immutability.
+- `dsh-invariants` configures global enablement plus package allow/block regex lists; each check remains owned and tested by its product package.
 - The runtime boundary carries a recursive snapshot-and-freeze cost once per accepted event; later readers and cached projections reuse the owned immutable records.

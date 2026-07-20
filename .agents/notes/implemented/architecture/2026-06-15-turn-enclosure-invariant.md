@@ -21,7 +21,7 @@ In case 2, if the injected `context/message` is the last event before a flush/di
 - An `agent.inject()` made while the agent is **running** joins the already-open turn. While the current step executes assistant tool calls, accepted context waits in arrival order until that batch settles, then appends after every recorded result and before the turn closes even when execution is interrupted.
 - An `agent.inject()` made while **idle** wraps its `context/message` in a one-shot turn: `turn/start{trigger:{kind:'injection'}}` → `context/message` → `turn/end{completed}`. A new `injection` variant joins the merge-extensible `TurnTriggerMap`.
 - The loop derives the next turn number from the log each iteration (`lastTurnNumber(session) + 1`) instead of keeping a private counter, so an idle injection's one-shot turn cannot collide with the next real turn's number.
-- The `dsh-invariants` plugin **enforces** the invariant in dev: a `user/message` / `context/message` / `steering/message` appended while no turn is open throws an `InvariantError`.
+- The `dsh-session/invariant` companion registers the check with `ctx.invariants`: when selected, a `user/message` / `context/message` / `steering/message` appended while no turn is open throws an `InvariantError` attributed to `@deepseek-ai/dsh-session`.
 
 The serializability invariant is enforced at the same source boundary (`Session.append` throws on non-JSON-serializable data), so "what may enter the log" is now governed in one place rather than discovered downstream by whichever backend happens to be watching.
 

@@ -322,7 +322,7 @@ TypeScript cannot govern JavaScript casts, direct Cordis dispatch, process messa
 
 ### Runtime invariants cover cross-service facts
 
-The invariants plugin verifies that every declared scoped event uses a marked carrier and that event families exposing a subject use the matching key. Session trace validation stages before append commit and advances after the same event commits.
+The `dsh-scope/invariant` companion verifies, when selected, that every declared scoped event uses a marked carrier and that event families exposing a subject use the matching key. The separate `dsh-session/invariant` contribution stages trace validation before append commit and advances after the same event commits; both register through `ctx.invariants`.
 
 The plugin does not police trusted setup by scanning registries or reject prompt assembly objects fabricated through casts. Those checks would turn composition contracts into speculative runtime machinery without protecting a real external boundary.
 
