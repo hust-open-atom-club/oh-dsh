@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-07-19-required-cancellation-through-tool-capability-seams.md: c2cfb09f27222136965058695e9b6b706ac688a9
-2026-07-19-required-cancellation-through-tool-capability-seams.zh.md: b17480e8844f7200d3c100f5f02f69dfad83ad91
+2026-07-19-required-cancellation-through-tool-capability-seams.zh.md: f7a1d303212dfab6da27feba2d6e7195ea07bd50
