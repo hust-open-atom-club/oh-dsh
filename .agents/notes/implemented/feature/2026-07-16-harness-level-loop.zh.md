@@ -35,8 +35,8 @@ Status: implemented
 
 | 包 | 仓库类别 | 所属结构与动词 |
 |---|---|---|
-| `@deepseek-ai/dsh-goal` | `packages/goal/goal/`，领域服务 | 拥有 `GoalId`、比较并交换 `GoalRef`、`GoalSnapshot`、`GoalPhase`、进程本地 `GoalActivation`、重放折叠，以及 `get`、`create`、`edit`、`pause`、`resume`、`complete`、`block`、`markUsageLimited`、`markBudgetLimited`、`clear` 与 `disarm` 动词。 |
-| `@deepseek-ai/dsh-tool-goal` | `packages/goal/tool-goal/`，面向模型消费者 | 注册互斥的 `get_goal`、`create_goal` 与 `update_goal`；认证实时 Turn 来源，并把自治 Round 权限收窄到完成或阻塞报告。 |
+| `@deepseek-ai/dsh-goal` | `packages/goal/goal/`，领域服务 | 拥有 `GoalId`、比较并交换 `GoalRef`、`GoalSnapshot`、四状态 `GoalPhase`、结构化 `GoalBlockReason`、进程本地 `GoalActivation`、重放折叠，以及 `get`、`create`、`edit`、`pause`、`resume`、`complete`、`block`、`clear` 与 `disarm` 动词。 |
+| `@deepseek-ai/dsh-tool-goal` | `packages/goal/tool-goal/`，面向模型消费者 | 注册互斥的 `get_goal`、`create_goal` 与 `update_goal`；认证实时 Turn 来源，并把自治 Round 权限收窄到带机器可路由原因代码的完成或阻塞报告。 |
 | `@deepseek-ai/dsh-goal-session` | `packages/goal/goal-session/`，续行策略 | 在不导入具体 loop 的情况下，预留、设围栏、接纳、归属、结算、取消并静止排空同会话目标回合。 |
 | `@deepseek-ai/dsh-commands` | `packages/ui/commands/`，UI 注册表 | 拥有面向人类专用命令的 `CommandDefinition`、发现、作用域注册、直接分发、`CommandResult` 与请求取消。 |
 | `@deepseek-ai/dsh-command-goal` | `packages/goal/command-goal/`，人类命令生产方 | 为 TUI 和 ACP 注册构建在目标领域之上的 `/goal` 状态、创建、编辑、暂停、恢复与清除。 |
@@ -48,7 +48,7 @@ Status: implemented
 
 一个会话至多有一个当前目标。每次非清除变更都通过 `Agent.inject()` 追加一份完整、带版本且模型可见的目标快照；清除会追加带修订号的墓碑。会话日志是唯一持久事实来源，因此普通持久化、恢复、压缩语义与 `SessionStore.fork()` 会携带目标，无需第二个数据库或人为取消记录。
 
-持久阶段为 `active`、`paused`、`blocked`、`usage-limited`、`budget-limited` 与 `complete`。独立激活态是 `armed` 或 `disarmed`，且永不持久化。创建与显式恢复会激活目标；停止转换、会话启动、fork 重放、驱动器替换和驱动器拆卸都会让目标保持未激活。
+持久阶段只有 `active`、`paused`、`blocked` 与 `complete`。阻塞目标必须携带 `GoalBlockReason`，其中包含稳定的小写 kebab-case `code` 与非空的人类可读 `message`；用量限制、Round 耗尽、模型失败与策略拒绝都是原因代码，而不是额外生命周期阶段。独立激活态是 `armed` 或 `disarmed`，且永不持久化。创建与显式恢复会激活目标；停止转换、会话启动、fork 重放、驱动器替换和驱动器拆卸都会让目标保持未激活。
 
 这种分离让会话恢复可观察且符合直觉。重新打开会话绝不会自行开始目标工作。随后的人类提示词，例如“继续”、“恢复目标”或任何语言中的等价请求，会给运行时根 agent 的模型一个新 Turn；模型可在其中读取目标并调用 `update_goal(..., action: 'resume')`。`/goal resume` 是直接人类命令路径。运行时认证请求来自实时直接人类 Turn；提示策略让模型解释措辞在语义上是否授权创建或恢复。
 
@@ -62,7 +62,7 @@ fork 会话会继承持久目标前缀，因为这是自然的重放结果。for
 
 只有持久的目标来源 `user/message` 会计入一个 Round。过时预留会成为未消耗上限的零 Step 拒绝 Turn。并发目标修订会胜过旧 Round 的结算。
 
-普通 Turn 完成后，只有目标仍活跃、已激活且低于上限时才会安排另一个 Round。取消会暂停；速率限制记录 `usage-limited`；上限耗尽记录 `budget-limited`；其他错误、max-token 停止、策略拒绝和未知终止结果会进入阻塞状态以供检查。驱动器绝不会在异常结果后凭空发起自动重试。人类随后可以通过普通语言或 `/goal resume` 授权恢复。
+普通 Turn 完成后，只有目标仍活跃、已激活且低于上限时才会安排另一个 Round。取消会暂停。速率限制以代码 `usage-limited` 阻塞；上限耗尽使用 `round-limit`；队列失败使用 `queue-failed`；Turn 错误、max-token 停止、策略拒绝与未知终止结果使用各自对应的阻塞代码。驱动器绝不会在异常结果后凭空发起自动重试。人类随后可以通过普通语言或 `/goal resume` 授权恢复。
 
 ### 人类与模型表面
 
@@ -70,7 +70,7 @@ fork 会话会继承持久目标前缀，因为这是自然的重放结果。for
 
 模型只接收 `get_goal`、`create_goal` 和 `update_goal`。当直接人类请求清楚要求大量多 Round 工作时，模型可以创建目标，并且可以从任何语言推断该意图。它不得把日常单 Turn 工作变成目标。直接人类来源由代码强制执行；语义解释仍是模型判断。自治目标 Round 可以为准确当前目标 Round 报告 `complete` 或 `blocked`，但不能编辑、暂停、恢复或替换人类目标。
 
-TUI 与 ACP 默认挂载共享命令注册表和完整目标栈，并通过同一个生产方暴露 `/goal`。无 UI agent spine 要求显式选择加入，以免单次调用方静默变成多 Round 操作。行式 stdio 不消费命令平面；挂载目标栈后，它的普通人类文本仍可授权模型目标工具。
+TUI 与 ACP 默认挂载共享命令注册表和完整目标栈，并通过同一个生产方暴露 `/goal`。每条有效已注册命令都能被每个已组合的命令适配器发现和调用；若插件与某应用不兼容，该应用组合会省略其命令生产方，而不是依赖注册表层面的表面掩码。无 UI agent spine 要求显式选择加入，以免单次调用方静默变成多 Round 操作。行式 stdio 不消费命令平面；挂载目标栈后，它的普通人类文本仍可授权模型目标工具。
 
 ### 全新 agent Ralph 执行
 
@@ -94,7 +94,7 @@ Codex 提供了这里采用的最小可观察目标 UX：一个附着于聊天�
 
 ### 验证
 
-六份所属 Agent Note 记录了单元、集成、进程、快照、取消、重放与构建后运行时覆盖。该栈验证严格目标记录折叠、比较并交换竞争、会话 fork 继承、恢复后未激活、自然语言直接人类权限、可配置上限与阻塞阈值、准确目标回合归属、TUI/ACP 命令发现与 ACP 转录隔离。Ralph 的无密钥真实栈——工作线程引擎、spawn provider、结构化输出运行时与 agent loop——覆盖互不相同且无种子的子 agent、准确有界交接、完成、阻塞与 Round 上限结果、畸形及过大报告、保留上一份有效交接的普通子 agent 失败、单个阶段事件，以及取消后达到子 agent 静止状态。包源码继续受仓库逐文件 100% 覆盖率门禁约束，组装后应用由无密钥重放快照与构建后二进制测试固定。
+六份所属 Agent Note 记录了单元、集成、进程、快照、取消、重放与构建后运行时覆盖。该栈验证严格目标记录折叠、比较并交换竞争、会话 fork 继承、恢复后未激活、自然语言直接人类权限、可配置上限与阻塞阈值、准确目标回合归属、适配器范围的命令发现与转录隔离。已发布的无密钥快照覆盖通过无头应用创建/检查模型目标、通过 ACP 执行多 Round 同会话生命周期与取消、无需模型 Turn 的直接 `/goal` 状态，以及通过无头应用执行两个真实 Ralph Round。Ralph 快照会启动工作线程引擎、spawn provider、结构化输出运行时与 agent loop，随后检查互不相同且无种子的子日志和准确单向有界交接，同时固定父级事件流。聚焦的真实栈测试还覆盖完成、阻塞与 Round 上限结果、畸形及过大报告、保留上一份有效交接的普通子 agent 失败、单个阶段事件，以及取消后达到子 agent 静止状态。包源码继续受仓库逐文件 100% 覆盖率门禁约束，构建后二进制测试覆盖已安装产物解析。实现经验已记录进根测试策略：每项非平凡的模型或人类可见变更都必须在同一 PR 中携带真实示例无密钥快照，而不能依赖包级或 echo-agent 覆盖。
 
 ## 考虑过的替代方案
 
