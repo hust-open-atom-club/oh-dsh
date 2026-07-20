@@ -14,7 +14,7 @@ JSONL lookup selects a physical log from the requested session id across cwd buc
 
 The coordinator independently asserts the returned id and compares the stored cwd with a live session's cwd before repair, state publication, or suffix persistence. It keeps a detached copy of validated metadata; JSONL append and repair derive their path from that copy. The `PersistenceBackend<TornMarker>` interface therefore needs neither a scope-specific live lookup nor a storage-locator type.
 
-The backend supports one live writer per session; another backend instance or process must not mutate that session until the owner finishes disposal and all writes stop.
+An existing configured JSONL root must be a readable directory when the plugin loads. An absent root remains valid and is created on first materialization. The backend supports one live writer per session; another backend instance or process must not mutate that session until the owner finishes disposal and all writes stop.
 
 ## Alternatives considered
 
@@ -26,4 +26,4 @@ The backend supports one live writer per session; another backend instance or pr
 
 ## Consequences
 
-Mismatched, misplaced, and duplicate JSONL logs fail before repair or coordinator state mutation. The cwd-bucket format stays unchanged and needs no migration. Lookup remains proportional to the number of buckets, and one-live-writer ownership remains an explicit limitation. Coordinator and JSONL tests pin rejection before repair, unchanged bytes for both affected logs, path validation during listing, duplicate-id rejection, and cwd collision handling.
+Mismatched, misplaced, and duplicate JSONL logs fail before repair or coordinator state mutation. The cwd-bucket format stays unchanged and needs no migration. Lookup remains proportional to the number of buckets, and one-live-writer ownership remains an explicit limitation. Coordinator and JSONL tests pin rejection before repair, unchanged bytes for both affected logs, path validation during listing, duplicate-id rejection, cwd collision handling, and load-time root validation.

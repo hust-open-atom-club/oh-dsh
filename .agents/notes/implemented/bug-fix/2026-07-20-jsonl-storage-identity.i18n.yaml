@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-20-jsonl-storage-identity.md: c22377834244e5749993952a5fe8018b89130c1c
-2026-07-20-jsonl-storage-identity.zh.md: 8b9a291772ba7e079c06e0d9e3ab9f285ac1ad7e
+2026-07-20-jsonl-storage-identity.md: 1ada16791f411a54fbcf9271c7d7963223bbe683
+2026-07-20-jsonl-storage-identity.zh.md: 8027c51dbf6c7d01463b7851d859a40890bf03e1
