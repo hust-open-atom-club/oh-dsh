@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-07-17-one-send-one-turn.md: 7eec39e1e5b4678c9d454260f326929f4beff6c9
-2026-07-17-one-send-one-turn.zh.md: f28c93929045b3fcb0f2df8ff3c33adfb8a308ae
+2026-07-17-one-send-one-turn.zh.md: dde1530a4e6276769ad0ea00ba7af6aa5714520d

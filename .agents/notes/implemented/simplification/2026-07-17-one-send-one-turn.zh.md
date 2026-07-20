@@ -18,7 +18,7 @@ Status: implemented
 
 提示词准入只处理一条消息。获准提示词成为该轮次的 `user/message`；被阻止提示词追加一条持久的 `prompt/blocked`，并让这个单消息轮次以 `rejected` 结束。实现中没有混合批次或全阻止批次分支。
 
-运行中的 `steer()` 会把消息加入 steering（中途引导）FIFO。打开的轮次会在下一个 steering 检查点、请求或 continuation 决策之前记录该消息。Steering 可以让默认 continuation 决策进入下一步骤，但 continuation 或终止策略仍可在该步骤开始前停止轮次。轮次关闭且其持久性检查点处理结束后，剩余的 steering 会成为后续排队输入。终止性的 `agent/turn-stop`、取消或 dispose（资源释放）可能丢弃该消息。空闲时的 `steer()` 委托给 `send()`，因此创建一个独立的普通队列项。`inject()` 保持现有的轮次封闭与持久化刷新行为。`cancel()`、`status` 和 `whenIdle()` 仍是面向整个 agent 的操作，不变成逐消息控制。
+运行中的 `steer()` 会把消息加入 steering（中途引导）FIFO。打开的轮次会在下一个 steering 检查点记录该消息；该检查点发生在请求或 continuation 决策之前。Steering 可以让默认 continuation 决策进入下一步骤，但 continuation 或终止策略仍可在该步骤开始前停止轮次。轮次关闭且其持久性检查点处理结束后，剩余的 steering 会成为后续排队输入。终止性的 `agent/turn-stop`、取消或 dispose（资源释放）可能丢弃该消息。空闲时的 `steer()` 委托给 `send()`，因此创建一个独立的普通队列项。`inject()` 保持现有的轮次封闭与持久化刷新行为。`cancel()`、`status` 和 `whenIdle()` 仍是面向整个 agent 的操作，不变成逐消息控制。
 
 ## 曾考虑的替代方案
 
