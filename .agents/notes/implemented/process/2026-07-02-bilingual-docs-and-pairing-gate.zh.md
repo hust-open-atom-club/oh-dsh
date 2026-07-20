@@ -13,7 +13,7 @@ Status: implemented
 - **配对兄弟文件，两种语言同权。** 一对文档由三个兄弟文件组成：英文 `foo.md`、中文 `foo.zh.md`，以及一份一致性记录 `foo.i18n.yaml`。没有哪种语言是正典：一篇文档可以先用中文撰写和评审、之后再译成英文，反之亦可；约束配对的是：两侧必须表达相同的内容，且配对整体合并（两种语言加记录，绝不单独落一侧）。政策见 [docs/i18n/README.md](../../../../docs/i18n/README.md)；翻译规则见 [docs/i18n/translation-rules.md](../../../../docs/i18n/translation-rules.md)；术语真源见 [docs/i18n/terminology.md](../../../../docs/i18n/terminology.md)。
 - **伴随记录保存两侧 blob hash，使一致性可检查。** `foo.i18n.yaml` 保存两侧文件在上一次确认一致时各自的完整 git blob hash。此后修改了任一侧而未重新确认配对，都能被机械检测出来（纯内容比较，无需查询历史），而且同一个 PR（Pull Request）内改动的文件也能计算出 hash，commit hash 式的记录做不到这一点。重新记录（`verify-translation-pairing --write`）会产生一份可评审的 yaml diff：确认一致在 PR 中是一个显式、可见的动作。
 - **`verify-translation-pairing` 加入 `doc-sync`。** 门禁（[scripts/verify-translation-pairing.ts](../../../../scripts/verify-translation-pairing.ts)）强制执行以下规则：required 的配对必须存在；任何已存在的配对必须完整（三个文件齐全）且一致（两个 hash 匹配、切换行双向互链、结构签名一致）；被排除的文件（生成物或本身即双语的）不得配对；凡文件名以日期开头且日期不早于 manifest（元数据清单）中 `requiredSince` 分界日期的文档，也必须有完整配对。[scripts/translation-pairing.manifest.json](../../../../scripts/translation-pairing.manifest.json) 中的 `required` 清单只进不退：每个合并的翻译批次将自己的文件加入其中，覆盖面只增不减。
-- **翻译是 agent 的工作，由人评审。** 仓库内置的工作流是 [.agents/skills/dsh-translate-docs](../../../skills/dsh-translate-docs/SKILL.md)，与 [dsh-code-review](../../../skills/dsh-code-review/SKILL.md) 模式相同：skill（技能）承载工作流，并将文档作为真源。
+- **翻译是 agent 的工作，由人评审。** 仓库内置的工作流是 [.agents/skills/dsh-translate-docs](../../../skills/dsh-translate-docs/SKILL.md)，与 [dsh-code-review](../../../skills/dsh-code-review/SKILL.md) 模式相同：skill（技能）承载工作流，并将文档作为真源。该 skill 要求编排 agent 把翻译写作委派给 subagent。
 
 ## 曾考虑的替代方案
 
