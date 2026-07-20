@@ -78,4 +78,4 @@ TUI tests exercise all migrated built-ins, live plugin discovery, help/autocompl
 - Input metadata is ACP's current unstructured text hint. Typed forms, argument schemas, and completion providers remain command-owned or require a later protocol extension.
 - Generic command output is live-only and is not reconstructed after TUI restart or ACP reconnect.
 - Registry cancellation stops awaiting immediately, but external work stops only when a handler cooperates with its signal.
-- The shipped line-oriented `dsh-stdio` and JSON-RPC SDK front doors do not expose the command plane; only TUI and ACP consume it.
+- The headless CLI and JSON-RPC SDK front doors do not expose the command plane; only TUI and ACP consume it.
