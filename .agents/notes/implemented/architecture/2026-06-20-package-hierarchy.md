@@ -2,6 +2,8 @@
 
 Status: implemented
 
+The later [fold-stdio-helper](../simplification/2026-07-04-fold-stdio-ui-helper.md) decision superseded the original `support/ui-stdio` placement, and the [redundant-agent removal](../simplification/2026-07-20-remove-stdio-and-echo-agents.md) subsequently removed that surface entirely. The uniform depth-two hierarchy remains the decision owned here.
+
 ## Problem
 
 `packages/` was flat: 18 packages all sat at `packages/<name>/`, so a package's location said nothing about whether it was core product API, a swappable capability seam, a provider adapter, a product integration, or example/test support. The package README carried a `FIXME(package-hierarchy)` and `scripts/publint-all.ts` a `TODO(package-inventory)` flagging exactly this. Core packages, provider integrations, capability seams, example UI support, and snapshot-only replay support all looked equally foundational.

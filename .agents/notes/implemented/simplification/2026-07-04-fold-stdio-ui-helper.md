@@ -2,6 +2,8 @@
 
 Status: implemented
 
+The later [redundant-agent removal](2026-07-20-remove-stdio-and-echo-agents.md) supersedes this package-placement decision and removes the folded package, app, and line-oriented surface entirely.
+
 ## Problem
 
 The readline UI was a whole package (`@deepseek-ai/dsh-ui-stdio` under `packages/support/`) whose only runtime importer was the app package `@deepseek-ai/dsh-stdio-demo`. The examples reach the readline UI by loading the app, never by composing the helper themselves; every other repo reference was mechanical or descriptive surface that existed BECAUSE the package boundary existed — manifest and tsconfig entries, generated module-graph rows, dependency-graph and README rows, and doc comments naming the package. The ui group README recorded the support placement rationale ("exists chiefly for the examples and the coverage gate — `ui/` is reserved for surfaces shipped as product"), which left a standing tension: a shipped product app depending on a support package documented as NOT product surface.
