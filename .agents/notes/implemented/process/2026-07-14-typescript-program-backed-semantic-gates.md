@@ -38,9 +38,9 @@ Every declared harness event must have a discovered producer. A missing producer
 
 Exactly one match generates a resolver. Multiple matches are ambiguous and fail. Zero matches require `@dshScopeScan unsupported`, which is reserved for events whose routing key intentionally stays outside the payload, such as owner-keyed session events and parent-keyed subagent lifecycle events. The annotation records an unsupported scan; it does not encode an event name, parameter index, property path, or replacement type.
 
-The committed [`scoped-events.generated.ts`](../../../../packages/support/invariants/src/scoped-events.generated.ts) imports every scoped-event owner for its type-side `Events` contributions. Each generated lambda accepts `Parameters<Events[K]>`, and the complete object satisfies a `Record` over the derived `ScopedEventName` union. Ordinary TypeScript compilation therefore checks event existence, parameter position, property access, and scoped-event completeness. The only cast adapts Cordis's runtime `unknown[]` dispatch boundary to the already type-checked resolver.
+The committed [`scoped-events.generated.ts`](../../../../packages/core/scope/src/scoped-events.generated.ts) is a runtime-only map in the package that owns scoped dispatch and imports no event-owner package. Semantic completeness lives in the generator: its root Program enumerates every scoped `Events` declaration and real `scopeTarget` contract, resolves the unique payload path with the checker, and refuses missing, stale, or ambiguous entries before rendering the `unknown[]` runtime boundary.
 
-The invariants plugin consumes this generated runtime map instead of maintaining its own table. Additional event-owner packages are dev dependencies and project references of `dsh-invariants`, not peer dependencies, so the compile-time aggregation does not expand the plugin's runtime closure.
+The `dsh-scope/invariant` companion consumes this map instead of maintaining a handwritten table. Because Program analysis happens in the repository gate rather than through generated type imports, neither `dsh-scope` nor `dsh-invariants` acquires dependencies on every event owner.
 
 ### Semantic gaps fail explicitly
 
@@ -48,7 +48,7 @@ The generators reject missing declarations, config diagnostics, widened or gener
 
 ## Verification
 
-`verify-doc-graphs` freshness-checks semantic producer/listener discovery, and `verify-scoped-events` freshness-checks the generated resolver map. The root TypeScript build compiles the resolver against merged `Events`; workspace constraints and runtime-closure checks ensure its type-only aggregation does not become a deployment dependency.
+`verify-doc-graphs` freshness-checks semantic producer/listener discovery, and `verify-scoped-events` reruns the Program analysis while freshness-checking the generated resolver map. The root TypeScript build compiles its runtime adapter; workspace constraints and runtime-closure checks keep event-owner aggregation out of deployment dependencies.
 
 ## Alternatives considered
 
@@ -58,6 +58,6 @@ The generators reject missing declarations, config diagnostics, widened or gener
 
 - Event relation generation follows semantic receiver identity and closed event values instead of local naming conventions.
 - Scoped-event membership, subject extraction, and runtime invariant coverage come from event declarations and real dispatch contracts rather than handwritten tables.
-- Refactors that change event names, parameter positions, subject properties, or routing-key types fail generation or compilation at the owning contract.
+- Refactors that change event names, parameter positions, subject properties, or routing-key types fail generation at the owning contract.
 - Building a flattened Program costs more startup time and memory than parsing isolated files, and semantic gates depend on a valid root project graph.
 - Generated TypeScript remains committed source: changes to event owners or dispatch shapes must regenerate it and the affected documentation.

@@ -64,7 +64,7 @@ blocklist 匹配优先于 allowlist 匹配。每个条目都是区分大小写�
 | `@deepseek-ai/dsh-scope/invariant` | `@deepseek-ai/dsh-scope` | scoped event carrier 存在性与主体一致性 |
 | `@deepseek-ai/dsh-agent-loop/invariant` | `@deepseek-ai/dsh-agent-loop` | 模型请求重建 |
 
-这四个所有者提供了首批有状态检查。后续运行时契约决策为另外十四个确有事件或可变数据关系的所有者增加检查，并为其余包记录有理由的空 companion。每个伴随入口都是单独打包的 `./invariant` export，具有独立声明和对 Loader 安全的命名空间插件形态；服务包自身的伴随插件导入本地服务类型，避免形成自依赖。
+这四个所有者提供了首批有状态检查。后续运行时契约决策为另外十七个确有事件或可变数据关系的所有者增加检查，并为其余包记录有理由的空 companion。每个伴随入口都是单独打包的 `./invariant` export，具有独立声明和对 Loader 安全的命名空间插件形态；服务包自身的伴随插件导入本地服务类型，避免形成自依赖。
 
 `verify-package-invariants` 会发现每个工作区包，并拒绝缺失的伴随插件源码、生成标记、没有解释的空 installer、缺少或不使用失败报告器的非空 installer、外部或无法解析的注册名、缺失的 `./invariant` export 或发布文件、缺失的不变式对等依赖（peer dependency）、开发依赖及项目引用，以及遗漏伴随入口的自定义构建配置。
 

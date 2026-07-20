@@ -64,7 +64,7 @@ The former functional-plugin entrypoint and one-argument `InvariantError` constr
 | `@deepseek-ai/dsh-scope/invariant` | `@deepseek-ai/dsh-scope` | scoped-event carrier presence and subject consistency |
 | `@deepseek-ai/dsh-agent-loop/invariant` | `@deepseek-ai/dsh-agent-loop` | model-request reconstruction |
 
-These four owners supplied the initial stateful checks. The follow-up runtime-contract decision adds checks for fourteen more owners with real event or mutable-data relationships and records justified empty companions for the rest. Every companion is a separately bundled `./invariant` export with its own declarations and Loader-safe namespace plugin shape; the service package's own companion imports its local service type to avoid a self-dependency.
+These four owners supplied the initial stateful checks. The follow-up runtime-contract decision adds checks for seventeen more owners with real event or mutable-data relationships and records justified empty companions for the rest. Every companion is a separately bundled `./invariant` export with its own declarations and Loader-safe namespace plugin shape; the service package's own companion imports its local service type to avoid a self-dependency.
 
 `verify-package-invariants` discovers every workspace package and rejects missing companion source, generated markers, unexplained empty installers, non-empty installers that omit or ignore the reporter, foreign or unresolved registration names, missing `./invariant` exports or published files, missing invariant peer/development dependencies and project references, and bundle overrides that omit the companion entry.
 
