@@ -24,7 +24,7 @@ The compressed artifact is a standard concatenation of independent [Zstandard fr
 
 Compression uses Node's built-in [`zstdCompress` and `zstdDecompress`](https://nodejs.org/download/release/v22.19.0/docs/api/zlib.html), available at the repository's Node 22.19 floor. The backend enables `ZSTD_c_checksumFlag`, otherwise accepts Node's defaults, and exposes neither a compression-level knob nor a new dependency. The API is marked experimental by Node, so the Node 22.19, 24, and 26 compatibility gate exercises the exact helper.
 
-First materialization compresses the two initial frames before opening the temporary file, then keeps the existing write, file `fsync`, collision-safe hard-link publication, and directory `fsync` sequence. Later batches are compressed before opening the destination and appended at EOF. A caught write or file-sync failure truncates to the prior byte length, syncs the rollback, and rethrows so the coordinator can retry the unchanged batch.
+First materialization compresses the two initial frames before opening the temporary file, then writes and `fsync`s that file. POSIX publishes it through a collision-safe hard link and directory `fsync`; Windows publishes it without replacement through `MoveFileExW(..., MOVEFILE_WRITE_THROUGH)`. Later batches are compressed before opening the destination and appended at EOF. A caught write or file-sync failure closes the append handle, reopens the log read/write, truncates to the prior byte length, syncs the rollback, and rethrows so the coordinator can retry the unchanged batch on both platforms.
 
 ### Read, listing, and crash recovery
 
