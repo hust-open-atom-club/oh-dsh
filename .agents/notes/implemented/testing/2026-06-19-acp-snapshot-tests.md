@@ -40,7 +40,7 @@ Replay is positional and therefore permits only one in-flight model stream per s
 
 ### Recording harvests the log; keyless replay needs a providerless config
 
-Recording runs the scenario with the real `llm-deepseek` adapter and the JSONL persistence backend, then copies the produced `.jsonl` into the scenario dir. Per-event appends are durable, but the harness shuts the subprocess down gracefully (close stdin → `await ctx.dispose()`) before harvesting so the final events are flushed. `llm-replay` itself does no recording — it is replay-only.
+Recording runs the scenario with the real `llm-deepseek` adapter and the JSONL persistence backend configured with `persistenceCompression: 'none'`, then copies the produced `.jsonl` into the scenario dir. The explicit raw mode keeps committed replay fixtures line-readable while ordinary deployments use the backend's compressed default. Per-event appends are durable, but the harness shuts the subprocess down gracefully (close stdin → `await ctx.dispose()`) before harvesting so the final events are flushed. `llm-replay` itself does no recording — it is replay-only.
 
 Replay uses a `cordis.snapshot.yml` overlay that replaces the real adapter with `llm-replay` while retaining the live composition. Recording uses the ordinary config and a harness-supplied persistence root. Replay mode skips `.env` loading, so a stray API key cannot trigger a live call. See the [single-source config Agent Note](2026-07-04-single-source-acp-replay-config.md).
 
