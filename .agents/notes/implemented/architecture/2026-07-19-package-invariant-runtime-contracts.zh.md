@@ -1,65 +1,75 @@
-# Agent Note: 可执行的包不变式契约
+# Agent Note：有意义的包不变量契约
 
-Status: implemented
+状态：已实施
 
 [English](2026-07-19-package-invariant-runtime-contracts.md) | 中文
 
 ## 问题
 
-包拥有的不变式接缝让注册与发布覆盖完整，但生成的基线把包名所有权视为充分条件。空 installer 可以通过仓库门禁，却不观察任何运行时状态，也不拒绝任何无效状态。这样一来，完整计数只能证明接线存在，不能保护包契约。
+包自有不变量接缝让发布和注册实现了全覆盖，但最初的生成基线允许空安装器。后续方案又用针对插件名称、注入、effect、服务方法和固定纯函数示例的通用断言替代这些空实现。这些断言虽然让每个 companion 都能执行，却没有提高系统安全性：TypeScript、Cordis 启动、包测试和模块加载测试已经约束这些形状，而不变量服务应当发现不可能出现的运行时状态。
 
-不同包形态不能使用同一种不变式。Cordis 插件拥有 fiber、注入、effect 与服务；服务接缝允许结构兼容的第三方实现；有状态领域需要事件关系；纯库和 bin 包暴露代数、解析、规范化或入口约束。仓库需要一个可执行的统一义务，同时不能把这些契约重新移回了解产品语义的中央包。
+有用的运行时不变量会关联时间上的多个观测，或关联可变数据结构中的多个部分。例如：终止事件没有对应的开始事件、LLM delta 指向未打开的 block，或持久化结果的身份与请求不同。仅确认声明的方法存在、插件名称符合预期，或常量示例仍返回已知值，都不属于这种关系。
 
-Vitest 会为每个包测试全局挂载其所有者伴随插件，并由一个完整拓扑挂载全部伴随插件。因此伴随模块不能在测试模块建立 hoisted mock 之前急切导入所有产品入口；按名称观察时，也不能把继承父级显示名的匿名子 fiber 误认为包插件本身。
+有些包确实没有可持续观测的关系。纯工具、仅负责组合的包、薄适配器、可执行入口和测试支持包可能仍有重要契约，但类型检查、加载检查、聚焦单元测试或集成测试更适合执行这些契约。强迫这些包添加合成运行时断言，只会让实现围绕通过门禁优化，而不是检测损坏。
 
 ## 决策
 
-### 每个伴随插件都执行包契约
+### 注册必须全覆盖；断言必须有意义
 
-每个工作区包保留独立发布的 `./invariant` 伴随插件和准确 npm 包名注册，但 installer 必须通过绑定的 `fail(message)` 报告器执行至少一个包专属检查。删除所有权基线生成器及其根脚本入口；生成标记、空 installer 和从不引用报告器的 installer 都属于仓库错误。
+每个 workspace 包都发布单独构建的 `./invariant` companion，并用完整 npm 包名注册。companion 只能采用以下两种形式之一：
 
-实现后的契约采用四种形态：
+- 安装包自有的事件流或相关可变数据结构检查，并通过绑定的 `fail(message)` 报告器报告违规；或
+- 使用空安装器，并在其声明前写一条该包专属的 `No runtime invariant:` 注释，说明为什么该包没有合理的运行时关系可供观测。
 
-| 所有者形态 | 运行时契约 |
+空形式是明确的架构结论，不是生成占位符。如果后续包变更引入可变状态或事件协议，就必须用相应检查替换该说明。
+
+中央 `dsh-invariants` 服务只负责配置、注册唯一性、子 fiber 生命周期、回滚、释放和归属到包的失败。它不暴露通用插件形状、服务形状或启动断言 helper，也不导入产品包。
+
+### 已实施的检查
+
+当前 91 个包的 workspace 包含 18 个可执行 companion 和 73 个有理由的空 companion。
+
+| 所有者 | 运行时关系 |
 |---|---|
-| 有状态的 session、agent、scope 与 agent-loop 所有者 | 验证事件顺序、包围关系、状态转换、作用域主体和可重建的模型请求。 |
-| Cordis 插件所有者 | 验证插件自身声明的运行时名称、必要注入、拥有的 effect、提供的服务，以及包专属的全有或全无关系或配置依赖关系。 |
-| Cordis 服务接缝 | 验证当前和未来实现的结构化方法与描述字段表面。 |
-| 纯库、bin 与支持包 | 验证稳定的解析映射、协议优先级、保留与超时代数、路径解析、规范化、环境清理或刻意为空的运行时入口。 |
+| `dsh-session` | 序号严格递增、turn/step 包围关系，以及同一 step 内的工具调用/结果配对。 |
+| `dsh-agent` | agent 状态不得重复，并且不能离开终态 disposed。 |
+| `dsh-scope` | scoped event 必须携带 carrier，且路由 subject 保持一致。 |
+| `dsh-agent-loop` | 从 session 事件日志重建冻结的 loop 请求。 |
+| `dsh-llm` | stream block 文法、delta 类型/索引匹配、单次 usage、block 闭合和终止 finish。 |
+| `dsh-tools` | pre/execute/post 阶段单调推进，以及最终 execution/result 快照不可变。 |
+| `dsh-system-prompt` | 权威 assembly 中 section、tool 和 variable 的数据约束。 |
+| `dsh-compact` | compaction start/summary/end 配对、范围端点、token 数量和成功时必须存在 summary。 |
+| `dsh-hook-protocol` | hook invocation/result 的关联、dialect、身份和 duration 约束。 |
+| `dsh-bash` | 持久化 sandbox-mode 事件必须使用封闭的 sandbox-mode 词表。 |
+| `dsh-fs` | 文件系统决策/观测事件必须携带可用的 target 和 version 身份。 |
+| `dsh-subagent` | provider add/remove 和 child start/end 事件必须保持身份与配对。 |
+| `dsh-permission` | 持久化 permission 决策必须引用当前 permission 表中的 preset。 |
+| `dsh-user-approval` | approval asked/decided 记录按 call 配对，并使用有效 outcome 和 policy。 |
+| `dsh-workflow` | workflow 和 child-agent start/end 事件保持 run metadata、身份、outcome、数量和 error 关系。 |
+| `dsh-tasks` | 当前与终态 task snapshot 保持 id/kind、owner、status 和 timestamp 关系。 |
+| `dsh-tool-todo` | 持久化全量 snapshot 使用唯一且已 trim 的条目、封闭 status，并且最多有一个活动条目。 |
+| `dsh-time-context` | 标注插件来源的时钟 reading 在 turn、step、elapsed baseline、渲染时间和事件时间之间保持一致。 |
 
-实现时覆盖全部 91 个工作区包：四个有状态伴随插件、62 个插件 fiber 伴随插件、八个服务形状伴随插件和 17 个纯库、bin 或支持包伴随插件。
+基于 session 的 companion 在加载时从已有持久化事件重建 trace。其他检查观测权威 live event 边界或可变服务结果。如果接受无效事件会提交错误状态，验证就在发布前执行。
 
-### 与产品无关的观察器
+### 仓库门禁与测试
 
-`observePluginInvariant` 会立即检查已有 fiber，并通过根上下文共享的一对 Cordis 生命周期监听器背后的 callback/名称索引检查未来进入活跃状态的 fiber。安全导入时，契约可以提供准确 callback；否则匹配 `fiber.runtime.name`，即该 fiber 自身插件运行时声明的名称，而不是继承而来的 `fiber.name`，因此匿名 `ctx.inject()` 子级不会被误认成父包。观察器检查必要注入键、递归收集的 effect 标签、由该 fiber 准确提供的服务，以及可选的所有者验证器。依赖配置的包使用对称关系，例如自动压缩要么同时拥有两个监听器，要么在关闭时两个都没有。
+`verify-package-invariants` 发现每个 workspace 包，并强制 companion 源文件、完整名称注册、`./invariant` export、发布文件、依赖、TypeScript reference 和 bundle entry 完整。其 AST 规则拒绝生成标记和没有解释的空安装器。非空安装器必须接收并使用失败报告器。门禁不会通过方法名或 helper 调用推断语义质量。
 
-`observeServiceInvariant` 检查当前服务及之后的每次绑定。`serviceShapeViolation` 以结构方式验证可调用成员和非空字符串描述字段，而不使用 `instanceof`；因此符合契约的第三方后端和完整测试替身有效，不完整替身会失败。
-
-`assertInvariant` 处理包代数。纯包伴随插件返回异步 installer promise，并在子 fiber 启动期间动态导入所有者。服务会等待该 promise 以保证原子回滚，同时允许测试模块、Loader 或部署先建立 mock 和模块解析，再由不变式采样所有者。
-
-### 门禁与测试执行
-
-`verify-package-invariants` 发现每个工作区包，并保留准确注册名、`./invariant` export、发布文件、不变式 peer 与开发依赖、TypeScript 引用和 bundle 入口的发布检查。源码检查还会解析本地 `install` 函数，拒绝生成标记或空函数体，要求第二个失败报告器参数及其使用，并拒绝跨包重复的按名称插件观察器。这些 AST 检查只是最低接收规则，并不宣称源码形状足以证明语义质量。
-
-Vitest setup host 会在普通 Cordis 根上下文启动第一个插件前，以 `{ enabled: true }` 挂载 `InvariantService`，并添加当前测试包的伴随插件。host 会把伴随插件启动加入测试的根级组合边界，因此异步纯检查和插件观察器安装会让测试失败，而不会变成后台诊断。一个完整拓扑会一次挂载全部 91 个伴随插件，以证明运行时注册与覆盖率；选择、生命周期和所有者聚焦套件自行构建启用的不变式拓扑，在避免重复注册的同时继续测试不变式。
-
-辅助测试会拒绝错误插件名、缺失注入、effect、服务或自定义关系、错误服务形状和失败断言。随后，包套件在已有配置与 HMR 路径上激活真实插件。测试专用服务替身必须实现完整的已检查接缝，不能绕过全局不变式。
+Vitest 为每个包测试拓扑使用 `{ enabled: true }` 挂载 `InvariantService`，并加载所有者 companion。不变量 subpath 的 path mapping 会解析源 companion，而不是陈旧的构建输出。聚焦 suite 覆盖每个可执行 companion 的有效和无效观测；穷举拓扑加载全部 companion，以证明注册和释放 wiring。合成事件流的测试必须构造有效的外围生命周期，除非测试本身就是在断言违规。
 
 ## 考虑过的替代方案
 
-- **保留生成的仅声明所有权伴随插件。** 不予采纳，因为没有可执行断言的注册无法拒绝损坏的包，也会让完整门禁产生误导。
-- **为每个包生成一个合成断言。** 不予采纳，因为通用断言仍是在优化如何通过门禁，而不是保护所有者专属契约。
-- **把逐包契约矩阵移入 `dsh-invariants`。** 不予采纳，因为产品导入、词汇和变更所有权会重新回到中央服务。
-- **从伴随插件静态导入每个所有者入口。** 不予采纳，因为所有者测试 host 与完整测试 host 会在 hoisted mock 之前预加载包，发布组合也会支付无关模块初始化成本。
-- **要求第一方服务类身份。** 不予采纳，因为服务接缝是结构化扩展边界；`instanceof` 会拒绝有效的外部实现和测试替身。
-- **从包根入口隐式注册不变式。** 因包拥有服务 RFC 中的组合顺序与隐藏 effect 问题而不予采纳。
+- **保留生成的空 companion。** 拒绝，因为包获得有意义的运行时关系后，没有解释的占位符仍可能继续存在。
+- **要求每个包都执行断言。** 拒绝，因为方法存在性、插件形状和固定示例断言会重复更强的类型、加载和单元测试契约，却没有检查运行时一致性。
+- **在服务中保留通用形状 helper。** 拒绝，因为这会混淆编译期 API 验证和运行时不变量，并鼓励在中央定义产品假设。
+- **把产品检查移入服务。** 拒绝，因为产品词汇、依赖、测试和变更所有权应归属于产生这些数据的包。
+- **从根入口隐式注册 companion。** 拒绝，因为组合顺序和可选服务存在性会产生隐藏 effect。
 
 ## 后果
 
-- 每个包都贡献可执行检查；新增包若没有检查，会在顶层门禁失败。
-- 不变式服务保持与产品无关，同时提供可复用的生命周期与形状观察器。
-- 普通单元、snapshot 与 e2e 根上下文均全局启用不变式并注册当前测试包的伴随插件；一个完整拓扑注册全部伴随插件。
-- 用于按名称观察的插件名在一个 Cordis 根上下文内必须唯一；安全时包可以选择准确 callback 身份。
-- 纯包检查对稳定启动契约采样；可变行为必须使用事件、服务或插件 fiber 观察器。
-- 包测试和被选部署会执行相关伴随工作，以有界启动成本换取即时且带包归属的失败。
-- 原有正则选择、blocklist 优先级、注册唯一性、回滚、dispose 与 HMR 契约保持不变。
+- 每个包都有可见的所有权与发布 wiring，但只有具备合理运行时关系的包才会增加 listener 或 trace 状态。
+- 空 companion 是带包专属说明、可评审的决策；删除说明后门禁会失败。
+- 类型声明、Cordis 可加载性、插件 metadata、服务方法形状和纯代数继续由所属的编译、加载、单元或集成门禁覆盖。
+- 运行时失败会标明所属 npm 包，并指出不一致的观测，而不是复述必要的 API 形状。
+- 原有 selection、blocklist 优先级、重复所有权、回滚、释放和 HMR 服务契约保持不变。
