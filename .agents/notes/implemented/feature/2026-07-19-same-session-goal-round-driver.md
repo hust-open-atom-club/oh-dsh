@@ -40,7 +40,7 @@ The driver classifies one closed goal-owned turn as follows:
 |---|---|
 | durable `completed` | continue while active/armed and under cap |
 | cancellation of a reserved/admitted goal round, or its `aborted` result | pause and disarm |
-| `error` with code `RATE_LIMIT` | block with code `usage-limited` |
+| `error` with code `RATE_LIMIT` or `QUOTA` | block with code `usage-limited` |
 | other `error` | block with code `turn-error` |
 | `max-tokens` | block with code `max-tokens` |
 | non-stale `rejected` | block with code `prompt-rejected` |

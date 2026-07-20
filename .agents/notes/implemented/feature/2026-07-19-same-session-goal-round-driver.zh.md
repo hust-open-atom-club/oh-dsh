@@ -40,7 +40,7 @@ Status: implemented
 |---|---|
 | 持久的 `completed` | 目标仍 active/armed 且未到上限时继续 |
 | 取消已预留/接纳的目标回合，或该回合产生 `aborted` 结果 | 暂停并解除激活 |
-| 代码为 `RATE_LIMIT` 的 `error` | 以 `usage-limited` 代码阻塞 |
+| 代码为 `RATE_LIMIT` 或 `QUOTA` 的 `error` | 以 `usage-limited` 代码阻塞 |
 | 其他 `error` | 以 `turn-error` 代码阻塞 |
 | `max-tokens` | 以 `max-tokens` 代码阻塞 |
 | 非过期的 `rejected` | 以 `prompt-rejected` 代码阻塞 |
