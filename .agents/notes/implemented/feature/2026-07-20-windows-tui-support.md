@@ -22,7 +22,7 @@ The real Loader smoke selects a native pseudo-terminal boundary by host. macOS a
 
 - **Declare the TUI unsupported on Windows** — rejected because the pinned terminal runtime implements Windows console input explicitly and the harness has no POSIX-only production dependency. A documentation-only exclusion would discard an existing product path to accommodate a test harness gap.
 - **Run the POSIX driver through MSYS, Cygwin, or WSL** — rejected because that would test a compatibility environment rather than the native Windows console path users run.
-- **Use `node-pty` on every host** — rejected because the standard POSIX driver already provides the macOS and Linux boundary without another native package path. Platform-specific drivers keep ConPTY limited to the host that requires it while sharing one scenario contract.
+- **Use `node-pty` on every host** — rejected because the established POSIX driver already provides the macOS and Linux boundary; replacing it would widen the runtime change without improving those hosts. Platform-specific drivers reserve the `node-pty` runtime path for Windows while sharing one scenario contract.
 - **Rely on renderer unit tests and semantic terminal snapshots** — rejected because fake terminals do not prove Loader boot, real raw input, process exit, or terminal restoration at the operating-system boundary.
 
 ## Consequences
