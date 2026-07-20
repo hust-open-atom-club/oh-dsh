@@ -39,7 +39,7 @@ The driver classifies one closed goal-owned turn as follows:
 | Turn result | Action |
 |---|---|
 | durable `completed` | continue while active/armed and under cap |
-| broad cancellation / `aborted` | pause and disarm |
+| cancellation of a reserved/admitted goal round, or its `aborted` result | pause and disarm |
 | `error` with code `RATE_LIMIT` | mark `usage-limited` |
 | other `error` | block |
 | `max-tokens` | block |
@@ -52,9 +52,9 @@ No abnormal outcome requests an automatic retry. A later human prompt can ask to
 
 ### Durability and cancellation seam
 
-Every `goal/changed` notification creates a checkpoint obligation. The driver awaits `ctx.sessions.flush(session)` before reserving work, then checks for a newer mutation, agent lifecycle change, or competing prompt. Turn-end flush failure is reported by the existing `agent/error` notification after `turn/end`; the driver associates it with the exact attempt and disarms before the next idle decision.
+Every `goal/changed` notification creates a checkpoint obligation. The driver awaits `ctx.sessions.flush(session)` before reserving work, then checks for a newer mutation, agent lifecycle change, or competing prompt. Turn-end flush failure is reported by the existing `agent/error` notification after `turn/end`; the driver finds that exact closed turn even when a concurrent one-shot injection appended a later turn, associates the failure with the exact attempt, and disarms before the next idle decision.
 
-Broad cancellation previously exposed only its effects after queues were cleared or the request aborted. The public agent vocabulary now includes observe-only `agent/cancel-requested(agent, reason)`. The concrete loop emits it for effective cancellation before either action; fused notification containment means a broken listener cannot veto cancellation. The goal driver uses this edge to clear its reservation and pause an active armed goal before the loop destroys the queued-work evidence.
+Broad cancellation previously exposed only its effects after queues were cleared or the request aborted. The public agent vocabulary now includes observe-only `agent/cancel-requested(agent, reason)`. The concrete loop emits it for effective cancellation before either action; fused notification containment means a broken listener cannot veto cancellation. The goal driver uses this edge to clear its reservation before the loop destroys the queued-work evidence. When that reservation is a queued or admitted goal attempt, cancellation durably pauses the goal; when cancellation belongs to unrelated human work with no goal attempt, it only removes process-local activation. If the pause mutation throws, the driver falls back to disarming rather than allowing cancelled automatic work to restart.
 
 This is a coordination notification, not a second stop API. `Agent.cancel()` remains the only public broad cancellation verb, idle calls remain no-ops, and custom `Agent` implementations that claim the interface must honor the event ordering if consumers depend on it.
 
@@ -68,7 +68,7 @@ An inbox acceptance can win the microtask race immediately before plugin unload 
 
 ## Testing
 
-The unit suite uses the real agent loop and session service with only the model scripted. It covers exact sequential admission and cap enforcement, load/resume inertness, every outcome classification, rate limiting, request errors, max tokens, downstream prompt veto, pre-admission and in-flight cancellation, human-input ordering, queued and downstream revision races, forged goal attribution, failed mutation and turn checkpoints, scheduler and custom-agent failures, session-start reset, exact lifecycle retirement, and queued/running plugin teardown. The new driver source has per-file 100% statement, branch, function, and line coverage.
+The unit suite uses the real agent loop and session service with only the model scripted. It covers exact sequential admission and cap enforcement, load/resume inertness, every outcome classification, rate limiting, request errors, max tokens, downstream prompt veto, pre-admission and in-flight cancellation, unrelated-human cancellation, failed-pause fallback, human-input ordering, queued and downstream revision races, forged goal attribution, failed mutation and turn checkpoints including a later one-shot injection, scheduler and custom-agent failures, session-start reset, exact lifecycle retirement, and queued/running plugin teardown. The new driver source has per-file 100% statement, branch, function, and line coverage.
 
 A keyless Loader/stdio process test mounts the real goal domain, goal tools, goal driver, agent loop, persistence, and deterministic adapter through `cordis.yml`. One human turn creates a two-round goal; round one stops normally; round two reads the exact ref and completes it. The external JSONL assertion proves one session, round sources `1, 2`, unchanged round revision, final complete revision, five model steps, and no extra request after the terminal completion tool.
 
