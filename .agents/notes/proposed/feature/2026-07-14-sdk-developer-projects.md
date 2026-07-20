@@ -44,7 +44,7 @@ The table is the developer-visible support set for this phase. A `required` feat
 | Feature | Create state | Feature options | Constraints and relationships |
 |---|---|---|---|
 | `provider` | required | `deepseek` (default) / `custom` | DeepSeek collects an API key; custom also collects a base URL, and a CLI option may override the model name |
-| `app` | required | `stdio` (default) / `acp` / `embed` | Selects the run interface |
+| `app` | required | `tui` (default) / `acp` / `embed` | Selects the run interface |
 | `spine` | required | `default` | Timer, the LLM seam, session storage, system prompt, the tool registry, the agent registry, and the agent loop |
 | `bash` | required | `local` (default) / `sandbox` | The two feature options are exclusive and independent of the run interface, and both install the model-facing bash tool; sandbox installs the local sandbox provider and sandboxed bash backend |
 | `persistence` | required | `jsonl` (default) / `sqlite` | Every project selects exactly one persistence backend |
@@ -59,9 +59,9 @@ The table is the developer-visible support set for this phase. A `required` feat
 | `hooks` | optional | `claude` (default) / `codex`, multiple | Each feature option creates a separate editable configuration file |
 | `guard` | optional | `repeat-tool` | Provides repeated-tool-call reminders |
 | `timeout-policy` | optional | `default` | Applies a uniform policy to tools that declare timeout budgets |
-| `ask-user` | optional | `default` | Provides the `ask_user_question` tool; only `acp` and `stdio` can select it because those two feature options provide the injected user-interaction service |
+| `ask-user` | optional | `default` | Provides the `ask_user_question` tool; only `acp` and `tui` can select it because those two feature options provide the injected user-interaction service |
 
-Both `bash` feature options apply to ACP, stdio, and embed and are not selected by the run interface. The sandbox feature option writes no active config key and therefore keeps `dsh-bash-sandbox`'s `read-only` default. Generated `cordis.yml` includes a commented example that developers can change explicitly to `workspace-write`:
+Both `bash` feature options apply to ACP, TUI, and embed and are not selected by the run interface. The sandbox feature option writes no active config key and therefore keeps `dsh-bash-sandbox`'s `read-only` default. Generated `cordis.yml` includes a commented example that developers can change explicitly to `workspace-write`:
 
 ```yaml
 - id: bash
@@ -72,11 +72,11 @@ Both `bash` feature options apply to ACP, stdio, and embed and are not selected 
   #   workspaceRoot: !!js process.cwd()
 ```
 
-Feature contributions reference only single-plugin npm packages and never bundle packages such as `agent-spine-demo`, `stdio-demo`, or `acp-demo`. Plugins outside the table are not managed by create in this phase; advanced developers may still compose them by editing the ordinary project files directly.
+Feature contributions reference only single-plugin npm packages and never bundle packages such as `agent-spine-demo`, `tui-demo`, or `acp-demo`. Plugins outside the table are not managed by create in this phase; advanced developers may still compose them by editing the ordinary project files directly.
 
 ## Generated project
 
-With default answers, an npm project uses the DeepSeek provider, the stdio interface, local bash, JSONL persistence, and the preselected hmr, fs, todo, and skill features. Its initial tree is:
+With default answers, an npm project uses the DeepSeek provider, the TUI interface, local bash, JSONL persistence, and the preselected hmr, fs, todo, and skill features. Its initial tree is:
 
 ```text
 my-agent/
@@ -106,7 +106,7 @@ Generated `package.json` provides the following scripts. `dev`, `build`, `start`
 
 `dsh-sdk start` and `dsh-sdk dev` accept a module target and forward arguments after `--` unchanged to the project entrypoint. Generic argument parsing uses Node `parseArgs()` with zero schema: valued flags use `--key=value`, bare flags become `true`, and `--no-*` becomes `false`.
 
-- Stdio projects pass the selected model through `--model=<name>` and create or resume an agent according to optional `--resume=<session-id>`;
+- TUI projects pass the selected model through `--model=<name>` and create or resume an agent according to optional `--resume=<session-id>`;
 - ACP uses protocol `session/load`
 - Embed uses the model written into the generated code.
 
