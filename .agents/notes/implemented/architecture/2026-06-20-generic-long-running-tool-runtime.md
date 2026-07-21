@@ -23,6 +23,8 @@ Long-running tools are producers. `dsh-tool-bash` adapts a `BashProcess` into in
 
 The literal types live in the [task data-structure catalog](../../../../docs/core-data-structures/tasks.md). A producer calls `ctx.tasks.start()` with a kind, label, optional owning `Agent`, and a `run()` function. The runtime completes all failable preflight work before calling `run()` and invokes it once. After `run()` returns hooks, registration commits without another failable step; a producer cannot start work that lacks a collectable task id.
 
+A model-facing producer exposes that committed id in its canonical success value, normally `{ kind: 'background', taskId }`; Native rendering may keep human-readable prose. A pre-aborted background call fails rather than returning a no-op because no task exists to satisfy the promised handle. Once registration publishes the id, cancellation belongs to the task's own controller and the task runtime: later cancellation of the producing tool call must not kill the published task. `task_kill`, owner disposal, and service teardown request cancellation; foreground execution remains coupled to the call's `exec.signal`.
+
 The producer hooks define three responsibilities:
 
 - `cancel(reason?)` synchronously requests termination, is idempotent, and must cause `done` to settle.
