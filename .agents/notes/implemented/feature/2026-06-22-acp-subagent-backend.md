@@ -20,7 +20,11 @@ The client advertises NO optional capabilities (no `fs`, no `terminal`): the chi
 
 ### No start-time capabilities
 
-The provider's `capabilities` are all `false`. An out-of-process child cannot honor the parent's `maxDepth` (it has no access to `parent.options.subagentDepth`) or `toolFilter` (it owns its own tool registry), and the first cut does not implement `outputSchema`. The service rejects a request needing any of them before `start` runs. The backend injects only `subagents` (not `ctx.agents`) and ignores `request.parent`.
+The provider's `capabilities` are all `false`. An out-of-process child cannot honor the parent's `maxDepth` (it has no access to `parent.options.subagentDepth`) or `toolFilter` (it owns its own tool registry), and the first cut does not implement `outputSchema`. The service rejects a request needing any of them before `start` runs. The backend injects only `subagents` (not `ctx.agents`); the ONE thing it reads off `request.parent` is the session header's cwd (see the workspace resolution below) — no conversation context, depth, or tool state crosses the process boundary.
+
+### Workspace cwd resolution
+
+The child's working directory is an explicit resolution, never the harness process cwd: the deployment `cwd` override when configured (made absolute against the launch directory and validated at load), else the parent session header's cwd (validated at start), and a loud rejection before anything spawns when neither exists. One ACP server process serves sessions from many workspaces, so `process.cwd()` cannot stand in for a session's workspace — the old implicit fallback ran children in the server's launch directory. A candidate must be an absolute path naming a directory the harness can ENTER (`X_OK` — `statSync().isDirectory()` alone accepts a mode-600 directory that spawn would fail with EACCES), and the same resolved path becomes both the subprocess cwd and the ACP `session/new` workspace.
 
 ### StopReason mapping
 
@@ -33,6 +37,7 @@ The child is a separate process, so it inherits an environment. Credential-shape
 ## Testing
 
 - **Keyless unit/integration:** A scripted ACP subprocess exercises real stdio for prompt/output flow, every stop-reason mapping, signal and disposal cancellation (including pre-abort, pre-session race, and torn-pipe cases), both permission policies, ignored non-message updates, missing-command cleanup, provider reload, and namespace exports.
+- **Keyless Loader composition:** A test-only cordis.yml boots the stdio app through the real Loader with the backend's `cwd` omitted; a scripted model delegates once and the scripted child proves it ran in — and was announced — the parent session's workspace (the cwd-inheritance branch end to end).
 - **With-key e2e:** The backend spawns the real ACP example; its model answers `PONG`, writes `proof.txt`, and the parent verifies the file.
 - **Snapshot gap:** Each ACP child is a separate process with its own replay session, unlike in-process per-session replay. Deterministic mock-server coverage exists, while `TODO(acp-subagent-replay)` tracks parent replay against a replaying child.
 
