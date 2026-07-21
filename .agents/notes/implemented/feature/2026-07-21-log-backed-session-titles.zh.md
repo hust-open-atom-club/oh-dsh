@@ -40,7 +40,7 @@ Status: implemented
 
 与源日志的其他部分相同，fork 会原样继承作为种子的标题事件。首消息提供方不会自动为 fork 重新生成标题。全部消息提供方可以在子会话出现后续提示词后追加一项归子会话所有的修订，并使用继承的合格消息和新增的合格消息。
 
-`ctx.sessionQuery.readTitle()` 会折叠一份实时优先或已持久化的日志，而不会在 `listSessions()` 期间加载标题。ACP（Agent Client Protocol）会在实时流式输出和加载回放期间把该事件映射到 `session_info_update`，并使用事件时间戳作为 `updatedAt`。TUI 使用最新标题作为其标题栏副标题，并在完成终端安全渲染后，将终端窗口标题设置为 `<session title> — <configured product title>`。
+`ctx.sessionQuery.readTitle()` 会折叠一份实时优先或已持久化的日志，而不会在 `listSessions()` 期间加载标题。ACP（Agent Client Protocol）会在实时流式输出和加载回放期间把该事件映射到 `session_info_update`，并使用事件时间戳作为 `updatedAt`。TUI 使用最新标题作为其标题栏副标题，并在完成终端安全渲染后，将终端窗口标题设置为 `<session title> — <configured product title>`。合成标题轮次本身仍会完成，并作为元数据写入的持久性边界；报告 agent 完成情况的消费方使用核心的 `findLastMessageTurnEnd()` 折叠逻辑，因此后续的标题轮次、注入轮次或其他归插件所有的轮次无法取代此前由消息触发的结果。
 
 ## 考虑过的替代方案
 

@@ -40,7 +40,7 @@ Automatic provider failures are nonfatal warnings and retain the latest title. E
 
 A fork inherits seed title events unchanged, like the rest of its source log. The first-message provider does not automatically retitle a fork. The all-messages provider may append a child-owned revision after a later child prompt, using inherited and new eligible messages.
 
-`ctx.sessionQuery.readTitle()` folds one live-preferred or persisted log without loading titles during `listSessions()`. ACP maps the event to `session_info_update` during both live streaming and load replay, using the event timestamp for `updatedAt`. The TUI uses the latest title as its header subtitle and sets the terminal window title to `<session title> — <configured product title>` after terminal-safe rendering.
+`ctx.sessionQuery.readTitle()` folds one live-preferred or persisted log without loading titles during `listSessions()`. ACP maps the event to `session_info_update` during both live streaming and load replay, using the event timestamp for `updatedAt`. The TUI uses the latest title as its header subtitle and sets the terminal window title to `<session title> — <configured product title>` after terminal-safe rendering. A synthetic title turn remains a completed durability boundary for the metadata write; consumers reporting agent completion use the core `findLastMessageTurnEnd()` fold so a later title, injection, or other plugin-owned turn cannot replace the preceding message-triggered outcome.
 
 ## Alternatives considered
 
