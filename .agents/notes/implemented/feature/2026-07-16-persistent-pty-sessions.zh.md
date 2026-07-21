@@ -32,7 +32,7 @@ idle 检测属于后端行为，不是第二条公共 seam。远程或容器后�
 
 `PtyService` 在进程内保存活会话，但每个会话都由工具执行上下文传入的确切 `Agent` 拥有。服务铸造不透明的 `PtySessionId`；模型可选填的 `name` 只是显示元数据，仅在该 owner 内唯一。所有操作都以 `sessionId` 为目标，`list`/`read`/`signal`/`kill` 会拒绝 owner 之外的调用方。
 
-实现不提供插件加载期 auto-start 会话。`pty_spawn` 只在 agent 工具调用期间创建会话，此时所有权和所属的事件溯源会话都已确定。未来的声明式启动功能必须通过尚未发布的 agent setup 组合，而不能创建全局共享终端。
+实现不提供插件加载期 auto-start 会话。`terminal_open` 只在 agent 工具调用期间创建会话，此时所有权和所属的事件溯源会话都已确定。未来的声明式启动功能必须通过尚未发布的 agent setup 组合，而不能创建全局共享终端。
 
 agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出。后端或工具插件 reload 不会遗留会话：所有权持续存放在 `PtyService` 中，直到 agent 结束，与 [`ctx.tasks`](../../../../packages/tasks/tasks/README.md) 的服务持有记录模式一致。
 
@@ -51,22 +51,22 @@ agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出�
 
 | 工具 | 用途 | 结果 |
 |---|---|---|
-| `pty_spawn` | 从已注册的后端类型创建按 owner 隔离的会话 | `{ sessionId, name, type, motd }` |
-| `pty_send` | 发送文本、可选提交 Enter，并等待就绪或注册一个后台任务 | 有界 viewport、等待状态和会话状态；后台模式还返回 `taskId` |
-| `pty_read` | 从保留的 scrollback 读取一个有界页 | `{ text, totalLines, lineBegin, lineEnd, truncated }` |
-| `pty_signal` | 向当前前台进程组发送一种允许的信号 | `{ delivered, targetPgid }` |
-| `pty_kill` | 关闭一个会话并等待进程树静默退出 | `{ killed }` |
-| `pty_list` | 列出调用方的活会话 | 按 owner 隔离的会话摘要 |
+| `terminal_open` | 从已注册的后端类型创建按 owner 隔离的会话 | `{ sessionId, name, type, motd }` |
+| `terminal_send` | 发送文本、可选提交 Enter，并等待就绪或注册一个后台任务 | 有界 viewport、等待状态和会话状态；后台模式还返回 `taskId` |
+| `terminal_read` | 从保留的 scrollback 读取一个有界页 | `{ text, totalLines, lineBegin, lineEnd, truncated }` |
+| `terminal_signal` | 向当前前台进程组发送一种允许的信号 | `{ delivered, targetPgid }` |
+| `terminal_close` | 关闭一个会话并等待进程树静默退出 | `{ killed }` |
+| `terminal_list` | 列出调用方的活会话 | 按 owner 隔离的会话摘要 |
 
-`pty_send({ sessionId, text, submit?, run_in_background? })` 将 `text` 视为 UTF-8 字节，并由工具实现在解析阶段把 `submit` 默认成 `true`。`submit` 为 true 时先写入文本，再写入平台 Enter 序列；为 false 时只写文本，使控制字符和 REPL 片段无需隐藏的内容启发式即可发送。
+`terminal_send({ sessionId, text, submit?, run_in_background? })` 将 `text` 视为 UTF-8 字节，并由工具实现在解析阶段把 `submit` 默认成 `true`。`submit` 为 true 时先写入文本，再写入平台 Enter 序列；为 false 时只写文本，使控制字符和 REPL 片段无需隐藏的内容启发式即可发送。
 
 前台发送返回有界的渲染增量和两个独立事实：`waitReason`（`stdin_read | inferred_idle | timeout | session_exit`）与 `sessionStatus`（`running`，或携带退出码或信号的 `exited`）。`session_exit` 指 PTY 顶层 shell 进程退出，不指由 shell 消费状态的任意前台命令。timeout 从不意味着进程已经退出。
 
 当 `run_in_background: true` 时，`dsh-tool-pty` 在 `ctx.tasks` 上注册进行中的发送，并立即返回 `taskId`。`task_output(wait: true)` 负责等待、读取增量输出并记录最终结果；`task_kill` 将取消转发为 `SIGINT`，只有 PTY 后端拥有的 teardown 路径可以升级信号。若 task 对外接口不存在，后台模式必须在写入输入前失败。设计不新增 PTY 专用的 `sleep` 工具或通用唤醒 seam。
 
-`pty_read` 从最新保留行向后分页。后端同时对保留的 scrollback 和完整返回值执行行数与 UTF-8 字节上限，因此单个超长行无法绕过限制。`truncated` 用于区分保留数据丢失与普通 viewport 增量。
+`terminal_read` 从最新保留行向后分页。后端同时对保留的 scrollback 和完整返回值执行行数与 UTF-8 字节上限，因此单个超长行无法绕过限制。`truncated` 用于区分保留数据丢失与普通 viewport 增量。
 
-`pty_signal` 接受闭合集 `SIGINT | SIGTERM | SIGKILL | SIGTSTP | SIGHUP`。后端在执行时解析终端前台进程组。当目标组是顶层 shell 时拒绝 `SIGKILL`，并指引调用方使用 `pty_kill`；进程组解析失败时操作直接失败，而不是向猜测的 PID 发送信号。
+`terminal_signal` 接受闭合集 `SIGINT | SIGTERM | SIGKILL | SIGTSTP | SIGHUP`。后端在执行时解析终端前台进程组。当目标组是顶层 shell 时拒绝 `SIGKILL`，并指引调用方使用 `terminal_close`；进程组解析失败时操作直接失败，而不是向猜测的 PID 发送信号。
 
 ### 本地就绪检测
 
@@ -82,7 +82,7 @@ Tier 2 在持续 `idleSilenceMs` 没有输出后返回 `inferred_idle`，因此 
 
 ### 模型可见输出与持久性
 
-现有持久化 `tool/call` 与 `tool/result` 事件是模型发送文本和返回给模型的渲染输出的真源。`pty_spawn` 通过已记录的工具结果返回 MOTD；前台 `send`/`read`/`list`/`signal`/`kill` 结果走同一路径记录。PTY 包不会把原始字节流重复写入自定义会话事件。
+现有持久化 `tool/call` 与 `tool/result` 事件是模型发送文本和返回给模型的渲染输出的真源。`terminal_open` 通过已记录的工具结果返回 MOTD；前台 `send`/`read`/`list`/`signal`/`close` 结果走同一路径记录。PTY 包不会把原始字节流重复写入自定义会话事件。
 
 后台发送复用现有后台任务完成通知和 `task_output` 结果路径，因此进入后续模型请求的任何输出同样持久化。原始终端字节只作为有界的进程内状态存在，既不持久化也不可恢复。未来的 opt-in transcript sink 必须拥有独立的保留、凭证和隐私契约。
 
@@ -90,7 +90,7 @@ Tier 2 在持续 `idleSilenceMs` 没有输出后返回 `inferred_idle`，因此 
 
 顶层 `node-pty` 子进程是所有权锚点。关闭时，后端先停止 callback，再按父 PID 以子进程优先顺序捕获该 PID 及其传递子进程、发送 `SIGTERM`、关闭 PTY 并等待静默，然后在可配置的 `disposeGraceMs` 后向已验证的存活者发送 `SIGKILL`，并等待它们离开进程表。每个捕获的 PID 都包含进程启动身份，避免 PID 复用把升级信号发给无关进程。
 
-teardown 独立报告根进程退出与存活进程清理。它不会只因 shell 退出就声称成功；dispose 只有在已捕获的进程树成员全部消失后才完成，否则返回结构化清理失败并列出存活者。所有权绝不会扩大到根 PID 所属 POSIX 会话的全部成员。
+teardown 独立报告根进程退出与存活进程清理。它不会只因 shell 退出就声称成功；dispose 只有在已捕获的进程树成员全部消失后才完成，否则返回结构化清理失败并列出存活者。即使某个 close 失败，服务 dispose 仍会清空其后端、预留与 owner detacher 注册表。所有权绝不会扩大到根 PID 所属 POSIX 会话的全部成员。
 
 ### 组合与推行
 

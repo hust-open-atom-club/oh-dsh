@@ -32,7 +32,7 @@ Idle detection is backend behavior, not a second public seam. A remote or contai
 
 `PtyService` stores live sessions process-locally, but every session is owned by the exact `Agent` passed through the tool execution context. The service mints an opaque `PtySessionId`; an optional model-chosen `name` is display metadata and is unique only within that owner. Every operation targets `sessionId`, and `list`/`read`/`signal`/`kill` reject callers other than the owner.
 
-There are no plugin-load auto-start sessions. `pty_spawn` creates a session only during an agent tool call, when ownership and the owning event-sourced session are known. A future declarative startup feature must compose through unpublished agent setup rather than create shared global terminals.
+There are no plugin-load auto-start sessions. `terminal_open` creates a session only during an agent tool call, when ownership and the owning event-sourced session are known. A future declarative startup feature must compose through unpublished agent setup rather than create shared global terminals.
 
 Agent-scope disposal closes registrations first, then awaits quiescent teardown of every owned PTY. Backend or tool-plugin reload does not orphan sessions: ownership lives in `PtyService` until the agent ends, following the same service-owned-record pattern as [`ctx.tasks`](../../../../packages/tasks/tasks/README.md).
 
@@ -51,22 +51,22 @@ The implementation uses only public `node-pty` capabilities: child PID, `data` a
 
 | Tool | Purpose | Result |
 |---|---|---|
-| `pty_spawn` | Create an owner-scoped session from a registered backend type | `{ sessionId, name, type, motd }` |
-| `pty_send` | Send text, optionally submit Enter, and wait for readiness or register a background task | bounded viewport plus wait and session status; background also returns `taskId` |
-| `pty_read` | Read a bounded page from retained scrollback | `{ text, totalLines, lineBegin, lineEnd, truncated }` |
-| `pty_signal` | Send one allowed signal to the current foreground process group | `{ delivered, targetPgid }` |
-| `pty_kill` | Close one session and await process-tree quiescence | `{ killed }` |
-| `pty_list` | List the caller's live sessions | owner-scoped session summaries |
+| `terminal_open` | Create an owner-scoped session from a registered backend type | `{ sessionId, name, type, motd }` |
+| `terminal_send` | Send text, optionally submit Enter, and wait for readiness or register a background task | bounded viewport plus wait and session status; background also returns `taskId` |
+| `terminal_read` | Read a bounded page from retained scrollback | `{ text, totalLines, lineBegin, lineEnd, truncated }` |
+| `terminal_signal` | Send one allowed signal to the current foreground process group | `{ delivered, targetPgid }` |
+| `terminal_close` | Close one session and await process-tree quiescence | `{ killed }` |
+| `terminal_list` | List the caller's live sessions | owner-scoped session summaries |
 
-`pty_send({ sessionId, text, submit?, run_in_background? })` treats `text` as UTF-8 bytes and resolves `submit` to `true` in the tool implementation. When `submit` is true it writes the platform Enter sequence after the text; when false it writes only the text, allowing control characters and REPL fragments without hidden content heuristics.
+`terminal_send({ sessionId, text, submit?, run_in_background? })` treats `text` as UTF-8 bytes and resolves `submit` to `true` in the tool implementation. When `submit` is true it writes the platform Enter sequence after the text; when false it writes only the text, allowing control characters and REPL fragments without hidden content heuristics.
 
 Foreground sends return a bounded rendered delta and two independent facts: `waitReason` (`stdin_read | inferred_idle | timeout | session_exit`) and `sessionStatus` (`running` or `exited` with exit code or signal). `session_exit` refers to the PTY's top-level shell process, not an arbitrary foreground command whose status the shell consumes. A timeout never implies process exit.
 
 With `run_in_background: true`, `dsh-tool-pty` registers the in-flight send on `ctx.tasks` and returns immediately with `taskId`. `task_output(wait: true)` waits, reads incremental output, and records the final result; `task_kill` forwards cancellation as `SIGINT` and escalates only through the PTY backend's owned teardown path. If the task surface is absent, background mode fails before writing input. No PTY-specific `sleep` tool or general wake-up seam is added.
 
-`pty_read` pages backward from the newest retained line. The backend enforces both line and UTF-8 byte caps on retained scrollback and the complete returned value, so one oversized line cannot bypass the bound. `truncated` distinguishes retention loss from an ordinary viewport delta.
+`terminal_read` pages backward from the newest retained line. The backend enforces both line and UTF-8 byte caps on retained scrollback and the complete returned value, so one oversized line cannot bypass the bound. `truncated` distinguishes retention loss from an ordinary viewport delta.
 
-`pty_signal` accepts the closed set `SIGINT | SIGTERM | SIGKILL | SIGTSTP | SIGHUP`. The backend resolves the terminal foreground process group at execution time. `SIGKILL` is rejected when that group is the top-level shell, directing the caller to `pty_kill`; a failed group lookup fails the operation instead of signaling a guessed PID.
+`terminal_signal` accepts the closed set `SIGINT | SIGTERM | SIGKILL | SIGTSTP | SIGHUP`. The backend resolves the terminal foreground process group at execution time. `SIGKILL` is rejected when that group is the top-level shell, directing the caller to `terminal_close`; a failed group lookup fails the operation instead of signaling a guessed PID.
 
 ### Local readiness detection
 
@@ -82,7 +82,7 @@ Tier 2 returns `inferred_idle` after `idleSilenceMs` without output. A sleeping 
 
 ### Model-visible output and durability
 
-The existing durable `tool/call` and `tool/result` events are the source of truth for text sent by the model and rendered output returned to it. `pty_spawn` returns its MOTD through the logged tool result; foreground `send`/`read`/`list`/`signal`/`kill` results are logged the same way. The PTY packages do not duplicate raw byte streams into custom session events.
+The existing durable `tool/call` and `tool/result` events are the source of truth for text sent by the model and rendered output returned to it. `terminal_open` returns its MOTD through the logged tool result; foreground `send`/`read`/`list`/`signal`/`close` results are logged the same way. The PTY packages do not duplicate raw byte streams into custom session events.
 
 Background sends use the existing task completion notice and `task_output` result path, so any output that reaches a later model request is likewise durable. Raw terminal bytes remain bounded process-local state and are neither persisted nor restorable. A future opt-in transcript sink would need its own retention, credential, and privacy contract.
 
@@ -90,7 +90,7 @@ Background sends use the existing task completion notice and `task_output` resul
 
 The top-level `node-pty` child is the ownership anchor. On close, the backend stops callbacks, snapshots that PID and its transitive descendants by parent PID in children-first order, sends `SIGTERM`, closes the PTY, waits for quiescence, then sends `SIGKILL` to verified survivors after configurable `disposeGraceMs` and waits for them to leave the process table. Every captured PID includes process-start identity so reuse cannot redirect escalation.
 
-Teardown reports root exit and survivor cleanup independently. It does not claim success merely because the shell exited; disposal resolves only after no captured tree member remains or returns a structured cleanup failure naming the survivors. It never broadens ownership to every member of the root PID's POSIX session.
+Teardown reports root exit and survivor cleanup independently. It does not claim success merely because the shell exited; disposal resolves only after no captured tree member remains or returns a structured cleanup failure naming the survivors. Service disposal still clears its backend, reservation, and owner-detacher registries when a close fails. It never broadens ownership to every member of the root PID's POSIX session.
 
 ### Composition and rollout
 
