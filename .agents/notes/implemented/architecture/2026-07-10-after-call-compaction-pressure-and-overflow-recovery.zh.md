@@ -32,9 +32,9 @@ Status: implemented
 
 `CompactService.compactIfNeeded(agent, trigger, signal)` 接收 `trigger: 'pressure' | 'context-overflow'`。接口不增加估算方法或 token 类型；`ctx.tokenMeter` 继续作为可复用的核算所有者。
 
-对于 `pressure`，compact-basic 把服务级阈值与保留尾部策略应用到一次统一的 `ctx.tokenMeter.measure()` 结果。低于压力时直接返回，不执行剪枝。压力达到条件后，可选的 `ctx.toolResultPrune` 会改写当前表层中过大的工具结果，compact-basic 再通过同一个 meter 重新计量；若压力恢复安全则跳过模型调用，否则从已剪枝表层选择范围并生成摘要。范围定价、来源、被遮蔽 token 数与非缩小摘要拒绝也由同一个单例 meter 完成。通用默认值保持为阈值比例 `0.8`、保留历史 `floor(contextWindow × 0.16)`、摘要提供方/模型 `''`、`maxTokens: 8192`、`compactionRetries: 1` 与 `auto: true`。
+对于 `pressure`，compact-basic 先解析持久提供方/模型目标的适配器所属容量与精确目标策略，再把得到的阈值与保留尾部预算应用到一次统一的 `ctx.tokenMeter.measure()` 结果。低于压力时直接返回，不执行剪枝。压力达到条件后，可选的 `ctx.toolResultPrune` 会改写当前表层中过大的工具结果，compact-basic 再通过同一个 meter 重新计量；若压力恢复安全则跳过模型调用，否则从已剪枝表层选择范围并生成摘要。范围定价、来源、被遮蔽 token 数与非缩小摘要拒绝也由同一个单例 meter 完成。通用默认值保持为阈值比例 `0.8`、保留历史比例 `0.16`、摘要提供方/模型 `''`、`maxTokens: 8192`、`compactionRetries: 1` 与 `auto: true`；可选 `modelPolicies` 项可以按精确提供方/模型组合覆盖这些值。
 
-对于规范化溢出，compact-basic 绕过标量压力与普通保留 token 预算。它先执行剪枝，再在保留最新不可分割单元的同时选择最大的工具配对平衡头部范围；存在范围时，才在同一 signal 下尝试一次缩小摘要压缩。自动监听器先记录 `session.surface.replaceGeneration`，剪枝或摘要让 generation 增加时就返回 `{ action: 'retry' }`。即使剪枝先落盘而后续摘要工作抛错，这条规则仍然成立；取消依然优先。后端若只返回结果但没有替换表层，不能授权重试；只有剪枝取得进展时，即使没有 `CompactionResult` 也可以授权重试。
+对于规范化溢出，compact-basic 不要求容量元数据，并绕过标量压力与普通保留 token 预算。它先执行剪枝，再在保留最新不可分割单元的同时选择最大的工具配对平衡头部范围；存在范围时，才在同一 signal 下尝试一次缩小摘要压缩。自动监听器先记录 `session.surface.replaceGeneration`，剪枝或摘要让 generation 增加时就返回 `{ action: 'retry' }`。即使剪枝先落盘而后续摘要工作抛错，这条规则仍然成立；取消依然优先。后端若只返回结果但没有替换表层，不能授权重试；只有剪枝取得进展时，即使没有 `CompactionResult` 也可以授权重试。
 
 `maxOverflowRetries` 可选且默认为 `1`；`0` 只禁用溢出恢复，不会禁用压力检查。`auto: false` 不注册任何自动监听器。非规范化错误、尝试耗尽、已经中止的 signal、缺失路由模型、没有安全范围、generation 未变化，以及在任何替换之前恢复抛错，都会委托给下一个监听器。若没有后续恢复，循环报告原始提供方错误对象与代码。generation 增加后的恢复抛错会基于持久进展授权重试；即使恢复工作并发完成，取消或销毁仍具有最终优先级。
 
