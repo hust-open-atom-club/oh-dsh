@@ -27,7 +27,7 @@ Status: implemented
 
 ### 已实施的检查
 
-当前 100 个包的 workspace 包含 21 个可执行 companion 和 79 个有理由的空 companion。
+当前 103 个包的 workspace 包含 21 个可执行 companion 和 82 个有理由的空 companion。
 
 | 所有者 | 运行时关系 |
 |---|---|
