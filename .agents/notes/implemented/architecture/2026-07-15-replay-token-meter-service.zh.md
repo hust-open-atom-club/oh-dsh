@@ -32,7 +32,7 @@ Usage 会对互不重叠的输入、缓存读取、缓存写入与输出 bucket 
 
 `dsh-compact-basic` 要求 `ctx.tokenMeter`；`CompactService` 不增加 token 方法或类型。配置、区域事务与摘要器分别保留在独立模块中，服务自身注册自动监听器，而 `summarize()` 仍是唯一的子类 hook。单例计量器一致用于压力、保留、被遮蔽内容、来源以及非缩小摘要拒绝的定价。
 
-自动压缩的每次阈值与保留联合决策只使用一次统一计量。区域事务先追加持久 `compact/start` 锁，再执行一次计量，并在异步摘要完成后再次计量；期间任何持久追加都会改变 `logRevision`，从而阻止替换。
+自动压缩的每次阈值与保留联合决策只使用一次统一计量。区域事务会在追加持久 `compact/start` 锁后执行计量，在异步摘要完成后再次计量，随后比较分离的表层节点向量。期间发生的表层变更会阻止替换；`logRevision` 可以因无关的纯日志事实而推进，而不会使未变的选定范围失效。
 
 压缩策略采用服务级默认值：阈值比例 `0.8`、保留尾部比例 `0.16`、`summarizationProvider: ''`、`summarizationModel: ''`、`maxTokens: 8192`、`compactionRetries: 1`、`maxOverflowRetries: 1` 与 `auto: true`。顶层字段适用于每个路由目标；`modelPolicies` 中的精确提供方/模型项可以部分覆盖这些字段。压力检查根据所属适配器解析的容量缩放比例，`retainTokens` 可以替代 `retainRatio`；保留值必须小于最终阈值。摘要提供方与模型必须同时设置或同时为空；空组合先解析最近记录的请求目标，再使用 `AgentOptions` 中的组合。
 
