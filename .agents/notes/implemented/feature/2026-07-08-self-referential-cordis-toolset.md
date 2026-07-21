@@ -32,7 +32,7 @@ Sandbox globals are deliberately small: a tagged write-through `console` (`[cord
 
 Mount code crosses the vm boundary through three controls. Dual-realm `instanceof` recognizes both host and vm objects. `harness.defineTool` normalizes results into host-realm JSON and validates the `ToolExecuteReturn` shape before logging. The mounted plugin receives a whitelist context façade, not a raw or pass-through `Context`; framework plumbing and context-valued returns are rejected. Service reads require a declared `inject`, preserving Cordis activation and unload semantics. `ctx.tools.get` exposes only the schema view, so mounted code cannot bypass `ToolRegistry.execute` by calling a definition directly.
 
-The boundary normalizes unambiguous JSON-Schema forms into `SchemaSpec`, including object wrappers, `integer`, and optional fields. Invalid vocabulary fails with the accepted alternatives. Parse, TypeScript, missing-return, Node-API, and duplicate-tool errors include the relevant source line or corrective contract without narrating implementation internals.
+The boundary normalizes unambiguous JSON-Schema forms into `ParameterSchemaSpec`, preserving `integer`, raw object openness, and required arrays. Direct DSL object nodes must declare `additionalProperties`; invalid vocabulary fails with the accepted alternatives. Parse, TypeScript, missing-return, Node-API, and duplicate-tool errors include the relevant source line or corrective contract without narrating implementation internals.
 
 ### The dynamic group and mount lifecycle
 
@@ -60,7 +60,7 @@ Model-visible ⟺ logged holds with no new session event type: a mount or unmoun
 
 | Dimension | Structured per-capability tools | Single `cordis_mount` |
 |---|---|---|
-| Schema correctness | `parameters` is still a model-written JSON object needing SchemaSpec validation, merely one step earlier | The same validation runs at the sandbox boundary, with the same instructive errors |
+| Schema correctness | `parameters` is still model-written JSON needing unified-schema validation, merely one step earlier | The same validation runs at the sandbox boundary, with the same instructive errors |
 | The code field | An `execute` body is still model-written JS in a vm; the realm and service-call correctness problems are unchanged | One sandbox, one normalization path, one guarded registration |
 | Capability coverage | Tools only; listeners, services, `inject` relations each need another structured tool — a surface that grows without bound | One vocabulary (a cordis plugin) covers every effect, present and future |
 | Cross-mount composition | Not expressible in a tool-registration payload | Native `provide`/`inject`, ordinary cordis semantics |
