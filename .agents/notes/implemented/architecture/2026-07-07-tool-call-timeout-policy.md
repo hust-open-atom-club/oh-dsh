@@ -61,10 +61,7 @@ function toolTimeoutResult(timeoutMs: number): ToolExecutionResult {
   return {
     content: [{ type: 'text', text: `Error: tool call timed out after ${timeoutMs}ms` }],
     isError: true,
-    error: {
-      message: `tool call timed out after ${timeoutMs}ms`,
-      info: { name: 'ToolTimeoutError', code: 'TOOL_TIMEOUT' },
-    },
+    error: { name: 'ToolTimeoutError', code: 'TOOL_TIMEOUT' },
   }
 }
 ```
