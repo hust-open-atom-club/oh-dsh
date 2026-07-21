@@ -24,7 +24,7 @@ If an LLM adapter browser or dynamic model-picker needs this signal later, reint
 
 ## Verification
 
-`llm/adapter-change` and its emits are gone and the regenerated cordis catalog is fresh; HMR-safety holds (disposing a contributing fiber removes the adapter); `tools/change` and `system-prompt/change` remain documented and tested; and no production path changed observable behavior — the ACP snapshot expected outputs and the echo-agent smoke are byte-unchanged.
+`llm/adapter-change` and its emits are gone and the regenerated cordis catalog is fresh; HMR-safety holds (disposing a contributing fiber removes the adapter); `tools/change` and `system-prompt/change` remain documented and tested; and the ACP snapshots plus the keyless Headless Loader smoke pin the unchanged production paths.
 
 ## Consequences
 

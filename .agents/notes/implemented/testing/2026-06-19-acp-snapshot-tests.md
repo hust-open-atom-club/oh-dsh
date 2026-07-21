@@ -40,7 +40,7 @@ Replay is positional and therefore permits only one in-flight model stream per s
 
 ### Recording harvests the log; keyless replay needs a providerless config
 
-Recording runs the scenario with the real `llm-deepseek` adapter and the JSONL persistence backend, then copies the produced `.jsonl` into the scenario dir. Per-event appends are durable, but the harness shuts the subprocess down gracefully (close stdin → `await ctx.dispose()`) before harvesting so the final events are flushed. `llm-replay` itself does no recording — it is replay-only.
+Recording runs the scenario with the real `llm-deepseek` adapter and the JSONL persistence backend configured with `persistenceCompression: 'none'`, then copies the produced `.jsonl` into the scenario dir. The explicit raw mode keeps committed replay fixtures line-readable while ordinary deployments use the backend's compressed default. Per-event appends are durable, but the harness shuts the subprocess down gracefully (close stdin → `await ctx.dispose()`) before harvesting so the final events are flushed. `llm-replay` itself does no recording — it is replay-only.
 
 Replay uses a `cordis.snapshot.yml` overlay that replaces the real adapter with `llm-replay` while retaining the live composition. Recording uses the ordinary config and a harness-supplied persistence root. Replay mode skips `.env` loading, so a stray API key cannot trigger a live call. See the [single-source config Agent Note](2026-07-04-single-source-acp-replay-config.md).
 
@@ -57,7 +57,7 @@ Normalization replaces session, cwd, protocol-id, timestamp, path, and process v
 
 ### Isolation: normalization now, sandbox later
 
-Tool determinism comes from a temporary cwd, scrubbed environment, fresh non-login shell, constrained commands, and normalization. It does not claim OS confinement. A sandboxed executor can replace the local backend through the existing [capability seam](../architecture/2026-06-13-capability-seams.md) if a stronger tier is needed.
+Tool determinism comes from a temporary cwd, scrubbed environment, fresh non-login shell, constrained commands, and normalization. Concurrent replay runs own separate cwd, persistence, and fixed-length scenario-keyed spill roots, so one scenario's teardown cannot delete another's in-flight full-output recovery while real-path preview budgets remain stable. This tier does not claim OS confinement. A sandboxed executor can replace the local backend through the existing [capability seam](../architecture/2026-06-13-capability-seams.md) if a stronger tier is needed.
 
 ### The replay plugin is its own package
 

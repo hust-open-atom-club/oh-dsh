@@ -44,7 +44,7 @@ create 还提供一次 `none / plugin / tool` 选择。`plugin` 固定生成 `pl
 | 功能 | create 状态 | 功能选项 | 限制与关系 |
 |---|---|---|---|
 | `provider` | required | `deepseek`（默认）/ `custom` | DeepSeek 收集 API key；custom 另收集 base URL，模型名可由 CLI 参数覆盖 |
-| `app` | required | `stdio`（默认）/ `acp` / `embed` | 选择运行接口 |
+| `app` | required | `tui`（默认）/ `acp` / `embed` | 选择运行接口 |
 | `spine` | required | `default` | timer、LLM seam、会话存储、系统提示词、工具注册表、agent 注册表，以及 agent loop |
 | `bash` | required | `local`（默认）/ `sandbox` | 两个功能选项互斥、与运行接口正交，且都安装面向模型的 bash 工具；sandbox 安装本地沙箱提供方和沙箱 bash 后端 |
 | `persistence` | required | `jsonl`（默认）/ `sqlite` | 每个工程恰好选择一个持久化后端 |
@@ -59,9 +59,9 @@ create 还提供一次 `none / plugin / tool` 选择。`plugin` 固定生成 `pl
 | `hooks` | optional | `claude`（默认）/ `codex`，可多选 | 各功能选项生成独立的可编辑配置文件 |
 | `guard` | optional | `repeat-tool` | 提供重复工具调用提醒 |
 | `timeout-policy` | optional | `default` | 对声明超时预算的工具执行统一策略 |
-| `ask-user` | optional | `default` | 提供 `ask_user_question` 工具；注入的 user-interaction 服务由 acp/stdio 两个功能选项提供，因此仅这两个接口可选 |
+| `ask-user` | optional | `default` | 提供 `ask_user_question` 工具；注入的 user-interaction 服务由 acp/tui 两个功能选项提供，因此仅这两个接口可选 |
 
-`bash` 的两个功能选项都适用于 ACP、stdio 和 embed，不由运行接口决定。sandbox 功能选项不写任何生效的配置键，因而沿用 `dsh-bash-sandbox` 的 `read-only` 默认值；生成的 `cordis.yml` 保留注释示例，开发者可以显式改为 `workspace-write`：
+`bash` 的两个功能选项都适用于 ACP、TUI 和 embed，不由运行接口决定。sandbox 功能选项不写任何生效的配置键，因而沿用 `dsh-bash-sandbox` 的 `read-only` 默认值；生成的 `cordis.yml` 保留注释示例，开发者可以显式改为 `workspace-write`：
 
 ```yaml
 - id: bash
@@ -72,11 +72,11 @@ create 还提供一次 `none / plugin / tool` 选择。`plugin` 固定生成 `pl
   #   workspaceRoot: !!js process.cwd()
 ```
 
-功能贡献只引用单插件 NPM 包，绝不引用 `agent-spine-demo`、`stdio-demo`、`acp-demo` 这类组合 NPM 包。表格之外的插件不由本期 create 管理；开发者仍可直接编辑普通工程文件进行高级组合。
+功能贡献只引用单插件 NPM 包，绝不引用 `agent-spine-demo`、`tui-demo`、`acp-demo` 这类组合 NPM 包。表格之外的插件不由本期 create 管理；开发者仍可直接编辑普通工程文件进行高级组合。
 
 ## 生成工程
 
-使用默认答案创建 npm 工程时，provider 为 DeepSeek，运行接口为 stdio，bash 为 local，持久化为 JSONL，hmr、fs、todo 与 skill 处于选中状态。初始目录树为：
+使用默认答案创建 npm 工程时，provider 为 DeepSeek，运行接口为 TUI，bash 为 local，持久化为 JSONL，hmr、fs、todo 与 skill 处于选中状态。初始目录树为：
 
 ```text
 my-agent/
@@ -106,7 +106,7 @@ my-agent/
 
 `dsh-sdk start` 与 `dsh-sdk dev` 可以接收模块 target，并把 `--` 后的参数原样转发给工程入口。通用参数解析使用 Node `parseArgs()` 的零 schema 模式：带值 flag 采用 `--key=value`，bare flag 转换为 `true`，`--no-*` 转换为 `false`。
 
-- stdio 工程通过 `--model=<name>` 传入所选 model，并根据可选的 `--resume=<session-id>` 创建或恢复 agent；
+- TUI 工程通过 `--model=<name>` 传入所选 model，并根据可选的 `--resume=<session-id>` 创建或恢复 agent；
 - acp 使用协议 `session/load`
 - embed 使用生成代码中的 model。
 
