@@ -5,7 +5,7 @@ description: Use before pushing, force-pushing, marking ready for review, claimi
 
 # DSH Pre-Push Checks
 
-Use this skill to choose and run the smallest sufficient verification set before a `deepseek-harness` push. Do not treat the local pre-push hook as the full CI contract: CI also runs coverage, build, demo smoke, and built-bin smoke.
+Use this skill to choose and run the smallest sufficient verification set before a `deepseek-harness` push. Do not treat the local pre-push hook as the full CI contract: CI also runs coverage, build, and built-bin smoke.
 
 ## First Steps
 
@@ -54,7 +54,7 @@ pnpm run test:snapshot
 Run built-bin smoke tests after `pnpm run build` when app packages, app boot, package runtime imports, bin entries, loader behavior, or published artifact paths change.
 
 ```sh
-pnpm exec vitest run --config vitest.e2e.config.ts packages/examples/stdio-demo/tests/built-bin.e2e.ts packages/examples/cli-demo/tests/built-bin.e2e.ts packages/examples/acp-demo/tests/built-bin.e2e.ts
+DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples/headless-agent/tests/keyless-smoke.e2e.ts examples/tui-agent/tests/tui-keyless-smoke.e2e.ts packages/examples/cli-demo/tests/built-bin.e2e.ts packages/examples/acp-demo/tests/built-bin.e2e.ts
 ```
 
 Run real e2e when behavior depends on a real model/API, tool-use loop, ACP integration, prompt injection, or end-to-end agent UX. If `.env` is available, use it; do not print secrets.

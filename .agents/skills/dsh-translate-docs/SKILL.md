@@ -1,9 +1,15 @@
 ---
 name: dsh-translate-docs
-description: Use when creating or updating the bilingual counterpart of a doc in this repo (English ↔ Chinese pairs) — orients the translator to the pairing contract, the terminology source of truth, the translation rules, and the consistency gate that verifies the result
+description: Use when creating or updating the bilingual counterpart of a doc in this repo (English ↔ Chinese pairs) — tells the orchestrating agent when to delegate translation to a subagent, and orients the translator to the pairing contract, the terminology source of truth, the translation rules, and the consistency gate that verifies the result
 ---
 
 # Translating DeepSeek-Harness docs
+
+## Delegate to a subagent
+
+When this skill fires and translations need to be written, do not translate yourself: spawn a subagent to do the translation work. If you are that delegated subagent, skip this section; the sections from here on address the agent actually writing the translation.
+
+## What this skill is
 
 **This skill is guidance, not a translation memory.** It is the workflow map for keeping `foo.md ↔ foo.zh.md` pairs consistent and natural in both languages. Both languages carry equal authority — a change is authored in either one, and that side is the source for that update. You are the translator: the rules below say what must hold, not how to phrase any particular sentence — phrasing judgment is yours, terminology is not.
 
