@@ -14,24 +14,20 @@ The obstacle is a seam boundary: `presentResult(args, result)` is a **pure funct
 
 Add a **persisted, tool-private presentation channel** so a tool's `execute` can attach a result-time render payload that survives replay, and use it to carry the applied-hunk diff.
 
-### 1. A `meta` channel on the tool result (core)
+### 1. A replayable presentation projection on canonical tool output (core)
 
-`ToolDefinition.execute` may now return either its model-facing `ContentBlock[]` (unchanged, the common case) OR `{ content: ContentBlock[]; meta?: unknown }`:
+The original implementation let `execute` return `{ content, meta }`. The [canonical tool-output contract](2026-07-20-canonical-tool-output-contract.md) supersedes that authoring shape: every tool now returns one schema-declared JSON value, `output.render(args, value)` derives model-facing blocks, and optional `output.presentationMeta(args, value)` derives replayable UI data.
 
-```ts ignore-check
-type ToolExecuteReturn = ContentBlock[] | { content: ContentBlock[]; meta?: unknown }
-```
+`presentationMeta` is tool-owned `JsonValue` that the core persists without interpreting its fields. `Session.append` validates it with the rest of the event, and replay passes the stored payload back to `presentResult`; presentations therefore reproduce without I/O or recomputation. The canonical value itself remains execution-local and is not added to the session format.
 
-`meta` is tool-owned `unknown` that the core persists without interpretation. `Session.append` rejects non-JSON values, and replay passes the stored payload back to `presentResult`; presentations therefore reproduce without I/O or recomputation. Runtime validation avoids adding a shared serializable-value dependency to the tools core.
-
-This is the general shape ("a tool attaches durable result presentation"), not an fs-specific one — any tool can use it.
+This remains the general shape ("a tool projects durable result presentation"), not an fs-specific one—any tool can use it.
 
 ### 2. The tool computes the hunk; the backend returns before/after (fs)
 
 Per the [capability-seam split](2026-06-13-capability-seams.md), the storage backend returns only **storage facts** and the model-facing tool owns **presentation**:
 
 - `dsh-fs` widens `FsEditOutcome` with `{ before: string; after: string }` and `FsWriteOutcome` with `{ before: string | null; after: string }` (`before: null` ⇒ a create, or an existing-but-undiffable binary/non-UTF-8 file). The local backend already holds both texts at write time; it returns them as raw LF-normalized text, with **no diff/UI concept** entering the seam.
-- `dsh-tool-fs` stores contextual hunks in `meta: { diffs: FileDiff[] }`. Successful mutations always complete with a diff card because ACP result content replaces the pending card: creates or unchanged overwrites fall back to an args-derived whole-file diff, while edits use applied hunks. Failed mutations carry no diff metadata and render their error normally.
+- `dsh-tool-fs` returns canonical before/after mutation facts and projects contextual hunks as `meta: { diffs: FileDiff[] }`. Successful mutations always complete with a diff card because ACP result content replaces the pending card: creates or unchanged overwrites fall back to an args-derived whole-file diff, while edits use applied hunks. Failed mutations carry no diff metadata and render their error normally.
 
 ### 3. The bridge renders a `diff` result card
 
@@ -43,7 +39,7 @@ Per the [capability-seam split](2026-06-13-capability-seams.md), the storage bac
 
 ## Consequences
 
-`tool/result` events may now carry a tool-private `meta` payload — part of the on-disk vocabulary, runtime-gated to JSON by `Session.append` — and any tool can attach durable result presentation without another core change. The diff card reproduces on session reload and snapshot replay for free: it is read back from the log, never recomputed. The costs: an overwrite holds both the prior and new text in memory to compute a UI-only hunk (`TODO(overwrite-diff-bound)`), and `dsh-tool-fs` carries a small, well-known runtime dependency.
+`tool/result` events carry a tool-private `meta` payload—part of the on-disk vocabulary, runtime-gated to JSON by `Session.append`—and any tool can project durable result presentation without another core change. The diff card reproduces on session reload and snapshot replay for free: it is read back from the log, never recomputed. The costs: an overwrite holds both the prior and new text in memory to compute a UI-only hunk (`TODO(overwrite-diff-bound)`), and `dsh-tool-fs` carries a small, well-known runtime dependency.
 
 ## Non-goals
 
