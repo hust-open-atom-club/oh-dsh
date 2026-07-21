@@ -28,7 +28,7 @@ Six methods (five required + an optional lifecycle hook) — the only seam betwe
 
 ### The opaque torn marker
 
-The single design choice that keeps the seam clean: the crash-repair "where is the torn tail" token is OPAQUE to the coordinator. The coordinator computes the synthetic closers (it owns `interruptedTurnClosers` from `dsh-session`), but it only ever tests `tornMarker !== undefined` and passes the value straight back to `commitRepair` — it never inspects it. Each backend picks its own marker type: JSONL uses the byte offset to truncate to, SQLite the seq to delete from (both happen to be `number`). The JSONL backend folds its `committedBytes < buffer.byteLength` comparison INSIDE the hook so the returned marker is already `number | undefined`; without that fold the coordinator would have to know about byte lengths.
+The single design choice that keeps the seam clean: the crash-repair "where is the torn tail" token is OPAQUE to the coordinator. The coordinator computes the synthetic closers (it owns `interruptedTurnClosers` from `dsh-session`), but it only ever tests `tornMarker !== undefined` and passes the value straight back to `commitRepair` — it never inspects it. Each backend picks its own marker type: JSONL carries the byte offset to truncate to plus any complete events decoded from an incomplete final frame, while SQLite carries the seq to delete from. The coordinator therefore knows neither byte lengths nor frame recovery state.
 
 ## Testing
 

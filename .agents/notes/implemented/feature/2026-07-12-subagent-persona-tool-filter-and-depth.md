@@ -49,9 +49,11 @@ The global registry remains live. A deny-only filter admits a later global name 
 
 The depth limit bounds recursive delegation independently of tool visibility. A top-level agent has depth zero; an in-process child has its parent's validated depth plus one. `maxDepth` is an absolute non-negative safe integer, and a start rejects before child ownership begins when the derived child depth is greater than the cap.
 
-Every public entry validates the domain rather than relying on one model-facing configuration path. Negative values, fractions, negative zero, non-finite values, unsafe integers, malformed stored parent depth, and derived overflow all reject. Omitting the cap leaves depth unbounded by this mechanism.
+The effective parent depth is the greater of durable `SessionHeader.delegationDepth` and runtime `AgentOptions.subagentDepth`. An in-process child records its derived depth in the session header, and resume restores that header, so a restart cannot lower the recursion count.
 
-A deployment can combine depth and filtering. For example, it may keep the delegation tool visible at depth one but set `maxDepth: 1`, or deny the delegation tool entirely in children. Neither choice changes the provider's conversation-history behavior.
+Every public entry validates the domain rather than relying on one model-facing configuration path. Negative values, fractions, negative zero, non-finite values, unsafe integers, malformed stored parent depth, and derived overflow all reject. A direct `SubagentStartRequest` may omit the cap to leave depth unbounded; loader-resolved `dsh-tool-subagent` configuration instead defaults to `3`, accepts a numeric override, and uses explicit `'provider-managed'` to omit the cap for an out-of-process provider whose deployment owns its recursion budget. Three is a small finite default that still permits a root plus three descendant generations: the [SDK helper's generated subagent entries](../../../../packages/sdk/helper/src/features/builtin/index.ts) and [JSON-RPC example](../../../../examples/jsonrpc-agent/cordis.yml) use that general policy, while the shipped interactive ACP, headless, and REPL examples pin one. A numeric tool cap fails at provider mount when the provider lacks `depthLimit`.
+
+A deployment can combine depth and filtering, but the numeric cap does not synthesize a filter. The delegation tool stays visible at the cap because authorization may depend on runtime state; every attempted start checks the calling agent's current durable and runtime depth, and a rejected start returns an errored tool result without publishing a child. A deployment may separately deny delegation tools in children when its visibility policy is static. Neither choice changes the provider's conversation-history behavior.
 
 ### Capability gating keeps providers honest
 
@@ -83,10 +85,10 @@ A security design would need a separate authority representation, propagation ru
 
 **Hide only tool schemas.** Presentation-only filtering lets the model execute a tool that the prompt says does not exist through Code Mode or a forged call. One resolver governs both presentation and execution instead.
 
-**Use only tool filtering to stop recursion.** Removing the delegation tool is useful but provider-specific and does not protect direct service callers or alternate delegation tools. Absolute depth is an independent structural bound.
+**Encode the depth cap as an automatic tool filter.** A creation-time filter snapshots a decision that may depend on runtime state, affects only one configured tool name, and does not protect direct service callers or alternate delegation tools. The provider instead enforces the absolute cap at every start.
 
 ## Consequences
 
 Contributors can configure child role, visible global tools, and recursion without defining new providers. Capability checks fail before ownership starts, unpublished setup makes the first request consistent, and one tool resolver prevents presentation/execution drift.
 
-The cost is that deployments must understand live allow/deny behavior and the distinction between visibility and authority. Provider authors must advertise each supported control accurately, and in-process providers must install every requested contribution before publication. The controls deliberately do not solve security confinement or parent-to-child non-escalation.
+The cost is that deployments must understand live allow/deny behavior and the distinction between visibility and authority. A model may call a visible delegation tool after the current depth policy forbids another child and receive an error. Provider authors must advertise each supported control accurately, and in-process providers must install every requested contribution before publication. The controls deliberately do not solve security confinement or parent-to-child non-escalation.
