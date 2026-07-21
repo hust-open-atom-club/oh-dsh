@@ -53,13 +53,13 @@ Status: implemented
 | `dsh-tool-todo` | 持久化全量 snapshot 使用唯一且已 trim 的条目、封闭 status，并且最多有一个活动条目。 |
 | `dsh-time-context` | 标注插件来源的时钟 reading 必须匹配 session 当前打开的 turn、下一个 step 开始前的位置和 elapsed baseline；渲染时间必须可解析，且不得晚于对应事件。 |
 
-基于 session 的 companion 在加载时从已有持久化事件重建 trace。其他检查观测权威 live event 边界或可变服务结果。如果接受无效事件会提交错误状态，验证就在发布前执行。
+基于 session 的 companion 在加载时验证已有持久化事件；关系依赖事件顺序时，会使用每个候选事件之前的事件前缀。其他检查观测权威 live event 边界或可变服务结果。如果接受无效事件会提交错误状态，验证就在发布前执行。
 
 ### 仓库门禁与测试
 
 `verify-package-invariants` 发现每个 workspace 包，并强制 companion 源文件、完整名称注册、仅含具名 export 的 Loader 形状、`./invariant` export、发布文件、依赖、TypeScript reference 和 bundle entry 完整。其 AST 规则拒绝生成标记、默认导出和没有解释的空安装器。非空安装器必须接收并使用失败报告器，注册时还必须传入该经检查的本地 `install` 函数。门禁不会通过方法名或 helper 调用推断语义质量。
 
-Vitest 为每个包测试拓扑使用 `{ enabled: true }` 挂载 `InvariantService`，并加载所有者 companion。不变量 subpath 的 path mapping 会解析源 companion，而不是陈旧的构建输出。聚焦 suite 覆盖每个可执行 companion 的有效和无效观测；穷举拓扑通过真实 Loader 命名空间归一化运行每个源 companion。产物门禁在 plain Node 下导入每个已编译的 `./invariant` 自引用，并重复执行该 Loader 形状检查。合成事件流的测试必须构造有效的外围生命周期，除非测试本身就是在断言违规。
+Vitest 为每个包测试拓扑使用 `{ enabled: true }` 挂载 `InvariantService`，并加载所有者 companion。不变量 subpath 的 path mapping 会解析源 companion，而不是陈旧的构建输出。聚焦 suite 覆盖每个可执行 companion 的有效和无效观测；穷举拓扑通过真实 Loader 命名空间归一化运行每个源 companion。产物门禁会按每个包的精确 `npm pack` 文件清单暂存文件，在 plain Node 下导入该包已编译的 `./invariant` 自引用，并重复执行该 Loader 形状检查；这样，未发布的共享运行时分片会在正式发布前导致门禁失败。合成事件流的测试必须构造有效的外围生命周期，除非测试本身就是在断言违规。
 
 ## 考虑过的替代方案
 

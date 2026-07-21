@@ -53,13 +53,13 @@ The current 100-package workspace has 21 executable companions and 79 justified 
 | `dsh-tool-todo` | Durable whole-list snapshots use unique trimmed items, closed statuses, and at most one active item. |
 | `dsh-time-context` | Plugin-attributed clock readings agree with the session's open turn, next pre-step position, and elapsed baseline; rendered time parses and does not postdate its event. |
 
-Session-backed companions reconstruct their trace from existing durable events when they load. Other checks observe the authoritative live event boundary or mutable service result. Validation runs before publication where accepting an invalid event would otherwise commit bad state.
+Session-backed companions validate existing durable events when they load, using the prefix preceding each candidate where the relationship depends on event order. Other checks observe the authoritative live event boundary or mutable service result. Validation runs before publication where accepting an invalid event would otherwise commit bad state.
 
 ### Repository gate and tests
 
 `verify-package-invariants` discovers every workspace package and enforces companion source, exact-name registration, named-only Loader shape, `./invariant` exports, publication files, dependencies, TypeScript references, and bundle entries. Its AST rule rejects generated markers, default exports, and unexplained empty installers. A non-empty installer must accept and use the failure reporter, and registration must pass that checked local `install` function. The gate deliberately does not infer semantic quality from method names or helper calls.
 
-Vitest mounts `InvariantService` with `{ enabled: true }` for every package test topology and loads the owning companion. The invariant subpath path mapping resolves source companions instead of stale built output. Focused suites cover every executable companion's valid and invalid observations, and the exhaustive topology runs every source companion through the real Loader namespace normalization. An artifact gate imports every compiled `./invariant` self-reference under plain Node and repeats that Loader-shape check. Tests that synthesize event streams must produce a valid surrounding lifecycle unless the test is intentionally asserting a violation.
+Vitest mounts `InvariantService` with `{ enabled: true }` for every package test topology and loads the owning companion. The invariant subpath path mapping resolves source companions instead of stale built output. Focused suites cover every executable companion's valid and invalid observations, and the exhaustive topology runs every source companion through the real Loader namespace normalization. An artifact gate stages each package's exact `npm pack` file inventory, imports its compiled `./invariant` self-reference under plain Node, and repeats that Loader-shape check, so an unpublished shared runtime chunk fails before release. Tests that synthesize event streams must produce a valid surrounding lifecycle unless the test is intentionally asserting a violation.
 
 ## Alternatives considered
 
