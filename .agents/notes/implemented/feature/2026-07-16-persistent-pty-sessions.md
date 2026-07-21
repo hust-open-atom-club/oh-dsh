@@ -70,7 +70,7 @@ With `run_in_background: true`, `dsh-tool-pty` registers the in-flight send on `
 
 ### Local readiness detection
 
-The local backend first recognizes a private OSC prompt marker emitted by its controlled bash startup, then runs three bounded fallback tiers. The marker is removed before output reaches the model and avoids a fixed silence delay for ordinary shell commands on both platforms. All timings are validated config fields: `pollIntervalMs`, `exactProbeAfterMs`, `idleSilenceMs`, and `timeoutMs`.
+The local backend first recognizes a private OSC prompt marker emitted by its controlled bash startup, then runs three bounded fallback tiers. The marker is removed before output reaches the model and avoids a fixed silence delay for ordinary shell commands on both platforms. Unpublished startup does not accept zero-output silence as readiness; timeout rejects the spawn. All timings are validated config fields: `pollIntervalMs`, `exactProbeAfterMs`, `idleSilenceMs`, and `timeoutMs`.
 
 On Linux, the inspector reads the shell's terminal foreground PGID from `/proc/<shellPid>/stat`, enumerates every process and thread in that process group, and probes their current syscalls. A positive Tier 1 result requires an observed stdin wait: direct `read(0)`, a permitted read of a `select`/`pselect6` or `poll`/`ppoll` argument containing fd 0, or an epoll interest list containing fd 0. Unreadable process memory and unrecognized syscalls are misses, never positive guesses. Architecture tables contain only syscall numbers defined by the corresponding Linux UAPI; unsupported architectures skip Tier 1.
 

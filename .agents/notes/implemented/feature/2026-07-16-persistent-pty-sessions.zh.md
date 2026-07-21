@@ -70,7 +70,7 @@ agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出�
 
 ### 本地就绪检测
 
-本地后端先识别受控 bash 启动时发出的私有 OSC prompt marker，再执行 3 个有界 fallback 层级。marker 在输出到达模型前被移除，使两个平台上的普通 shell 命令都无需固定等待静默阈值。所有时间参数都是经校验的配置字段：`pollIntervalMs`、`exactProbeAfterMs`、`idleSilenceMs` 和 `timeoutMs`。
+本地后端先识别受控 bash 启动时发出的私有 OSC prompt marker，再执行 3 个有界 fallback 层级。marker 在输出到达模型前被移除，使两个平台上的普通 shell 命令都无需固定等待静默阈值。尚未发布的 startup 不会把零输出静默视为就绪；timeout 会拒绝 spawn。所有时间参数都是经校验的配置字段：`pollIntervalMs`、`exactProbeAfterMs`、`idleSilenceMs` 和 `timeoutMs`。
 
 在 Linux 上，检查器从 `/proc/<shellPid>/stat` 读取 shell 的终端前台 PGID，枚举该进程组中的每个进程与线程，并检查它们当前的 syscall。Tier 1 只有观察到 stdin 等待才返回正结果：直接 `read(0)`、获准读取且含 fd 0 的 `select`/`pselect6` 或 `poll`/`ppoll` 参数，或者含 fd 0 的 epoll interest list。无法读取的进程内存和未识别的 syscall 都是 miss，绝不作为正向猜测。架构表只包含对应 Linux UAPI 定义的 syscall number；不支持的架构跳过 Tier 1。
 
