@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-21-semantic-session-checkpoints.md: e444e493bd0feface12088b7dba9227703fa147f
-2026-07-21-semantic-session-checkpoints.zh.md: 503c768b5653e22c464c5892bd7f4336113d1e38
+2026-07-21-semantic-session-checkpoints.md: b672375a177964589ef4a3bf3661d66a2086d0d0
+2026-07-21-semantic-session-checkpoints.zh.md: eedb4df471b17d42fad9b8f1c35f6139b9abe470
