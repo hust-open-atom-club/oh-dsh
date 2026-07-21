@@ -12,7 +12,7 @@ Nested Code calls never owned cards, so producing metadata for the outer call so
 
 ## Decision
 
-The canonical tool registry pipeline owns the final model-facing outer content. On success, the `run_code` output renderer renders captured logs followed by the return value or the explicit no-output marker. Runtime failures and policy denials are normalized into error content by `ToolRegistry` without invoking that renderer. Post-execute policy and spill may replace content before persistence.
+The canonical tool registry pipeline owns the final model-facing outer content. On success, the `run_code` output renderer renders captured logs followed by the return value or the explicit no-output marker. Runtime failures and pre-execution policy denials are normalized into error content by `ToolRegistry` without invoking that renderer. A post-execute block runs after successful rendering and replaces the result with error content; other post-execute policy and spill decisions may replace content before persistence.
 
 `run_code.presentResult` now forwards the final `result.content` into one generic result card. It deliberately omits the title so the pending card retains the program text. The redundant logs-only `presentationMeta` projection is removed: `tool/result.content` is the durable, replayable, post-policy projection and the card's only result-content source.
 
