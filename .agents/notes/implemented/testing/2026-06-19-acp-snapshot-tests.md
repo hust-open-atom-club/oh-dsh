@@ -57,7 +57,7 @@ Normalization replaces session, cwd, protocol-id, timestamp, path, and process v
 
 ### Isolation: normalization now, sandbox later
 
-Tool determinism comes from a temporary cwd, scrubbed environment, fresh non-login shell, constrained commands, and normalization. Concurrent replay runs own separate cwd, persistence, and fixed-length scenario-keyed spill roots, so one scenario's teardown cannot delete another's in-flight full-output recovery while real-path preview budgets remain stable. This tier does not claim OS confinement. A sandboxed executor can replace the local backend through the existing [capability seam](../architecture/2026-06-13-capability-seams.md) if a stronger tier is needed.
+Tool determinism comes from a generated cwd, scrubbed environment, fresh non-login shell, constrained commands, and normalization. The cwd defaults to the platform temp directory; a scenario can instead supply its parent when temp is an always-writable policy root and the behavior needs an independent project location. Concurrent replay runs own separate cwd, persistence, and fixed-length scenario-keyed spill roots, so one scenario's teardown cannot delete another's in-flight full-output recovery while real-path preview budgets remain stable. This tier does not claim OS confinement. A sandboxed executor can replace the local backend through the existing [capability seam](../architecture/2026-06-13-capability-seams.md) if a stronger tier is needed.
 
 ### The replay plugin is its own package
 
@@ -75,6 +75,6 @@ Tool determinism comes from a temporary cwd, scrubbed environment, fresh non-log
 
 ## Consequences
 
-The new tier adds reviewed per-scenario input, session, stdout, optional override, and optional workspace fixtures. Workspace seeds are copied into the temporary cwd for both record and replay. In return the tier provides deterministic keyless transcript coverage through the real Loader and tool composition. The subprocess, input, workspace, normalization, and replay harness can support examples beyond ACP.
+The new tier adds reviewed per-scenario input, session, stdout, optional override, and optional workspace fixtures. Workspace seeds are copied into the generated cwd for both record and replay. In return the tier provides deterministic keyless transcript coverage through the real Loader and tool composition. The subprocess, input, workspace, normalization, and replay harness can support examples beyond ACP.
 
 This Agent Note relates to but does not supersede the [proposed determinism Agent Note](../../proposed/testing/2026-06-11-deterministic-and-stress-testing.md): that proposal's "universal replay fixture" re-derives session *message history* after every test (an internal-consistency invariant), whereas snapshot tests pin the *external protocol output*. They are complementary — one guards the event-sourcing invariant, the other guards the editor-facing contract.
