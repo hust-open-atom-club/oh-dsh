@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-21-log-backed-session-titles.md: c78f4f16d12cdfacbf7bf5d494e93276d6ac9769
-2026-07-21-log-backed-session-titles.zh.md: 845ea9fbc1c50574d61086b9c744d2efe65cf433
+2026-07-21-log-backed-session-titles.md: 0690b09965df516b180652182c15e34c8faf06cc
+2026-07-21-log-backed-session-titles.zh.md: f973fdca4897bd57590fb0bc53a20a345144089f
