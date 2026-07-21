@@ -18,6 +18,14 @@ Background bash tasks carry an opaque owner token equal to the owning session id
 
 Connection teardown clears the live map, settles each pending prompt as cancelled, and disposes all `AgentHandle`s in parallel. Each handle stops and awaits its loop, flushes the session while attached, unregisters the agent, and removes the session. Teardown is memoized and shared by client disconnect and plugin disposal.
 
+## Protocol and workspace scope
+
+[ACP v1 expressly permits several concurrent sessions on one connection](https://github.com/agentclientprotocol/agent-client-protocol/blob/01beb5fb5eec60e9f516a80d85eb03594bac61e3/docs/get-started/architecture.mdx#L16-L24), and each new session carries its own primary `cwd`. This bridge implements that session-level multiplexing, including different primary workspaces as recorded by the [per-session cwd decision](../architecture/2026-07-02-fs-per-session-cwd.md); it does not create one agent subprocess per session.
+
+A multi-root project inside one session is a separate optional capability: ACP defines the [effective roots as the primary `cwd` plus `additionalDirectories`](https://github.com/agentclientprotocol/agent-client-protocol/blob/01beb5fb5eec60e9f516a80d85eb03594bac61e3/docs/protocol/v1/session-setup.mdx#L313-L367). [Zed sends the remaining project work directories only when the agent advertises that capability](https://github.com/zed-industries/zed/blob/ea77ca2818f3e059a2b61ecc7e63b67e01e1cec5/crates/agent_servers/src/acp.rs#L1139-L1145), otherwise it [drops them from the session request](https://github.com/zed-industries/zed/blob/ea77ca2818f3e059a2b61ecc7e63b67e01e1cec5/crates/agent_servers/src/acp.rs#L1454-L1472). The bridge does not advertise this capability and rejects non-empty values, as recorded in its [known limitations](../../../../packages/ui/acp/README.md#known-limitations-and-deferred-work), so a current Zed multi-root project reaches it with only the first work directory.
+
+[The standard transport is one editor-launched agent subprocess per stdio connection](https://github.com/agentclientprotocol/agent-client-protocol/blob/01beb5fb5eec60e9f516a80d85eb03594bac61e3/docs/protocol/v1/transports.mdx#L17-L42); multiple editor connections therefore require multiple subprocesses or a custom transport, while this decision guarantees multiple sessions within one connection. Within that connection, `ctx.sandboxPolicy` resolves every session's `cwd` as its own `workspace-write` root, so the shared bash and filesystem services can serve concurrent projects without granting cross-project writes. This does not add ACP `additionalDirectories`; it removes the process-wide root limit from the already-supported one-primary-root-per-session path.
+
 ## Alternatives considered
 
 **One live session per connection** — rejected. It adds process overhead and contradicts the target client's multi-session shape without removing multiplexing needs from the editor.
