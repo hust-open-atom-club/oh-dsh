@@ -28,7 +28,7 @@ A migration of the event/vocabulary surface to runtime schemas touches, at minim
 - **Six merge-extensible maps** (~370 LOC of core types): `ContentBlockMap`, `MessageSourceMap`, `FinishReasonMap` (in `dsh-llm`); `TurnTriggerMap`, `TurnEndReasonMap`, `SessionEventMap` (in `dsh-session`).
 - **~10 `declare module` augmentation sites** across `dsh-agent`, `dsh-agent-loop`, `dsh-bash`, `dsh-llm`, `dsh-session`, `dsh-session-persistence`, `dsh-system-prompt`, `dsh-tools` — each would move from declaration merging to a runtime `register()` call.
 - **The event producers** — 16 `session.append(...)` call sites in the loop — unchanged in shape but now validated at the boundary.
-- **~7 switch-consumers** that branch on these unions: `deriveMessages` (`dsh-session`), `BlockAssembler` (`dsh-llm`), the `dsh-invariants` plugin, both LLM adapters (`dsh-llm-deepseek`, `dsh-llm-pi-ai`), and the tool schema layer (`dsh-tools`). The `assertNever`-on-closed-unions vs fall-through-on-extensible-unions convention (a documented lint rule) would need rethinking — runtime variants are not statically exhaustive.
+- **~7 switch-consumers** that branch on these unions: `deriveMessages` and the package-owned invariant companion (`dsh-session`), `BlockAssembler` (`dsh-llm`), both LLM adapters (`dsh-llm-deepseek`, `dsh-llm-pi-ai`), and the tool schema layer (`dsh-tools`). The `assertNever`-on-closed-unions vs fall-through-on-extensible-unions convention (a documented lint rule) would need rethinking — runtime variants are not statically exhaustive.
 - **The `defineTool` `InferArgs` DSL** (`dsh-tools`), which derives zero-cast `execute` arg types from a compile-time schema spec — the showcase of the current approach.
 - **Docs**: architecture.md (the pattern is described as foundational), [dev-mode invariants](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.md), and any Agent Note that references the pattern.
 
@@ -37,7 +37,7 @@ This is a repository-wide vocabulary redesign, not a persistence implementation 
 ## Alternatives considered
 
 ### A. Status quo — merge-extensible types + `isJsonValue` at the durable boundary
-Keep the compile-time pattern. Persistence stays opaque-JSON + serializability guard. Plugins extend via declaration merging; correctness of event *shape* is the producer's responsibility, enforced by TypeScript at compile time and by the `dsh-invariants` plugin's structural checks in dev.
+Keep the compile-time pattern. Persistence stays opaque-JSON + serializability guard. Plugins extend via declaration merging; correctness of event *shape* is the producer's responsibility and is enforced by TypeScript at compile time. Package-owned invariant companions check selected cross-record relationships when enabled but do not provide general runtime shape schemas.
 
 - **Pros**: zero churn; plugin extension is a one-line `interface` augmentation with full type inference and no runtime registration ceremony; no new runtime dependency; the `defineTool` DSL and `assertNever` exhaustiveness keep working.
 - **Cons**: no runtime structural validation at the persistence boundary or at plugin seams; a malformed-but-JSON datum is caught late.
@@ -72,4 +72,4 @@ Defer. If runtime validation is wanted at the durable boundary, **Option B** (sc
 
 - If a registry is adopted, is the library **schemastery** (already in the tree, already the config schema lib) or **Zod** (richer ecosystem, currently only transitive)? Adopting two schema libraries is a cost in itself.
 - Can a hybrid keep compile-time inference (so `defineTool` and plugin DX survive) while adding an *optional* runtime schema per variant, validated only at the persistence/wire boundary rather than on every in-process append?
-- Does the `dsh-invariants` plugin already cover enough of the runtime-shape gap in dev that boundary validation is only needed for genuinely untrusted input (reload of an externally-modified log)?
+- Does the `ctx.invariants` service already cover enough of the runtime-shape gap when enabled that boundary validation is only needed for genuinely untrusted input (reload of an externally-modified log)?
