@@ -34,7 +34,7 @@ type ToolExecutionResult =
 
 `tools/post-execute` has two mutually exclusive successful projections. Replacing `content` changes only Native/model presentation and preserves the canonical value and metadata. Replacing `value` revalidates the replacement and recomputes both presentation projections. A block removes the value and becomes a failure. Content replacement is therefore not a confidentiality mechanism: policy that must prevent programmatic access blocks the call or replaces the value.
 
-Canonical values are execution-local. The agent loop persists `tool/result` with only `content`, `error`, and optional `meta`; Code Mode's `tool/code-dispatch` persists only its bounded summary. Neither event stores the intermediate value, so replay reproduces presentation but cannot reconstruct the programmatic result. When a tool declares `presentationMeta`, it is computed only for a direct surface call; a nested Code dispatch gets no metadata or result card. The outer `run_code` card instead reads final post-policy content and declares no presentation metadata. Generic and tool-owned spill projections similarly skip nested dispatches, whose canonical value never enters model context.
+Canonical values are execution-local. The agent loop persists `tool/result` with only `content`, `error`, and `meta`; Code Mode's `tool/code-dispatch` persists only its bounded summary. Neither event stores the intermediate value, so replay reproduces presentation but cannot reconstruct the programmatic result. `presentationMeta` is computed only for a direct surface call, including the outer `run_code`; a nested Code dispatch gets no metadata or result card. Generic and tool-owned spill projections similarly skip nested dispatches, whose canonical value never enters model context.
 
 The first-party tools preserve their existing Native text while returning domain DTOs:
 
@@ -58,7 +58,7 @@ The first-party tools preserve their existing Native text while returning domain
 | `structured_output` | `{ recorded: true }` |
 | `run_code` | `{ logs: string[], result?: JsonValue }` |
 
-Provider and executor acquisition limits remain real limits on the canonical value. Formatting-only limits belong in `render`; `glob` and `grep`, for example, keep every acquired item in `value` while their Native projection retains and best-effort spills the configured first page. Filesystem mutations derive replayable diff metadata from `args` and the canonical before/after value rather than returning UI state from the body.
+Provider and executor acquisition limits remain real limits on the canonical value. Formatting-only limits belong in `render`; `glob` and `grep`, for example, keep every acquired item in `value` while their Native projection retains and best-effort spills the configured first page. Generic spill prepends and delegates its post-execute listener so an ordinary tool-owned asynchronous projection completes before generic byte bounding regardless of plugin load order. Filesystem mutations derive replayable diff metadata from `args` and the canonical before/after value rather than returning UI state from the body.
 
 MCP bridges preserve protocol blocks through `McpResult<{...}> = { content: JsonValue[]; structuredContent? }`. An advertised `outputSchema` is enforced when it belongs to the supported raw subset; unsupported schemas fall back to `JsonValue` rather than pretending to validate them. Native rendering still uses the existing MCP-to-`ContentBlock` projection, and MCP `isError` becomes a failed tool result.
 
