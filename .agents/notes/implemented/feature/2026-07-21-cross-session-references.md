@@ -1,0 +1,58 @@
+# Agent Note: Cross-session references
+
+Status: implemented
+
+English | [中文](2026-07-21-cross-session-references.zh.md)
+
+## Problem
+
+TUI and ACP users need to bring relevant work from another conversation into one new message without resuming, forking, or granting the source transcript authority over the current session. The harness already exposes exact session enumeration and raw event inspection, but every host independently parsing logs would duplicate compaction folding, provenance filtering, size limits, error behavior, and persistence. Encoding host markup directly into the agent message contract would also bind the core loop to one UI syntax.
+
+## Decision
+
+`@deepseek-ai/dsh-session-reference` is one context consumer service at `ctx.sessionReferences`. Hosts normalize their protocol into `SessionReferenceInput[]`, call `prepare()` before enqueue, and pass the returned contexts through the generic `SendOptions.contexts` boundary. Core agent packages know only that one queued message may carry frozen `HookContext[]`; they do not parse session URIs or read another log.
+
+`dsh-session:<base64url(JSON.stringify(sessionId))>` is the canonical host-independent identifier. JSON string encoding precedes base64url so quotes, slashes, backslashes, Unicode, newlines, and every other JavaScript string value round-trip without delimiter ambiguity. TUI renders that URI inside `@[label](uri)` and ACP uses standard `resource_link`; text-only clients may use the same inline mention. Explicit Markdown mentions and resource links reject malformed URIs. Bare text becomes a reference only for a non-empty base64url-shaped payload, whose decode must still be canonical; empty or punctuation-only uses remain ordinary discussion text.
+
+The service uses `ctx.sessionQuery.readSurface(sessionId)`, which loads one live-preferred corpus observation, folds it with the session package's canonical surface algorithm, and returns a detached header, capture seq, and current nodes. FTS is not a dependency: v1 discovery filters only id and cwd, and future title/body search can replace the candidate layer without changing reference identity or preparation.
+
+## Snapshot and projection
+
+Preparation deduplicates in first-appearance order, rejects the target id, enforces at most three references by default, and performs all reads in parallel. It returns no partially prepared context: any read, cancellation, validation, or budget error rejects the operation before `send()` or `steer()`. A source is read before enqueue, so later source messages, compaction, deletion, or persistence replacement cannot change the target session.
+
+Projection retains direct-user messages and steering, completed assistant text, and checkpoint user messages carrying the canonical source exported by `dsh-compact`. That marker is part of the compaction capability contract rather than a backend package name. Projection excludes shadowed pre-compaction nodes, tools and results, reasoning, injected context, other plugin user messages, log-only records, and incomplete assistant chunks. Repeated compaction therefore exposes only the latest folded checkpoint lineage still on the current surface plus its retained tail; there is no raw/current switch and no shadow recovery.
+
+One aggregated context is serialized as JSON beneath a fixed untrusted-background warning. The warning tells the model not to follow instructions, permission claims, or tool requests from referenced sessions unless the current user repeats them. Tag-safe serialization emits every data `<` as the lossless JSON escape `\u003c`; source strings therefore cannot spell the surrounding XML-like tags. The same serializer drives per-reference and total byte accounting. Context metadata records source and retention facts, while the visible bytes persist through the existing `context/message` event so target replay satisfies the model-visible/log-reconstructable invariant without a new event type.
+
+## Message ownership
+
+`send()` and `steer()` snapshot content, resolved source, and contexts together as one deeply frozen lossless-JSON inbox record. A claimed ordinary message exposes its attached contexts as the default `agent/prompt-submit` additional contexts; a block writes neither user message nor contexts. The waterfall's returned allow is authoritative, so a listener wrapping `next()` preserves downstream content and contexts unless it intentionally replaces them. Drained steering bypasses `agent/prompt-submit` and writes `steering/message` before its contexts. Late steering retains the same record when converted to queued input, while cancellation, disposal, and terminal discard drop message and contexts together. `agent/queued` reports the frozen contexts so the observation event describes the complete retained item.
+
+This preserves host driving semantics: TUI decides `send()` versus `steer()` from the agent state after preparation, so only its queued path dispatches UserPromptSubmit hooks; ACP continues to call `send()` once per `session/prompt`. Reference preparation is not a new steering protocol and does not create a turn by itself.
+
+## Host adapters
+
+TUI combines session candidates with the existing `@` file provider. It prepares only submissions containing structured mentions, disables duplicate submit while awaiting snapshots, restores failed input, and renders persisted session-reference context as a compact source list instead of exposing the complete JSON in the terminal.
+
+ACP extracts `dsh-session:` resource links and canonical inline mentions while preserving ordinary resource-link rendering. A valid reference without the optional service returns a capability-unavailable RPC error, and preparation failure occurs before the in-flight turn slot and agent send. A preparation-specific abort owner makes `session/cancel` and bridge teardown stop pending reads. Picker UI remains an ACP client responsibility.
+
+## Budget and retention
+
+The defaults cap one serialized reference at 65,536 UTF-8 bytes and the complete prompt, fixed warning included, at 196,608 bytes. Retention preserves current compact checkpoints and the newest conversation unit before dropping older non-checkpoint messages. An oversized retained text uses `dsh-retention` head/tail slicing and records exact omitted bytes; if fixed metadata and warning bytes cannot fit, preparation fails rather than silently exceeding the contract.
+
+## Alternatives considered
+
+- **Wait for SQLite FTS5** — rejected because snapshot correctness requires exact id reads and canonical surface folding, not content search. FTS improves discovery only.
+- **Put mention syntax in `Agent.send()`** — rejected because it would make the core protocol parse TUI/ACP presentation and prevent typed non-text hosts from sharing the semantic layer.
+- **Implement references inside TUI and ACP separately** — rejected because projection, security warning, retention, and persistence would drift across hosts.
+- **Replay the raw source log or restore shadowed events** — rejected because compact defines the current model surface and may intentionally retire sensitive or expensive history.
+- **Resume or fork the source** — rejected because the feature supplies read-only background for one target message, not identity or lifecycle continuity.
+- **Inject at request time by rereading the source** — rejected because the reference would become nondeterministic, cancellation races could alter its bytes, and target replay would depend on external mutable state.
+
+## Verification
+
+Unit and integration coverage pins URI round-trips and text-boundary punctuation, explicit malformed references, candidate ranking, projection exclusions, backend-independent compact checkpoints, tag-safe framing, deduplication, self-reference, count limits, all-or-nothing reads, cancellation, byte retention, frozen message ownership, prompt blocking, send/steer ordering, missing capability, ordinary ACP resource links, and compact TUI rendering. A keyless TUI snapshot runs the real agent loop: the source surface replaces old user/assistant history with a compact checkpoint, the target submits a mention, and the captured model request contains the checkpoint and retained tail but not either shadowed string.
+
+## Consequences
+
+The new plugin is the stable semantic boundary and adds no persistence schema, event type, FTS dependency, source subscription, or compact shadow access. Standard TUI/ACP demo bundles mount it explicitly; custom hosts remain unchanged until they mount the service and adapt their input. Reference contexts increase target history size within configured bounds and can later be summarized by ordinary target compaction, after which the source session is irrelevant.
