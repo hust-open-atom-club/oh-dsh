@@ -14,7 +14,7 @@ The canonical surface separates transformable policy, around-dispatch control, a
 
 **Agent events** (`dsh-agent`):
 - `agent/session-start(agent, source)` — emit, once before turn 1, carrying a `SessionStartSource` (`startup` for a fresh/forked create, `resume` for a reloaded persisted session; `clear`/`compact` reserved). A pure notification — it CANNOT block startup (a deliberate gap: a bridge logs/injects, it does not gate startup). A listener seeds context via `agent.inject()`.
-- `agent/prompt-submit(agent, content, source, next) → PromptDecision` — waterfall, fired per drained queued message inside the open turn, before the `user/message` append. `allow` (optionally rewriting the prompt `content` or attaching separately sourced `additionalContexts[]`) or `block` (dropping the prompt; the loop appends a durable `prompt/blocked` in its place — see the dispatch note below).
+- `agent/prompt-submit(agent, content, source, next) → PromptDecision` — waterfall, fired for the turn's single claimed queued message before the `user/message` append. `allow` optionally rewrites the prompt `content` or attaches separately sourced `additionalContexts[]`; `block` appends a durable `prompt/blocked` and rejects that zero-step turn.
 
 **`agent/turn-continuation`** receives and returns a `ContinuationDecision`. A `{action:'continue', reason?}` may carry model-facing content and source recorded as next-step steering in the same turn — the typed twin of the `/goal` step-end-steer pattern. It is not a `context/message`, so its type does not offer durable context metadata.
 
@@ -30,11 +30,11 @@ Every call follows `tools/pre-execute` → guards → `tools/execute` → dispat
 
 Core dispatch and the tool body sit inside normalization boundaries, so tool, listener, malformed-result, non-JSON result, and identity-shape failures resolve as JSON-safe `isError` results rather than escaping the turn. A post-execute listener can therefore inspect a thrown tool, and a final observer sees exactly what the caller receives and the session log can persist.
 
-**`TurnEndReason.rejected`** (`dsh-session`): a turn whose entire prompt batch was blocked by `prompt-submit`.
+**`TurnEndReason.rejected`** (`dsh-session`): a zero-step turn whose claimed prompt was blocked by `prompt-submit`.
 
 ### Three load-bearing loop decisions
 
-1. **Open the turn before prompt policy.** A fully blocked batch becomes a zero-step `rejected` turn, preserving enclosure and giving ACP a durable terminal event. Every veto also records `prompt/blocked` with the original prompt and reason, so mixed batches retain blocked inputs. Every allowed `additionalContexts` entry is injected into the open turn.
+1. **Open the turn before prompt policy.** A blocked prompt becomes a zero-step `rejected` turn, preserving enclosure and giving ACP a durable terminal event. The veto records `prompt/blocked` with the original prompt and reason, while every allowed `additionalContexts` entry is injected into the open turn. Each claimed ordinary-send item is the sole message in its turn under the [one-send-one-turn simplification](../simplification/2026-07-17-one-send-one-turn.md); a pre-start drop creates no turn.
 
 2. **Post-tool `additionalContexts` and asynchronous injections enter the active-batch FIFO and append when that batch settles.** `content`/`feedback` shape the result `execute()` returns, but each context is a separate `context/message`, and a single step or composite tool can produce many. Appending context immediately would interleave `result(c1) → context → result(c2)` or place nested context before its outer result, breaking tool-call/result adjacency. `ToolRunContext.deferContext()` therefore collects nested-dispatch context through failures, `execute()` surfaces the ordered array on `ToolExecutionResult`, and the loop accepts it into the same FIFO as `agent.inject()` calls made during execution. The FIFO appends after every recorded result when the batch settles, including before an interrupted turn closes. An accepted outer call preserves deferred contexts before decision contexts; an outer block discards deferred contexts and exposes only contexts explicitly supplied by the blocking decision.
 

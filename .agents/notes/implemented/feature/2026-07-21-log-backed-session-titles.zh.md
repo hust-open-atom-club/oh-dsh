@@ -18,7 +18,7 @@ Status: implemented
 
 每个已接受的修订都是纯日志 `session/title` 事件。其载荷包含规范化后的非空文本、用于派生标题的所有合格且来源为人类的 `user/message` 的准确 seq，以及回退来源信息，或已注册的提供方 id 加可选的提供方和模型路由。辅助标题模型发起调用前，共享辅助组件会追加一个纯日志 `session/title-llm-request` 事件，其载荷包含标题提供方 id、准确的源 seq、路由、系统提示词、消息和输出 token 上限；即使后续生成失败，这次请求仍可审计。发送的请求信封经过深度冻结，以确保其与该记录精确一致，但它有意不携带进程本地的 agent loop（智能体循环）请求身份，因此仅针对 agent loop 的重建检查不会将它与主对话请求头进行比较。未进入调用阶段的验证失败不会创建请求事件。`foldSessionTitle()` 选择最新的标题事件，并将该事件的 seq 和时间戳加入 `SessionTitleSnapshot`。这两类事件都不会进入 `session.surface` 或 `deriveMessages()`。
 
-核心会话包通过 `ctx.sessions.appendOutOfBand()` 暴露这一接口，但只允许所属插件同时通过声明合并向 `OutOfBandSessionEventMap` 添加标记的插件事件类型使用。开放轮次会直接接收纯日志事件，并负责其常规检查点。已关闭的日志会在该插件的触发器下接收 `turn/start → event → turn/end`，随后等待刷写完成。合成轮次一旦开启，即使目标追加失败，系统仍会尝试将其关闭并刷写；整个序列完成前会延迟 detach。会话标题提供 `session-title` 零步骤触发器，并让这两类标题事件都使用这一服务边界。
+核心会话包通过 `ctx.sessions.appendOutOfBand()` 暴露这一接口，但只允许所属插件同时通过声明合并向 `OutOfBandSessionEventMap` 添加标记的插件事件类型使用。开放轮次会直接接收纯日志事件，并负责其常规检查点。已关闭的日志会在该插件的触发器下接收 `turn/start → event → turn/end`，随后等待刷写完成。合成轮次一旦开启，即使目标追加失败，系统仍会尝试将其关闭并刷写；整个序列完成前会延迟 detach。会话标题提供不带消息来源的 `session-title` 零步骤触发器，并让这两类标题事件都使用这一服务边界。该触发器并非由消息引起，因此可合并扩展的 `TurnTriggerMap` 的消费方在读取变体字段前，会先根据 `kind` 判别类型；例如，目标轮次准入会忽略所有非 `message` 触发器。
 
 ### 输入与异步时序
 
