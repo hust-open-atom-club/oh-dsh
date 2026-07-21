@@ -22,22 +22,22 @@ harness 已具备文本搜索与文件读取能力，但二者都无法识别程
 
 `dsh-lsp-local` 是通用 host，不是语言服务器目录或安装器。部署显式配置命令与映射；未来 preset 属于组合插件或 `cordis.yml` overlay。
 
-模型与服务边界仅公开 `definition`、`references`、`implementation` 和 `hover`；`ctx.lsp` 不提供任意 JSON-RPC 方法。
+模型与服务边界仅公开 `goToDefinition`、`findReferences`、`goToImplementation` 和 `hover`；`ctx.lsp` 不提供任意 JSON-RPC 方法。这些操作字面量与 Claude Code 熟悉的 camelCase 命名一致，而工具名与 `file_path` 字段仍由 harness 自行定义。
 
 提示词将 LSP 定位为精确查询手段：`Use search/read for ordinary navigation. Use lsp when textual matches are ambiguous or before a change requires precise definitions, implementations, or references.`
 
-## Package 与职责边界
+## 包与职责边界
 
 `dsh-lsp` 按带品牌类型的 id 和扩展名到语言 id 的映射注册提供方。`registerProvider()` 以原子方式占用 id 与所有规范化扩展名：输入无效或存在冲突时不发布任何状态，清理函数释放全部占用。提供方插件通过 `ctx.effect()` 注册。系统按查询且不受顺序影响地选择提供方；没有匹配项时返回结构化不可用错误。第一版不提供 glob、language-id 或显式路由选择器，也不静态声明操作能力。
 
-服务边界只公开 `query(request, signal?)`，因为没有字段需要实现层填充默认值：`workspaceRoot` 是必填项，`languageId` 来自注册映射，超时与结果限制由消费方负责。`query()` 执行校验、选择与推导时不使用隐藏的 `??` 后备逻辑，因此没有需要 resolve 的可执行 spec。`dsh-tool-lsp` 只把 `exec.signal` 作为裸 `AbortSignal` 传递，与 web 一致，并使 `dsh-lsp` 不依赖 `dsh-tools`。提供方在选择前被移除时按不可用失败；之后的释放遵循已选提供方的取消生命周期，不改路由。
+服务边界只公开 `query(request, signal?)`，因为没有字段需要实现层填充默认值：`workspaceRoot` 是必填项，`languageId` 来自注册映射，超时与结果限制由消费方负责。`query()` 执行选择与推导时不使用隐藏的 `??` 后备逻辑，因此没有需要 resolve 的可执行 spec。`dsh-tool-lsp` 校验模型参数，并只把 `exec.signal` 作为裸 `AbortSignal` 传递，与 web 一致，并使 `dsh-lsp` 不依赖 `dsh-tools`。提供方在选择前被移除时按不可用失败；之后的释放遵循已选提供方的取消生命周期，不改路由。
 
 预期契约如下：
 
 ```ts
 import type { Branded } from '@deepseek-ai/dsh-brand'
 
-type LspOperation = 'definition' | 'references' | 'implementation' | 'hover'
+type LspOperation = 'goToDefinition' | 'findReferences' | 'goToImplementation' | 'hover'
 type LspProviderId = Branded<'LspProviderId'>
 
 interface LspPosition {
@@ -77,7 +77,7 @@ interface LspService {
 }
 ```
 
-映射键规范化为带前导点的小写扩展名，并按 `filePath` 的最后一个扩展名选择；语言 id 仅用于文档同步。服务边界中的位置和范围从零开始按 UTF-16 计数。`references` 始终包含声明：提供方在内部执行该约束，本地映射设置 `context.includeDeclaration: true`，调用方不能配置。封闭结果联合将导航统一为位置，将 `hover` 统一为内容或 `null`；导航结果携带提供方解析后的工作区根目录，使消费方依据同一规范化根目录相对化文件 URI。服务边界不公开协议类型、进程或文档控制，也不提供通用请求逃生口。
+映射键规范化为带前导点的小写扩展名，并按 `filePath` 的最后一个扩展名选择；语言 id 仅用于文档同步。服务边界中的位置和范围从零开始按 UTF-16 计数。`findReferences` 始终包含声明：提供方在内部执行该约束，本地映射设置 `context.includeDeclaration: true`，调用方不能配置。封闭结果联合将导航统一为位置，将 `hover` 统一为内容或 `null`；导航结果携带提供方解析后的工作区根目录，使消费方依据同一规范化根目录相对化文件 URI。服务边界不公开协议类型、进程或文档控制，也不提供通用请求逃生口。
 
 `dsh-lsp-local` 负责主机文件、服务器配置、JSON-RPC、进程与临时文档状态和协议转换；它依赖 `dsh-lsp` 与 Node API，不依赖 `dsh-fs`。服务器表的键是提供方 id。插件在注册前解析每个服务器的本地设置；如果后续映射无效或发生冲突，插件会撤销此前的注册，并为每个提供方保留独立进程池。`dsh-tool-lsp` 在运行时只注入 `tools`、`lsp` 和 `systemPrompt`，通过包内的 `sessionCwd(exec)` 辅助函数从 `exec.agent?.session.header.cwd` 取得工作区，其取值方式与文件系统工具一致，也不导入提供方。
 
@@ -87,18 +87,18 @@ interface LspService {
 
 ```ts
 interface LspToolInput {
-  readonly operation: 'definition' | 'references' | 'implementation' | 'hover'
+  readonly operation: 'goToDefinition' | 'findReferences' | 'goToImplementation' | 'hover'
   readonly file_path: string
   readonly line: number
   readonly character: number
 }
 ```
 
-`line` 和 `character` 是从一开始计数的正数 UTF-16 光标坐标；工具将其转换为服务边界中从零开始的 `LspPosition`，并将渲染位置转回。`references` 包含声明，避免影响分析漏掉定义位置。提供方、语言 id、工作区根目录、限制、超时、初始化和可执行文件均不进入模型输入。
+`line` 和 `character` 是从一开始计数的正数 UTF-16 光标坐标；工具将其转换为服务边界中从零开始的 `LspPosition`，并将渲染位置转回。`findReferences` 包含声明，避免影响分析漏掉定义位置。提供方、语言 id、工作区根目录、限制、超时、初始化和可执行文件均不进入模型输入。
 
 工具必须从会话 `header.cwd` 取得 `workspaceRoot`，没有后备值；缺失时在查询或启动前以 `LSP_WORKSPACE_REQUIRED` 失败。本地提供方基于根目录解析相对路径并直接接受绝对路径；两种路径都会进行规范化，如果目标位于规范工作区外，则在启动前拒绝。
 
-位置按文件稳定分组并渲染为 `path:line:character`。Node `fileURLToPath()` 可接受的 `file:` URI 在工作区内转换为相对路径，在工作区外转换为绝对路径；其他 URI 保持原样。`maxLocations` 默认值为 `100`，`maxHoverChars` 在 `hover` 归一化后应用，默认值为 `16_000`；两者都会报告省略数量。空位置与 `null` hover 是成功的无结果响应；格式错误的载荷保持为结构化错误。
+位置按文件稳定分组并渲染为 `path:line:character`。Node `fileURLToPath()` 可接受的 `file:` URI 在工作区内转换为相对路径，在工作区外转换为绝对路径；其他 URI 保持原样。`maxLocations` 默认值为 `100`，并报告省略的条目；`maxResultChars` 默认值为 `16_000`，并限制每个完整渲染结果，其中包括截断元数据。空位置与 `null` hover 是成功的无结果响应；服务器载荷缺失或格式错误时，以结构化 `LSP_MALFORMED_RESPONSE` 错误失败。
 
 ACP 使用 `{ card: 'generic', kind: 'search', title, locations: [{ path: file_path, line }] }`，`title` 由参数推导并标明操作与光标。由于 `FileLocation` 没有 character，跟随位置聚焦输入行，标题保留完整光标；展示保持纯函数。
 
@@ -108,11 +108,11 @@ ACP 使用 `{ card: 'generic', kind: 'search', title, locations: [{ path: file_p
 
 服务边界和提供方不增加启动或请求截止时间。非工具调用方不会获得隐藏超时，必须自行提供 `AbortSignal`，并在需要预算时使用 `deadline()`。
 
-提供方释放发生在工具执行之外，因此 `dsh-lsp-local` 保留 `shutdownTimeoutMs`（默认 `5_000`）限制 `shutdown`/`exit`，以及 `killGraceMs`（默认 `2_000`）限制强制终止前的宽限期；失败实例的清理也使用相同边界。它使用 `deadline()` 和 `timeoutOf()`，但仍负责请求取消、进程信号和等待关闭，因为超时通知不会终止工作。
+提供方释放发生在工具执行之外，因此 `dsh-lsp-local` 保留 `shutdownTimeoutMs`（默认 `5_000`）限制 `shutdown`/`exit`，以及 `killGraceMs`（默认 `2_000`），同时用于限制请求取消宽限期和从 SIGTERM 升级到 SIGKILL 的宽限期；失败实例的清理也使用相同边界。定时器值超过 Node `2_147_483_647` ms 的调度范围时，插件加载失败。提供方使用 `deadline()` 和 `timeoutOf()`，但仍负责请求取消、进程信号和等待关闭，因为超时通知不会终止工作。
 
 ## 工作区、文件系统与文档同步
 
-`dsh-lsp-local` 通过 Node API 在子进程所在的主机命名空间中规范化并读取文件。它拒绝缺失、非普通、非 UTF-8、超大或规范路径越出工作区的源文件，并在校验与读取期间保持同一句柄。它不使用 `ctx.fs` 或发送 `fs/observed`：只有 LSP 结果对模型可见，因此查询不满足写前读取策略。
+`dsh-lsp-local` 通过 Node API 在子进程所在的主机命名空间中规范化并读取文件。它拒绝缺失、非普通、非 UTF-8、超大或规范路径越出工作区的源文件，并在校验与读取期间保持同一个 `O_NOFOLLOW | O_NONBLOCK` 句柄，因此没有写入方的 FIFO 不会在普通文件校验前造成阻塞。它在每项文件系统操作前后检查调用方是否取消。它不使用 `ctx.fs` 或发送 `fs/observed`：只有 LSP 结果对模型可见，因此查询不满足写前读取策略。
 
 `read` 工具的输出带窗口与行号，进入 transcript（文本记录）且已被观察，不适合作为源文件。在 `tool-lsp` 内读取还会把提供方专用同步职责交给消费方，并排除非本地提供方。
 
@@ -123,7 +123,7 @@ ACP 使用 `{ card: 'generic', kind: 'search', title, locations: [{ path: file_p
 3. 发送所请求的 `textDocument/definition`、`textDocument/references`、`textDocument/implementation` 或 `textDocument/hover` 请求。
 4. 如果 `didOpen` 成功，则在请求完成或取消后于 `finally` 中尝试发送 `textDocument/didClose`。关闭写入失败不会覆盖已经确定的结果或错误，但会使实例失效，并等待有界进程终止完成。
 
-每次调用后都关闭文档，因此第一版不需要 `didChange`、`didSave`、内容缓存、变更监听器或文档 LRU。每个实例使用一个可取消队列串行执行完整生命周期；不同实例可以并行。服务器工作区索引仍负责从源文件跳转到的已关闭文件。
+每次调用后都关闭文档，因此第一版不需要 `didChange`、`didSave`、内容缓存、变更监听器或文档 LRU。每个工作区的提供方队列可取消，并串行执行源文件读取、打开、查询和关闭的完整生命周期，因此等待中的查询只在轮到它时才读取当前字节；实例也会串行执行协议生命周期。不同工作区可以并行。服务器工作区索引仍负责从源文件跳转到的已关闭文件。
 
 规范工作区 `realpath` 必须是目录，并用于进程 cwd、`rootUri`、唯一的 `workspaceFolders` 条目和进程池 identity；符号链接别名因此共享实例。结果位置可以在工作区外，但外部路径不能成为查询源。远程、虚拟或独立沙箱化文件系统需要另一种提供方。
 
@@ -133,7 +133,7 @@ ACP 使用 `{ card: 'generic', kind: 'search', title, locations: [{ path: file_p
 
 初始化声明 `general.positionEncodings: ['utf-16']`、`workspace: { workspaceFolders: true, configuration: true }`、`textDocument.hover.contentFormat: ['markdown', 'plaintext']`，以及 definition 与 implementation 的 `linkSupport: true`，但不支持动态注册。服务器返回的操作与同步能力均为真源。服务器省略 `positionEncoding` 时默认为 `utf-16`；其他值均属于协议错误。配置可以提供初始化选项和 `workspace/configuration` 响应，但客户端拒绝 `workspace/applyEdit`，绝不执行命令或编辑。
 
-导航结果直接映射 `Location`，并将 `LocationLink` 的 `targetUri` 与 `targetSelectionRange` 映射为统一位置。`hover` 归一化直接采用 `MarkupContent.value`，保留字符串 `MarkedString`，把带语言标签的值渲染为围栏代码块，以一个空行连接数组，并在最后应用 `maxHoverChars`。
+导航结果直接映射 `Location`，并将 `LocationLink` 的 `targetUri` 与 `targetSelectionRange` 映射为统一位置。位置必须是非负整数。`hover` 归一化只接受有效的 `MarkupContent` 和 `MarkedString` 结构，保留字符串值，把带语言标签的值渲染为围栏代码块，并以一个空行连接数组。面向模型的工具在渲染后应用 `maxResultChars`。
 
 取消信号传递到查询的所有阶段，请求 id 创建后还会发送 `$/cancelRequest`。无响应的服务器会被终止并等待关闭；实例串行化保证没有其他正在执行的工作被连带中断。资源释放会拒绝并取消工作、尝试优雅关闭、通过有界终止流程升级处理，并等待完全停稳。
 
@@ -176,10 +176,10 @@ ACP 使用 `{ card: 'generic', kind: 'search', title, locations: [{ path: file_p
 - 包测试固定三个包的依赖方向、运行时注入和仅通过 `ctx.lsp` 通信的边界。
 - 工具测试固定四种操作、坐标校验、配置限制与省略标记、提示词和 ACP 展示。
 - 注册表测试固定原子占用/释放、不受顺序影响的选择，以及结构化的不可用、已释放、冲突和不支持操作错误。
-- 测试用 stdio server 固定精确的初始化能力、四种协议映射、`Location`/`LocationLink` 与 `hover` 归一化，以及 `references.includeDeclaration`。
+- 测试用 stdio server 固定精确的初始化能力、四种协议映射、`Location`/`LocationLink` 与 `hover` 归一化，以及 `findReferences` 到 `references.includeDeclaration` 的映射。
 - 同步测试固定 UTF-16 协商与转换、受支持和被拒绝的 `textDocumentSync` 形式、配对的临时打开/关闭、关闭写入失败和错误响应拒绝。
 - 超时测试固定一个 `TOOL_TIMEOUT` 预算、不对上游取消错误分类、服务边界无隐藏截止时间，以及受限且等待完成的清理。
-- 生命周期测试固定启动 single-flight、实例内串行、跨实例并行、可取消队列、崩溃后不重放的替换，以及释放后完全停稳。
+- 生命周期测试固定启动 single-flight、完整生命周期串行化及排队查询读取最新源文件、跨工作区并行、可取消队列、崩溃后不重放的替换、stdin 失败后的进程拆除，以及释放后完全停稳。
 - 主机文件系统测试固定 session cwd 要求、符号链接下相对与绝对源路径的规范 containment、文档校验、file/non-file URI 渲染、无格式源文本和不发送 `fs/observed`。
 - 无密钥且固定版本的 TypeScript 真实服务器 e2e 覆盖四种操作；可运行配置使用同一项显式提供方映射。
 - 快照覆盖模型可见 schema、提示词、结果、省略提示和 ACP 渲染；构建产物冒烟测试覆盖分帧与清理。

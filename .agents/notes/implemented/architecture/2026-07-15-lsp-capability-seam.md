@@ -22,7 +22,7 @@ Add LSP as a three-package capability seam with one read-only model tool and one
 
 `dsh-lsp-local` is a generic host, not a language-server catalog or installer. Deployments explicitly configure commands and mappings; future presets belong in composition plugins or `cordis.yml` overlays.
 
-The model and seam expose exactly `definition`, `references`, `implementation`, and `hover`; no arbitrary JSON-RPC method escapes through `ctx.lsp`.
+The model and seam expose exactly `goToDefinition`, `findReferences`, `goToImplementation`, and `hover`; no arbitrary JSON-RPC method escapes through `ctx.lsp`. These operation literals match Claude Code's familiar camelCase names while the tool name and `file_path` field remain harness-owned.
 
 The prompt positions LSP as a precision aid: `Use search/read for ordinary navigation. Use lsp when textual matches are ambiguous or before a change requires precise definitions, implementations, or references.`
 
@@ -30,14 +30,14 @@ The prompt positions LSP as a precision aid: `Use search/read for ordinary navig
 
 `dsh-lsp` registers providers by branded id and extension-to-language-id mapping. `registerProvider()` atomically reserves the id and every normalized extension: invalid input or any conflict publishes nothing, and its disposer releases all reservations. Provider plugins register through `ctx.effect()`. Selection is per query and order-independent; no match returns a structured unavailable error. The first version has no glob, language-id, or explicit route selector and no statically declared operation capabilities.
 
-The seam exposes one `query(request, signal?)` operation because no fields need implementation defaulting: `workspaceRoot` is required, `languageId` comes from the registration, and consumers own timeouts and result limits. `query()` validates, selects, and derives without hidden `??` fallbacks, leaving no executable spec to resolve. `dsh-tool-lsp` passes only `exec.signal` as a bare `AbortSignal`, matching web and keeping `dsh-lsp` independent of `dsh-tools`. Removal before selection fails as unavailable; later disposal follows the selected provider's cancellation lifecycle without rerouting.
+The seam exposes one `query(request, signal?)` operation because no fields need implementation defaulting: `workspaceRoot` is required, `languageId` comes from the registration, and consumers own timeouts and result limits. `query()` selects and derives without hidden `??` fallbacks, leaving no executable spec to resolve. `dsh-tool-lsp` validates model arguments and passes only `exec.signal` as a bare `AbortSignal`, matching web and keeping `dsh-lsp` independent of `dsh-tools`. Removal before selection fails as unavailable; later disposal follows the selected provider's cancellation lifecycle without rerouting.
 
 The intended contract shape is:
 
 ```ts
 import type { Branded } from '@deepseek-ai/dsh-brand'
 
-type LspOperation = 'definition' | 'references' | 'implementation' | 'hover'
+type LspOperation = 'goToDefinition' | 'findReferences' | 'goToImplementation' | 'hover'
 type LspProviderId = Branded<'LspProviderId'>
 
 interface LspPosition {
@@ -77,7 +77,7 @@ interface LspService {
 }
 ```
 
-Mapping keys normalize to lowercase, leading-dot extensions selected from `filePath`'s final extension; language ids only synchronize documents. Seam positions and ranges are zero-based UTF-16. `references` always includes declarations: providers enforce this internally, the local mapping sets `context.includeDeclaration: true`, and callers get no flag. Closed result unions normalize navigation to locations and hover to content or `null`; navigation results carry the provider's resolved workspace root so consumers relativize file URIs in the same canonical namespace. The seam exposes no protocol types, process or document controls, or generic request escape hatch.
+Mapping keys normalize to lowercase, leading-dot extensions selected from `filePath`'s final extension; language ids only synchronize documents. Seam positions and ranges are zero-based UTF-16. `findReferences` always includes declarations: providers enforce this internally, the local mapping sets `context.includeDeclaration: true`, and callers get no flag. Closed result unions normalize navigation to locations and hover to content or `null`; navigation results carry the provider's resolved workspace root so consumers relativize file URIs in the same canonical namespace. The seam exposes no protocol types, process or document controls, or generic request escape hatch.
 
 `dsh-lsp-local` owns host files, server configuration, JSON-RPC, process and transient-document state, and protocol translation; it depends on `dsh-lsp` and Node APIs, not `dsh-fs`. The server-table key is its provider id. The plugin resolves every server-local setting before registration, rolls back earlier registrations if a later mapping is invalid or conflicts, and retains an independent process pool per provider. `dsh-tool-lsp` runtime-injects only `tools`, `lsp`, and `systemPrompt`, obtains the workspace from `exec.agent?.session.header.cwd` through a package-local `sessionCwd(exec)` helper matching the filesystem tools' lookup, and imports no provider.
 
@@ -87,18 +87,18 @@ The single `lsp` tool accepts:
 
 ```ts
 interface LspToolInput {
-  readonly operation: 'definition' | 'references' | 'implementation' | 'hover'
+  readonly operation: 'goToDefinition' | 'findReferences' | 'goToImplementation' | 'hover'
   readonly file_path: string
   readonly line: number
   readonly character: number
 }
 ```
 
-`line` and `character` are positive, one-based UTF-16 cursor coordinates; the tool converts them to the seam's zero-based `LspPosition` and converts rendered locations back. `references` includes declarations so impact analysis does not omit the defining site. Provider, language id, workspace root, limits, timeout, initialization, and executable remain outside model input.
+`line` and `character` are positive, one-based UTF-16 cursor coordinates; the tool converts them to the seam's zero-based `LspPosition` and converts rendered locations back. `findReferences` includes declarations so impact analysis does not omit the defining site. Provider, language id, workspace root, limits, timeout, initialization, and executable remain outside model input.
 
 The tool requires `workspaceRoot` from session `header.cwd`, with no fallback; absence fails as `LSP_WORKSPACE_REQUIRED` before querying or startup. The local provider resolves relative paths against that root and accepts absolute paths directly; both forms are canonicalized and rejected before startup when the target is outside the canonical workspace.
 
-Locations render as stable, file-grouped `path:line:character` entries. A `file:` URI accepted by Node `fileURLToPath()` becomes a relative path inside the workspace or an absolute path outside it; other URIs remain verbatim. `maxLocations` defaults to `100`, and `maxHoverChars` defaults to `16_000` after hover normalization; both report omissions. Empty locations and `null` hover are successful no-result responses; malformed payloads remain structured errors.
+Locations render as stable, file-grouped `path:line:character` entries. A `file:` URI accepted by Node `fileURLToPath()` becomes a relative path inside the workspace or an absolute path outside it; other URIs remain verbatim. `maxLocations` defaults to `100` and reports omitted items; `maxResultChars` defaults to `16_000` and bounds every complete rendered result, including its truncation metadata. Empty locations and `null` hover are successful no-result responses; missing or malformed server payloads fail with structured `LSP_MALFORMED_RESPONSE` errors.
 
 ACP uses `{ card: 'generic', kind: 'search', title, locations: [{ path: file_path, line }] }` with an args-derived operation/cursor `title`. Because `FileLocation` has no character, follow-along focuses the input line while the title preserves the cursor; presentation remains pure.
 
@@ -108,11 +108,11 @@ ACP uses `{ card: 'generic', kind: 'search', title, locations: [{ path: file_pat
 
 The seam and provider add no startup or request deadline. Non-tool callers therefore receive no hidden timeout and must supply an `AbortSignal`, using `deadline()` when they need a budget.
 
-Provider disposal occurs outside tool execution, so `dsh-lsp-local` keeps `shutdownTimeoutMs` (default `5_000`) for `shutdown`/`exit` and `killGraceMs` (default `2_000`) before hard kill; the same bounds govern failed-instance cleanup. It uses `deadline()` and `timeoutOf()` but owns request cancellation, process signals, and awaiting close because timeout notification does not terminate work.
+Provider disposal occurs outside tool execution, so `dsh-lsp-local` keeps `shutdownTimeoutMs` (default `5_000`) for `shutdown`/`exit` and `killGraceMs` (default `2_000`) for both request-cancel grace and SIGTERM-to-SIGKILL escalation; the same bounds govern failed-instance cleanup. Timer values above Node's `2_147_483_647` ms scheduling range fail at load. The provider uses `deadline()` and `timeoutOf()` but owns request cancellation, process signals, and awaiting close because timeout notification does not terminate work.
 
 ## Workspace, filesystem, and document synchronization
 
-`dsh-lsp-local` canonicalizes and reads through Node APIs in the subprocess's host namespace. It rejects missing, non-regular, non-UTF-8, oversized, or canonical out-of-workspace sources and keeps one handle through validation and reading. It does not consume `ctx.fs` or emit `fs/observed`: only the LSP result is model-visible, so the query does not satisfy read-before-write policy.
+`dsh-lsp-local` canonicalizes and reads through Node APIs in the subprocess's host namespace. It rejects missing, non-regular, non-UTF-8, oversized, or canonical out-of-workspace sources and keeps one `O_NOFOLLOW | O_NONBLOCK` handle through validation and reading, so a FIFO with no writer cannot block before the regular-file check. It observes caller cancellation around each filesystem operation. It does not consume `ctx.fs` or emit `fs/observed`: only the LSP result is model-visible, so the query does not satisfy read-before-write policy.
 
 The `read` tool is unsuitable source because its output is windowed, numbered, transcript-visible, and observed. Reading in `tool-lsp` would also assign provider-specific synchronization to the consumer and preclude non-local providers.
 
@@ -123,7 +123,7 @@ The local provider uses a compatibility-first transient-open sequence for every 
 3. Send the requested `textDocument/definition`, `textDocument/references`, `textDocument/implementation`, or `textDocument/hover` request.
 4. If `didOpen` succeeded, attempt `textDocument/didClose` in `finally` after the request settles or aborts. A close-write failure does not replace the settled result or error, but invalidates the instance and awaits bounded process termination.
 
-Documents close after each call, so the first version needs no `didChange`, `didSave`, content cache, mutation listener, or document LRU. One abortable per-instance queue serializes complete lifecycles; distinct instances may run in parallel. The server's workspace index remains responsible for closed files reached from the source.
+Documents close after each call, so the first version needs no `didChange`, `didSave`, content cache, mutation listener, or document LRU. One abortable per-workspace provider queue serializes source-read/open/query/close lifecycles, so a waiting query reads current bytes only when its turn starts; the instance also keeps protocol lifecycles serialized. Distinct workspaces may run in parallel. The server's workspace index remains responsible for closed files reached from the source.
 
 The canonical workspace `realpath` must be a directory and supplies process cwd, `rootUri`, the sole `workspaceFolders` entry, and pool identity; symlink aliases therefore share an instance. Result locations may be external, but an external path cannot become a query source. Remote, virtual, or independently sandboxed filesystems require another provider.
 
@@ -133,7 +133,7 @@ The canonical workspace `realpath` must be a directory and supplies process cwd,
 
 Initialization advertises `general.positionEncodings: ['utf-16']`, `workspace: { workspaceFolders: true, configuration: true }`, `textDocument.hover.contentFormat: ['markdown', 'plaintext']`, and `linkSupport: true` for definition and implementation, with no dynamic registration. Returned operation and synchronization capabilities are authoritative. An omitted server `positionEncoding` defaults to `utf-16`; any other value is a protocol error. Configuration may supply initialization options and `workspace/configuration` responses, but the client rejects `workspace/applyEdit` and never executes commands or edits.
 
-Navigation maps `Location` directly and `LocationLink` from `targetUri` plus `targetSelectionRange`. Hover normalization takes `MarkupContent.value`, preserves string `MarkedString` values, renders language-tagged values as fenced code, joins arrays with one blank line, and applies `maxHoverChars` last.
+Navigation maps `Location` directly and `LocationLink` from `targetUri` plus `targetSelectionRange`. Positions must be nonnegative integers. Hover normalization accepts only valid `MarkupContent` and `MarkedString` shapes, preserves string values, renders language-tagged values as fenced code, and joins arrays with one blank line. The model-facing tool applies `maxResultChars` after rendering.
 
 Abort reaches every query phase and sends `$/cancelRequest` once an id exists. An unresponsive server is terminated and awaited without collateral active work because the instance is serialized. Disposal rejects and cancels work, attempts graceful shutdown, escalates through bounded termination, and awaits quiescence.
 
@@ -176,10 +176,10 @@ The local provider trusts its configured server and claims no sandbox confinemen
 - Package tests pin the three-package dependency direction, runtime injections, and `ctx.lsp`-only communication.
 - Tool tests pin the four operations, coordinate validation, configured bounds and omission markers, prompt, and ACP presentation.
 - Registry tests pin atomic reservation/release, order-independent selection, and structured unavailable, disposed, conflict, and unsupported-operation errors.
-- Fake-stdio tests pin exact initialization capabilities, four protocol mappings, `Location`/`LocationLink` and hover normalization, and `references.includeDeclaration`.
+- Fake-stdio tests pin exact initialization capabilities, four protocol mappings, `Location`/`LocationLink` and hover normalization, and `findReferences` mapping to `references.includeDeclaration`.
 - Synchronization tests pin UTF-16 negotiation and conversion, supported and rejected `textDocumentSync` forms, balanced transient open/close, close-write failure, and malformed-response rejection.
 - Timeout tests pin one `TOOL_TIMEOUT` budget, unclassified upstream cancellation, no hidden seam deadline, and bounded awaited teardown.
-- Lifecycle tests pin startup single-flight, per-instance serialization, cross-instance parallelism, abortable queues, crash replacement without replay, and quiescent disposal.
+- Lifecycle tests pin startup single-flight, complete-lifecycle serialization with fresh queued source reads, cross-workspace parallelism, abortable queues, crash replacement without replay, failed-stdin teardown, and quiescent disposal.
 - Host-filesystem tests pin session-cwd requirements, relative and absolute source containment through symlinks, document validation, file/non-file URI rendering, unformatted source, and no `fs/observed` event.
 - A keyless pinned TypeScript real-server e2e exercises all four operations; runnable configuration uses the same explicit provider mapping.
 - Snapshots cover model-visible schema, prompt, results, omissions, and ACP rendering; a built-artifact smoke test covers framing and cleanup.
