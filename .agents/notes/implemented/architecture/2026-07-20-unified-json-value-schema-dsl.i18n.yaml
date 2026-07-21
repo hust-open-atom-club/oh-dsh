@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-20-unified-json-value-schema-dsl.md: 94c3f5aa5fcb84abddc58e8fd298188b3284f7ea
-2026-07-20-unified-json-value-schema-dsl.zh.md: d8362c2c9987689fbd812b6c16aae815f56062e1
+2026-07-20-unified-json-value-schema-dsl.md: 6a3dc21a7ae76ba8f84f5b3edf8306285a02a683
+2026-07-20-unified-json-value-schema-dsl.zh.md: 77ac599e6713563528d0382dfecff83071488930

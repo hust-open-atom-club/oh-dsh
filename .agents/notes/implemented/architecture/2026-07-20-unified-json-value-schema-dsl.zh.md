@@ -12,7 +12,7 @@ Status: implemented
 
 `dsh-tools` 以两种表示形式统一管理一套 JSON 值 schema 词汇。`ValueSchemaSpec` 是可描述任意 JSON 根类型的作者侧形式；`ParameterSchemaSpec` 是其隐式对象属性映射形式，每个属性可标记 `required: true`。`JsonSchemaNode` 是原始协议表示。两种形式都支持字符串、有限数值、整数、布尔值、null、数组、对象、类型正确的标量 `enum`／`const`，以及要求恰好匹配一个分支的 `oneOf`；`{ type: 'json' }` 仅是作者侧语法糖，会编译为仅含注解、不施加约束的原始节点。
 
-显式的作者侧对象必须声明 `additionalProperties: true | false`。隐式参数根对象和原始 JSON Schema 保留标准的默认开放语义。`InferValue<S>` 和 `InferArgs<P>` 根据同一份声明推导 TypeScript 值，`valueSchemaSpecToJsonSchema()` 和 `parameterSchemaSpecToJsonSchema()` 也将这些声明编译为 JSON Schema。`assertSupportedJsonSchema()` 会拒绝不受支持或位置错误的关键字；`validateJsonSchemaValue()` 则以无损 `JsonValue` 边界校验受支持的子集，不允许 `undefined`、负零、非有限数、稀疏数组、循环引用、非普通对象、函数、symbol 及其他需要强制转换的值。内建的普通 Object 和 Array 容器跨 JavaScript 运行域后仍视为普通容器；其子类仍视为非普通对象。
+显式的作者侧对象必须声明 `additionalProperties: true | false`。隐式参数根对象和原始 JSON Schema 保留标准的默认开放语义。`InferValue<S>` 和 `InferArgs<P>` 根据同一份声明推导 TypeScript 值，`valueSchemaSpecToJsonSchema()` 和 `parameterSchemaSpecToJsonSchema()` 也将这些声明编译为 JSON Schema。`assertSupportedJsonSchema()` 会拒绝不受支持或位置错误的关键字；`validateJsonSchemaValue()` 则以无损 `JsonValue` 边界校验受支持的子集，不允许 `undefined`、负零、非有限数、稀疏数组、循环引用、非普通对象、函数、symbol 及其他需要强制转换的值。内建的普通 Object 和 Array 容器跨 JavaScript 运行域后仍视为普通容器；其子类仍视为非普通对象。校验和快照遍历均以迭代方式执行，因此合法嵌套的深度上限由可用内存决定，而非 JavaScript 调用栈。
 
 对象根限制属于消费方规则，不属于 schema 词汇本身。subagent 和工作流中由调用方定义的结构化输出通过 `assertObjectJsonSchema()` 和 `ObjectJsonSchema` 保持对象根限制；工具输出可以使用任意根类型。动态 Cordis 注册会把跨 JavaScript 运行域传入的 schema 重建为当前运行时持有的 JSON，保留原始包装层的默认开放语义，并要求直接使用 DSL 声明的对象明确选择开放方式，然后再调用同一编译器。
 
