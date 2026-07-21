@@ -22,7 +22,7 @@ Status: implemented
 explicit configured path  >  $DSH_HOME  >  ~/.dsh
 ```
 
-harness 把所有用户数据都放在同一个根目录下；不存在 XDG 的 config/data/cache 拆分。`dshHomeDisplay()` 为面向用户的路径以符号形式命名已解析的根目录——默认 home 显示为 `~/.dsh`，任何已配置的 home 显示为 `$DSH_HOME`——这样面向用户全局的 `AGENTS.md` 标签就绝不会泄露机器上的绝对路径。它取代了 workspace-context 中自定义的"默认值 vs `$DSH_HOME`"判断。
+空或仅含空白的 `$DSH_HOME` 被当作未设置处理，这与 telemetry 旧解析器所带的保护一致：若无此保护，`resolve('')` 会悄悄把 home 落在当前工作目录。harness 把所有用户数据都放在同一个根目录下；不存在 XDG 的 config/data/cache 拆分。`dshHomeDisplay()` 为面向用户的路径以符号形式命名已解析的根目录——默认 home 显示为 `~/.dsh`，任何已配置的 home 显示为 `$DSH_HOME`——这样面向用户全局的 `AGENTS.md` 标签就绝不会泄露机器上的绝对路径。它取代了 workspace-context 中自定义的"默认值 vs `$DSH_HOME`"判断。
 
 `@deepseek-ai/dsh-home` 被删除。它的三个引用方（`dsh-tool-bash`、`dsh-skill-local`、`dsh-agent-spine-demo`）现在从 `dsh-paths` 导入 `resolveDshHome`。`dsh-telemetry` 的 `globalConfigDir` 转而委托给 `resolveDshHome`，去掉了它的第二个解析器、`DSH_CONFIG_HOME` 覆盖项、XDG/`%APPDATA%` 分支以及 `deepseek-harness` 命名空间；匿名 id 现在直接存放在 harness home 之下。
 

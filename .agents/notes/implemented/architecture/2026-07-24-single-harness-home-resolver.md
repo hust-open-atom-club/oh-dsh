@@ -22,7 +22,7 @@ One resolver owns the harness home, in `@deepseek-ai/dsh-paths`, single-root:
 explicit configured path  >  $DSH_HOME  >  ~/.dsh
 ```
 
-The harness keeps all user data under one root; there is no XDG config/data/cache split. `dshHomeDisplay()` names a resolved root symbolically for user-facing paths — `~/.dsh` for the default home, `$DSH_HOME` for any configured home — so the user-global `AGENTS.md` label never leaks an absolute machine path. It replaces workspace-context's bespoke default-vs-`$DSH_HOME` check.
+An empty or whitespace-only `$DSH_HOME` is treated as unset, matching the guard telemetry's old resolver carried: without it `resolve('')` would silently place the home at the current working directory. The harness keeps all user data under one root; there is no XDG config/data/cache split. `dshHomeDisplay()` names a resolved root symbolically for user-facing paths — `~/.dsh` for the default home, `$DSH_HOME` for any configured home — so the user-global `AGENTS.md` label never leaks an absolute machine path. It replaces workspace-context's bespoke default-vs-`$DSH_HOME` check.
 
 `@deepseek-ai/dsh-home` is deleted. Its three importers (`dsh-tool-bash`, `dsh-skill-local`, `dsh-agent-spine-demo`) now import `resolveDshHome` from `dsh-paths`. `dsh-telemetry`'s `globalConfigDir` delegates to `resolveDshHome`, dropping its second resolver, the `DSH_CONFIG_HOME` override, the XDG/`%APPDATA%` branches, and the `deepseek-harness` namespace; the anonymous id now lives directly under the harness home.
 
