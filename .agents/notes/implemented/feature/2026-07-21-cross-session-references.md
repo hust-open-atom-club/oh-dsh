@@ -34,7 +34,7 @@ This preserves host driving semantics: TUI decides `send()` versus `steer()` fro
 
 TUI combines session candidates with the existing `@` file provider. Candidate lookup follows the editor's cancellation signal, and session id, cwd, and mention labels escape external terminal controls while the canonical URI retains the original id. TUI prepares only submissions containing structured mentions, disables duplicate submit while awaiting snapshots, restores failed input, and renders persisted session-reference context as a compact source list instead of exposing the complete JSON in the terminal.
 
-ACP extracts `dsh-session:` resource links and canonical inline mentions while preserving ordinary resource-link rendering. A valid reference without the optional service returns a capability-unavailable RPC error, and preparation failure occurs before the in-flight turn slot and agent send. A preparation-specific abort owner makes `session/cancel` and bridge teardown stop pending reads. Picker UI remains an ACP client responsibility.
+ACP detects direct slash commands from ordinary prompt flattening before extracting `dsh-session:` resource links and canonical inline mentions, so URI-shaped command arguments remain opaque while ordinary resource-link rendering is preserved. A valid reference without the optional service returns a capability-unavailable RPC error, and preparation failure occurs before the in-flight turn slot and agent send. A preparation-specific abort owner makes `session/cancel` and bridge teardown stop pending reads. Picker UI remains an ACP client responsibility.
 
 ## Budget and retention
 
@@ -51,7 +51,7 @@ The defaults cap one serialized reference at 65,536 UTF-8 bytes and the complete
 
 ## Verification
 
-Unit and integration coverage pins URI round-trips and text-boundary punctuation, explicit malformed references, candidate ranking, terminal-control escaping, projection exclusions, backend-independent compact checkpoints, tag-safe framing, deduplication, self-reference, count limits, all-or-nothing reads, prompt cancellation against a non-settling storage read, byte retention, frozen message ownership, prompt blocking, send/steer ordering, missing capability, ordinary ACP resource links, and compact TUI rendering. A keyless TUI snapshot runs the real agent loop: the source surface replaces old user/assistant history with a compact checkpoint, the target submits a mention, and the captured model request contains the checkpoint and retained tail but not either shadowed string.
+Unit and integration coverage pins URI round-trips and text-boundary punctuation, explicit malformed references, candidate ranking, terminal-control escaping, projection exclusions, backend-independent compact checkpoints, tag-safe framing, deduplication, self-reference, count limits, all-or-nothing reads, prompt cancellation against a non-settling storage read, byte retention, frozen message ownership, prompt blocking, send/steer ordering, missing capability, ordinary ACP resource links, opaque ACP command arguments, and compact TUI rendering. A keyless TUI snapshot runs the real agent loop: the source surface replaces old user/assistant history with a compact checkpoint, the target submits a mention, and the captured model request contains the checkpoint and retained tail but not either shadowed string.
 
 ## Consequences
 
