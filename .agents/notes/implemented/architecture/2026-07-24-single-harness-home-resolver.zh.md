@@ -32,7 +32,7 @@ explicit configured path  >  $DSH_HOME  >  ~/.dsh
 
 **采用 XDG（遵从 `$XDG_CONFIG_HOME`，或把 config/data/cache 拆分到各自的目录树）。** 经过考虑后放弃，转而采用一个显而易见的根目录。单一的 `$DSH_HOME || ~/.dsh` 基准事实与 `~/.claude` / `~/.aws` 一致，无需对每个 `~/.dsh` 消费方按类别重新归类，也不留下任何需要协调的解析器不对称。telemetry 对齐到同一根目录——而不是保留自己的 XDG 路径——正是本决策所要消除的那种分歧。
 
-**保留 telemetry 自己的 config 目录。** 它的 `deepseek-harness` 命名空间和独立的 XDG 策略是唯一违背 `dsh`/`~/.dsh` 约定的例外。把它折叠到共享解析器上，才让"单一 home 事实"成真。
+**保留 telemetry 自己的 config 目录。** 它的 `deepseek-harness` 命名空间和独立的 XDG 策略是唯一违背 `dsh`/`~/.dsh` 约定的例外。把它折叠到共享解析器上，才让"单一 home 事实"成真。代价是匿名 id 的作用域从机器变成了 `$DSH_HOME`：若某个项目把 `DSH_HOME` 指向仓库本地路径（或某条命令在 telemetry 之前加载了项目的 `.env`），得到的就是 home 本地的 id，因此该 id 统计的是 harness home，而非机器。这被接受为单一根目录的应有含义——重定位 `$DSH_HOME` 会移动*全部* harness 状态，telemetry 身份也在其中——模块契约据此表述为 per-harness-home 而非 per-machine。一个忽略 `$DSH_HOME` 的机器级全局身份，恰恰会重新引入本 Note 所要消除的那第二套 home 策略。
 
 ## 影响
 

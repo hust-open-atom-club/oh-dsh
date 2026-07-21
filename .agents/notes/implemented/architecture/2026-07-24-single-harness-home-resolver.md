@@ -32,7 +32,7 @@ An empty or whitespace-only `$DSH_HOME` is treated as unset, matching the guard 
 
 **Adopt XDG (honor `$XDG_CONFIG_HOME`, or split config/data/cache into separate trees).** Considered and dropped in favor of one obvious root. A single `$DSH_HOME || ~/.dsh` ground truth matches `~/.claude` / `~/.aws`, needs no per-kind reclassification of every `~/.dsh` consumer, and leaves no resolver asymmetry to reconcile. Telemetry aligning onto the same root — rather than keeping its own XDG path — is precisely the divergence this removes.
 
-**Keep telemetry's own config dir.** Its `deepseek-harness` namespace and separate XDG policy were the lone exception to the `dsh`/`~/.dsh` convention. Folding it onto the shared resolver is what makes "one home fact" true.
+**Keep telemetry's own config dir.** Its `deepseek-harness` namespace and separate XDG policy were the lone exception to the `dsh`/`~/.dsh` convention. Folding it onto the shared resolver is what makes "one home fact" true. The cost is that the anonymous id becomes scoped to `$DSH_HOME` rather than the machine: a project that points `DSH_HOME` at a repo-local path (or a command that loads a project `.env` before telemetry) gets a home-local id, so the id counts harness homes, not machines. This is accepted as the intended meaning of single-root — a relocated `$DSH_HOME` moves *all* harness state, telemetry identity included — and the module contract is stated as per-harness-home rather than per-machine. A machine-global identity that ignored `$DSH_HOME` would reintroduce exactly the second home policy this Note removes.
 
 ## Consequences
 
