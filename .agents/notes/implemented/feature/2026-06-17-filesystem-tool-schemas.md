@@ -68,7 +68,7 @@ The first pass rejects Codex-style patch grammars and multi-mode edit APIs. It u
 
 ## Result shape
 
-The first implementation returns `ContentBlock[]` through the existing `ToolDefinition.execute()` contract. `ctx.fs` returns structured filesystem results and owns file-state recording/refreshing; `tool-fs` formats those results into the model projection.
+The first implementation formatted `ContentBlock[]` in `execute`. The [canonical tool-output contract](../architecture/2026-07-20-canonical-tool-output-contract.md) now keeps `ctx.fs` result facts as the tool's validated value and derives the same model text through `output.render`; file-state recording/refreshing remains on `ctx.fs`.
 
 Default native projections:
 
