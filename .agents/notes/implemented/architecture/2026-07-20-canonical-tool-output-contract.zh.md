@@ -46,6 +46,7 @@ type ToolExecutionResult =
 | `glob` | `{ paths: string[] }` |
 | `grep` | `{ matches: [{ path, lineNumber, line }] }` |
 | `web_search` ／ `web_fetch` | 归一化后的 `WebSearchResult` ／ `WebFetchResult` |
+| `lsp` | `{ kind: "locations", locations, resolvedWorkspaceRoot }` 或 `{ kind: "hover", hover }` |
 | `bash` | `{ kind: "background", taskId }` 或 `{ kind: "foreground" } & BashRunResult` |
 | `task_output` ／ `task_list` ／ `task_kill` | 不含所有者或通知账务字段的公开任务快照 |
 | `subagent` | 后台任务句柄或 `{ kind: "foreground", runId, output: JsonValue[] }` |

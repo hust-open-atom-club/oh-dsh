@@ -46,6 +46,7 @@ The first-party tools preserve their existing Native text while returning domain
 | `glob` | `{ paths: string[] }` |
 | `grep` | `{ matches: [{ path, lineNumber, line }] }` |
 | `web_search` / `web_fetch` | The normalized `WebSearchResult` / `WebFetchResult` |
+| `lsp` | `{ kind: "locations", locations, resolvedWorkspaceRoot }` or `{ kind: "hover", hover }` |
 | `bash` | `{ kind: "background", taskId }` or `{ kind: "foreground" } & BashRunResult` |
 | `task_output` / `task_list` / `task_kill` | Public task snapshots without owner or notification bookkeeping |
 | `subagent` | Background task handle or `{ kind: "foreground", runId, output: JsonValue[] }` |
