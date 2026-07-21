@@ -119,7 +119,7 @@ ACP 使用 `{ card: 'generic', kind: 'search', title, locations: [{ path: file_p
 本地提供方对每次查询都采用兼容优先的临时打开流程。它接受旧式 `textDocumentSync` 的 `Full` 或 `Incremental`，也接受设置了 `openClose: true` 的选项；同步能力缺失、为 `None` 或明确不兼容时，在 `didOpen` 前以不支持错误失败。
 
 1. 规范化并校验主机路径，再使用 Node 文件系统 API 读取当前源文件。
-2. 发送 `textDocument/didOpen`，其中包含版本 `1`、完整文本和配置的语言 id。
+2. 发送 `textDocument/didOpen`，其中包含版本 `1`、完整文本和配置的语言 id。该写入仍可取消；写入失败或遭取消会使实例失效，并等待有界进程终止完成，池才能复用它。
 3. 发送所请求的 `textDocument/definition`、`textDocument/references`、`textDocument/implementation` 或 `textDocument/hover` 请求。
 4. 如果 `didOpen` 成功，则在请求完成或取消后于 `finally` 中尝试发送 `textDocument/didClose`。关闭写入失败不会覆盖已经确定的结果或错误，但会使实例失效，并等待有界进程终止完成。
 
@@ -177,7 +177,7 @@ ACP 使用 `{ card: 'generic', kind: 'search', title, locations: [{ path: file_p
 - 工具测试固定四种操作、坐标校验、配置限制与省略标记、提示词和 ACP 展示。
 - 注册表测试固定原子占用/释放、不受顺序影响的选择，以及结构化的不可用、已释放、冲突和不支持操作错误。
 - 测试用 stdio server 固定精确的初始化能力、四种协议映射、`Location`/`LocationLink` 与 `hover` 归一化，以及 `findReferences` 到 `references.includeDeclaration` 的映射。
-- 同步测试固定 UTF-16 协商与转换、受支持和被拒绝的 `textDocumentSync` 形式、配对的临时打开/关闭、关闭写入失败和错误响应拒绝。
+- 同步测试固定 UTF-16 协商与转换、受支持和被拒绝的 `textDocumentSync` 形式、打开写入阻塞与失败、配对的临时打开/关闭、关闭写入失败和错误响应拒绝。
 - 超时测试固定一个 `TOOL_TIMEOUT` 预算、不对上游取消错误分类、服务边界无隐藏截止时间，以及受限且等待完成的清理。
 - 生命周期测试固定启动 single-flight、完整生命周期串行化及排队查询读取最新源文件、跨工作区并行、可取消队列、崩溃后不重放的替换、stdin 失败后的进程拆除，以及释放后完全停稳。
 - 主机文件系统测试固定 session cwd 要求、符号链接下相对与绝对源路径的规范 containment、文档校验、file/non-file URI 渲染、无格式源文本和不发送 `fs/observed`。

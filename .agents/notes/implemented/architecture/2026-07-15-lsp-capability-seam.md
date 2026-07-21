@@ -119,7 +119,7 @@ The `read` tool is unsuitable source because its output is windowed, numbered, t
 The local provider uses a compatibility-first transient-open sequence for every query. It accepts legacy `textDocumentSync` `Full` or `Incremental`, or options with `openClose: true`; omitted, `None`, or explicitly incompatible synchronization fails as unsupported before `didOpen`.
 
 1. Canonicalize and validate the host path, then read the current source with Node filesystem APIs.
-2. Send `textDocument/didOpen` with version `1`, full text, and the configured language id.
+2. Send `textDocument/didOpen` with version `1`, full text, and the configured language id. Its write remains abortable; failure or cancellation invalidates the instance and awaits bounded process termination before the pool can reuse it.
 3. Send the requested `textDocument/definition`, `textDocument/references`, `textDocument/implementation`, or `textDocument/hover` request.
 4. If `didOpen` succeeded, attempt `textDocument/didClose` in `finally` after the request settles or aborts. A close-write failure does not replace the settled result or error, but invalidates the instance and awaits bounded process termination.
 
@@ -177,7 +177,7 @@ The local provider trusts its configured server and claims no sandbox confinemen
 - Tool tests pin the four operations, coordinate validation, configured bounds and omission markers, prompt, and ACP presentation.
 - Registry tests pin atomic reservation/release, order-independent selection, and structured unavailable, disposed, conflict, and unsupported-operation errors.
 - Fake-stdio tests pin exact initialization capabilities, four protocol mappings, `Location`/`LocationLink` and hover normalization, and `findReferences` mapping to `references.includeDeclaration`.
-- Synchronization tests pin UTF-16 negotiation and conversion, supported and rejected `textDocumentSync` forms, balanced transient open/close, close-write failure, and malformed-response rejection.
+- Synchronization tests pin UTF-16 negotiation and conversion, supported and rejected `textDocumentSync` forms, blocked and failed open writes, balanced transient open/close, close-write failure, and malformed-response rejection.
 - Timeout tests pin one `TOOL_TIMEOUT` budget, unclassified upstream cancellation, no hidden seam deadline, and bounded awaited teardown.
 - Lifecycle tests pin startup single-flight, complete-lifecycle serialization with fresh queued source reads, cross-workspace parallelism, abortable queues, crash replacement without replay, failed-stdin teardown, and quiescent disposal.
 - Host-filesystem tests pin session-cwd requirements, relative and absolute source containment through symlinks, document validation, file/non-file URI rendering, unformatted source, and no `fs/observed` event.
