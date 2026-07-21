@@ -122,7 +122,7 @@ The root plugin registers the full suite by composing the per-tool registration 
 
 ## Testing
 
-Tests follow the package boundary, not only the user-visible tools: the service seam in `dsh-fs`; real filesystem behavior through the `ctx.fs` interface in `dsh-fs-local` (resolution, symlinks, streaming, binary/UTF-8 rejection, unconditional and version-guarded writes, literal-edit semantics, line-ending preservation, structured `FsError` codes); the consumer surface in `dsh-tool-fs` against the real local provider (mock only the model/clock, never the collaborator); and integration through `ctx.tools.execute()` with and without `dsh-fs-policy`, world-verified by reading files back from disk rather than trusting the returned `ContentBlock[]`. The observed-state/owner-derivation policy is tested in `dsh-fs-policy`, not here.
+Tests follow the package boundary, not only the user-visible tools: the service seam in `dsh-fs`; real filesystem behavior through the `ctx.fs` interface in `dsh-fs-local` (resolution, symlinks, streaming, binary/UTF-8 rejection, unconditional and version-guarded writes, literal-edit semantics, line-ending preservation, structured `FsError` codes); the consumer surface in `dsh-tool-fs` against the real local provider (mock only the model/clock, never the collaborator); and integration through `ctx.tools.execute()` with and without `dsh-fs-policy`, world-verified by reading files back from disk rather than trusting either the canonical value or rendered content. The observed-state/owner-derivation policy is tested in `dsh-fs-policy`, not here.
 
 The defensive-pattern classes this repo has been bitten by are pinned directly:
 
