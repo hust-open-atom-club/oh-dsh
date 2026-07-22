@@ -8,7 +8,7 @@ English | [中文](2026-07-19-plugin-command-registration.zh.md)
 
 The TUI owns seven slash commands, while ACP defines a standard command catalog and invocation shape. Keeping command names, help text, autocomplete, dispatch, and cancellation inside each adapter makes every new command an adapter edit, prevents optional plugins from contributing commands, and lets the two front doors drift. Treating slash input as an ordinary model prompt is also unsafe: a user-visible direct action can unexpectedly consume tokens or let the model reinterpret an unknown command.
 
-A shared mechanism must remain a UI concern rather than a model tool or agent-loop branch. It also needs exact per-agent visibility, HMR-safe removal, per-session ACP discovery, direct result rendering, and request-scoped cancellation without adding command text or output to model history.
+A shared mechanism must remain a UI concern rather than a model tool or agent-loop branch. It also needs exact per-agent visibility, HMR-safe removal, per-session ACP discovery, direct result rendering, and request-scoped cancellation without automatically adding command text or output to model history.
 
 ## Decision
 
@@ -30,7 +30,7 @@ Registration and removal emit the unfiltered, non-vetoing `commands/change` regi
 
 ### Direct dispatch and cancellation
 
-Commands run in a human-only command plane. Their input does not become `user/message`, their output does not become a session event, and neither is sent to the model. A handler receives the exact target agent, raw input, and request-owned `AbortSignal`. The registry stops awaiting an uncooperative handler when the signal aborts; the handler remains responsible for stopping external side effects already started.
+Commands run in a human-only command plane. The registry does not turn their input into `user/message`, their output does not become a session event, and neither is sent to the model implicitly. A handler receives the exact target agent, raw input, and request-owned `AbortSignal`; a producer may explicitly schedule separate model-visible work through that agent and then owns its logging and lifecycle contract. The registry stops awaiting an uncooperative handler when the signal aborts; the handler remains responsible for stopping external side effects already started.
 
 Expected handler failures return `CommandResult.error`. Thrown or malformed results remain adapter-visible command failures, not model messages. This boundary deliberately separates UI output from durable domain mutation: a goal command may change `ctx.goals`, for example, but the goal service owns that persisted state.
 
