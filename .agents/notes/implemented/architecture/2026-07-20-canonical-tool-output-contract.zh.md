@@ -48,6 +48,7 @@ type ToolExecutionResult =
 | `web_search` ／ `web_fetch` | 归一化后的 `WebSearchResult` ／ `WebFetchResult` |
 | `lsp` | `{ kind: "locations", locations, resolvedWorkspaceRoot }` 或 `{ kind: "hover", hover }` |
 | `bash` | `{ kind: "background", taskId }` 或 `{ kind: "foreground" } & BashRunResult` |
+| `terminal_open` ／ `terminal_list` ／ `terminal_send` ／ `terminal_read` ／ `terminal_signal` ／ `terminal_close` | 公开会话快照、有界的读取／发送 DTO、信号／关闭操作结果，或后台任务句柄 |
 | `task_output` ／ `task_list` ／ `task_kill` | 不含所有者或通知账务字段的公开任务快照 |
 | `subagent` | 后台任务句柄或 `{ kind: "foreground", runId, output: JsonValue[] }` |
 | `workflow` ／ `ralph` | `{ runId, agentsStarted, result: JsonValue }` |

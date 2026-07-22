@@ -48,6 +48,7 @@ The first-party tools preserve their existing Native text while returning domain
 | `web_search` / `web_fetch` | The normalized `WebSearchResult` / `WebFetchResult` |
 | `lsp` | `{ kind: "locations", locations, resolvedWorkspaceRoot }` or `{ kind: "hover", hover }` |
 | `bash` | `{ kind: "background", taskId }` or `{ kind: "foreground" } & BashRunResult` |
+| `terminal_open` / `terminal_list` / `terminal_send` / `terminal_read` / `terminal_signal` / `terminal_close` | Public session snapshots, bounded read/send DTOs, signal/close outcomes, or a background task handle |
 | `task_output` / `task_list` / `task_kill` | Public task snapshots without owner or notification bookkeeping |
 | `subagent` | Background task handle or `{ kind: "foreground", runId, output: JsonValue[] }` |
 | `workflow` / `ralph` | `{ runId, agentsStarted, result: JsonValue }` |
