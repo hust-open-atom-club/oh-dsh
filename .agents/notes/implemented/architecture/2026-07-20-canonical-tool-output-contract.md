@@ -24,7 +24,7 @@ output: {
 
 `defineTool` infers the body return and both projectors from the unified `ValueSchemaSpec`. Raw and dynamic definitions provide the compiled `JsonSchemaNode` form. Registration rejects a missing declaration or unsupported raw schema; there is no content-return compatibility path.
 
-For each successful dispatch the registry snapshots the returned value as lossless `JsonValue`, validates it against `output.schema`, deep-freezes it, then invokes the pure renderer and, for a direct surface call, the optional metadata projector. Renderer, projector, schema, or lossless-JSON failures are contained as ordinary `ToolOutputError` results. An around `tools/execute` wrapper receives and returns the canonical success/failure union; a wrapper-authored success is normalized again through the resolved tool's output declaration instead of trusting independently authored content.
+For each successful dispatch the registry snapshots the returned value as lossless `JsonValue`, validates it against `output.schema`, deep-freezes it, then invokes the pure renderer and, for a direct surface call, the optional metadata projector. Renderer, projector, schema, or lossless-JSON failures are contained as ordinary `ToolOutputError` results. An around `tools/execute` wrapper receives and returns the canonical success/failure union; a wrapper-authored success is normalized again through the resolved tool's output declaration instead of trusting independently authored content. Canonical-result provenance is scoped to the immutable dispatch token, so returning a cached result from another call or tool triggers normalization under the active declaration rather than bypassing it.
 
 ```ts ignore-check
 type ToolExecutionResult =

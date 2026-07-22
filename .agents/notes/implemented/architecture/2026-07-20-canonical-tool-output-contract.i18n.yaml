@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-20-canonical-tool-output-contract.md: 4099568de5dcc21a89b7873d4a6d4c7e9c62f8e4
-2026-07-20-canonical-tool-output-contract.zh.md: 01b50ef7493ea6548cd238f55e445a702e4d78b3
+2026-07-20-canonical-tool-output-contract.md: 9cc7c97c1f0c9e0753ee826c1e20a3a425e2caf3
+2026-07-20-canonical-tool-output-contract.zh.md: 183a7e6bf212e63dffca1a346aa907f66006444a
