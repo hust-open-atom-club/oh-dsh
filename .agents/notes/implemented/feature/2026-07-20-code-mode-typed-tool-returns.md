@@ -53,7 +53,7 @@ Before dispatch the bridge snapshots binding arguments as lossless JSON and make
 
 The worker exposes the actual `ToolCallError` constructor used for `tools` binding failures, so `error instanceof ToolCallError` works. The error has the standard `Error` message plus the exact `toolName`; it deliberately omits `ToolFailure.info`, error codes, and Native content. This is an exception contract for control flow, not a failure union for programmatic classification.
 
-Binding arguments and resolutions are revalidated as lossless JSON on both sides of the hostile worker protocol and cross through structured clone with no byte cap. Both snapshot boundaries traverse iteratively, so valid nesting has no JavaScript call-stack depth cap. The dependency-light runtime seam names its structural equivalent `CodeJsonValue` so it need not depend on the session-owned canonical type; the generated SDK and tool API use `JsonValue`. Intermediate values are not prompt-truncated, context-spilled, or persisted. This preserves full acquired search, workflow, task, filesystem, and MCP values for programmatic filtering while leaving provider and executor acquisition limits truthful.
+Binding arguments and resolutions are revalidated as lossless JSON on both sides of the hostile worker protocol and have no byte cap. Before crossing through structured clone, each detached value is encoded as a flat pre-order token stream whose transport nesting is bounded; the receiver rebuilds it iteratively. Valid application nesting therefore has neither a JavaScript call-stack depth cap nor a platform-specific nested structured-clone limit. The dependency-light runtime seam names its structural equivalent `CodeJsonValue` so it need not depend on the session-owned canonical type; the generated SDK and tool API use `JsonValue`. Intermediate values are not prompt-truncated, context-spilled, or persisted. This preserves full acquired search, workflow, task, filesystem, and MCP values for programmatic filtering while leaving provider and executor acquisition limits truthful.
 
 ### Outer result and output ledger
 
@@ -63,7 +63,7 @@ The runtime accepts an exact lossless JSON completion of any root. Returning `un
 
 Logs stream eagerly so a terminated run can retain output already admitted. Native stdout and stderr writes that bypass the worker's patched stream slots use independent pipes, so terminal settlement continues bounded capture until worker termination completes before materializing the result. When the cap is crossed, the runtime returns an explicit bounded failure with the fitting captured prefix. That outer result then traverses the ordinary `run_code` rendering and spill policy, which may save the captured text and expose its configured head/tail preview. The spill layer cannot recover bytes the runtime rejected beyond the hard cap.
 
-Compute time, wall time, worker heap, cancellation, and fresh-worker isolation remain independent limits. The outer ledger never charges intermediate bindings, so structured-clone cost and available process or worker memory are their practical bounds.
+Compute time, wall time, worker heap, cancellation, and fresh-worker isolation remain independent limits. The outer ledger never charges intermediate bindings, so snapshotting, flat-wire encoding and decoding, structured-clone cost, and available process or worker memory are their practical bounds.
 
 ### Typed handles and lifetime
 
@@ -75,7 +75,7 @@ Dynamic Cordis mounting follows the same rule: `cordis_mount` returns `{ id, plu
 
 Nested dispatch keeps the existing bounded `tool/code-dispatch.resultSummary` for diagnostics but does not persist canonical values. `tool/result` continues to persist only rendered content, error, and optional metadata. This is deliberately not a session-format change, so `SESSION_FORMAT_VERSION` remains unchanged and replay cannot recreate intermediate program values.
 
-The opaque `exec.parent` token marks nested calls. Presentation metadata and generic or tool-owned spill projections skip those calls because they have no direct result card and their canonical values never enter context. The outer `run_code` call alone produces one card and may spill its final post-policy presentation; its presenter reads durable `tool/result.content` directly instead of persisting a presentation-metadata copy.
+The opaque `exec.parent` token marks nested calls. Presentation metadata and generic or tool-owned spill projections skip those calls because they have no direct result card and their canonical values never enter context. The outer `run_code` call alone computes presentation metadata, produces one card, and may spill its final post-policy presentation.
 
 ## Testing
 
@@ -97,14 +97,14 @@ Keyless real-worker integration tests pin the two handle workflows that prose re
 
 Code programs can compose tools through stable values instead of reverse-engineering Native prose. Native and Both Mode retain their existing text and editor presentation, while Code Mode receives output-schema types and exact runtime JSON. Tool authors must treat the canonical value as their programmatic API and put display-only formatting in the renderer.
 
-The worker performs structured cloning and lossless validation but does not make intermediate values cheap or durable. Outer overflow is an explicit failed run, and error handling remains intentionally human-guided rather than a versioned code union.
+The worker performs bounded-depth flat-wire transport and lossless validation but does not make intermediate values cheap or durable. Outer overflow is an explicit failed run, and error handling remains intentionally human-guided rather than a versioned code union.
 
 ## Known Limitations and Deferred Work
 
 - Subagent and workflow caller-defined structured outputs remain object-rooted through consumer-level guards even though tool outputs may use any JSON root.
 - Post-execute has separate value and presentation projections; replacing content is not a confidentiality mechanism, so policy must block or replace the value to hide it from programmatic callers.
 - Intermediate canonical values are execution-local and unavailable to replay because durable events persist only presentation and bounded summaries.
-- Intermediate values have no byte cap and can exhaust process or worker memory through retention or structured-clone cost.
+- Intermediate values have no byte cap and can exhaust process or worker memory through retention, flat-wire copies, or structured-clone cost.
 - The 64 MiB hard cap applies only to outer output; spill cannot recover bytes rejected beyond that cap.
 - Provider or executor acquisition limits may already have discarded source data before a canonical value reaches Code Mode.
 - Unsupported MCP output schemas fall back to `JsonValue`; richer Native multimedia projection is deferred.
