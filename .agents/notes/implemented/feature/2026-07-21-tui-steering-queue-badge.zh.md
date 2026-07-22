@@ -6,13 +6,13 @@ Status: implemented
 
 ## Problem
 
-轮次运行期间，编辑器提交会调用 `agent.steer()`，在运行中的轮次后面加入 steering（中途引导）队列（[前门 Agent Note](2026-07-17-dedicated-full-screen-tui-front-door.md)）。运行时的状态行只显示 `Working — Enter sends steering, Esc cancels`，因此按下 Enter 后没有任何反馈表明消息已入队、也看不出有多少条正在等待送达模型。连续 steering 多次的用户无法把队列和被吞掉的按键区分开。
+轮次运行期间，编辑器提交会调用 `agent.steer()`，在运行中的轮次后面加入 steering（中途引导）队列（[前门 Agent Note](2026-07-17-dedicated-full-screen-tui-front-door.md)）。运行时的状态行只以 `Enter sends steering, Esc cancels` 提示收尾，因此按下 Enter 后没有任何反馈表明消息已入队、也看不出有多少条正在等待送达模型。连续 steering 多次的用户无法把队列和被吞掉的按键区分开。
 
 ## Decision
 
 agent（智能体）的收件箱（inbox）才是权威的 steering 队列，但 TUI 无法观测它，因此徽标是从公开的 `agent/queued` 与 `steering/message` 事件重建出的实时计数，而非对队列本身的投影。
 
-- 运行时的状态行经 `formatRunningStatus(queued)` 组装：`queued > 0` 时为 `Working — ${queued} queued · Enter sends steering, Esc cancels`，为零时是纯提示文本。
+- 运行时的状态行经 `formatTurnStatus` 组装：`queued > 0` 时在 `Enter sends steering, Esc cancels` 提示前插入 `${queued} queued · ` 徽标，为零时是纯提示文本；其前的阶段标签与耗时归[详细状态行](2026-07-21-tui-verbose-status-line.md)所有。
 - `createTuiChat` 持有一个 `pendingSteering` 计数器：每收到一个针对本 agent 且 `info.steering` 为真的 `agent/queued` 就 `+1`，agent loop（智能体循环）每排空一条时随对应的 `steering/message` 会话事件 `-1`（下限为零），agent 一旦离开 `running` 状态即重置为零。
 - 计数通过 `setMessage` 刷新到实时的 `Loader` 上；空闲时刷新是空操作，因为 loader 只在运行中的轮次期间存在。
 - 重置放在 `agent/status` 状态切换里，而非 `setStatus` 中，因为 `setStatus` 在轮次中途的颜色方案变化时也会运行，绝不能清掉一个实时计数。

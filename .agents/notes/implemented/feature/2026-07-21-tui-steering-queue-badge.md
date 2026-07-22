@@ -6,13 +6,13 @@ English | [中文](2026-07-21-tui-steering-queue-badge.zh.md)
 
 ## Problem
 
-While a turn runs, an editor submission calls `agent.steer()` and joins the steering queue behind the running turn ([front-door Agent Note](2026-07-17-dedicated-full-screen-tui-front-door.md)). The running status line read only `Working — Enter sends steering, Esc cancels`, so pressing Enter gave no feedback that the message landed or how many were waiting to reach the model. A user steering several times could not tell the queue from a dropped keystroke.
+While a turn runs, an editor submission calls `agent.steer()` and joins the steering queue behind the running turn ([front-door Agent Note](2026-07-17-dedicated-full-screen-tui-front-door.md)). The running status line ended only with the `Enter sends steering, Esc cancels` hint, so pressing Enter gave no feedback that the message landed or how many were waiting to reach the model. A user steering several times could not tell the queue from a dropped keystroke.
 
 ## Decision
 
 The agent's inbox is the authoritative steering queue but is not observable from the TUI, so the badge is a live count reconstructed from the public `agent/queued` and `steering/message` events rather than a projection of the queue itself.
 
-- The running status line composes through `formatRunningStatus(queued)`: `Working — ${queued} queued · Enter sends steering, Esc cancels` when `queued > 0`, and the plain hint at zero.
+- The running status line composes through `formatTurnStatus`, which inserts a `${queued} queued · ` badge before the `Enter sends steering, Esc cancels` hint when `queued > 0` and shows the plain hint at zero; the phase label and elapsed timing before it are the [verbose status line](2026-07-21-tui-verbose-status-line.md)'s.
 - `createTuiChat` owns a `pendingSteering` counter: `+1` on each `agent/queued` for this agent whose `info.steering` is set, `-1` (floored at zero) on each `steering/message` session event as the loop drains one, and reset to zero whenever the agent leaves `running`.
 - The count refreshes onto the live `Loader` through `setMessage`; the refresh is a no-op while idle because the loader exists only during a running turn.
 - The reset lives in the `agent/status` transition, not in `setStatus`, because `setStatus` also runs on mid-turn palette changes and must not clear a live count.
