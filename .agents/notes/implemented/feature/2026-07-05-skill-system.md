@@ -50,4 +50,4 @@ The catalog is deterministic for a fixed root set and runtime registration revis
 
 ## Deferred
 
-Forked skill contexts (`context: fork`), direct user/slash invocation (`user-invocable`), parameter declarations and hints (`arguments` and `argument-hint`), and per-skill tool constraints (`allowed-tools` and `disallowed-tools`) are outside the shipped contract. The registry, local provider, and model-facing tool do not parse, advertise, or enforce these fields.
+Forked skill contexts (`context: fork`), parameter declarations and hints (`arguments` and `argument-hint`), and per-skill tool constraints (`allowed-tools` and `disallowed-tools`) are outside the shipped contract. The registry, local provider, and model-facing tool do not parse, advertise, or enforce these fields, and the `user-invocable` frontmatter field is likewise unparsed. Direct user invocation itself ships as a consumer-side affordance instead: the TUI front door offers a manual `/skill:<name>` command over the registry's existing `list()` and `get()` methods, without a registry, provider, or tool contract change — see [the TUI skill slash command](2026-07-21-tui-skill-slash-command.md).
