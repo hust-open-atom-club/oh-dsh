@@ -10,7 +10,7 @@ The shipped tui-agent `cordis.yml` loaded `@deepseek-ai/dsh-tool-todo`, exposing
 
 ## Decision
 
-The tui-agent `cordis.yml` no longer loads `tool-todo`; `todo_write` is opt-in. The `code-mode.cordis.yml` overlay inherits the base composition, so its generated SDK drops `todo_write` too. Enabling it is one entry — add `@deepseek-ai/dsh-tool-todo` to `cordis.yml` (or a `~/.config/dsh` personal overlay) — after which the model logs the whole-list `todo/write` snapshot and the TUI renders the plan, unchanged. The `TodoItem` type and the `todo/write` event stay in `@deepseek-ai/dsh-session` and the TUI's plan rendering stays wired, so both the default (disabled) and opt-in (enabled) paths are first-class. The sibling acp-agent, headless-agent, and jsonrpc-agent examples still ship the tool.
+The tui-agent `cordis.yml` no longer loads `tool-todo`; `todo_write` is opt-in. The `code-mode.cordis.yml` overlay inherits the base composition, so its generated SDK drops `todo_write` too. Enabling it is one entry — add `@deepseek-ai/dsh-tool-todo` to `cordis.yml` (or a `~/.dsh` personal overlay) — after which the model logs the whole-list `todo/write` snapshot and the TUI renders the plan, unchanged. The `TodoItem` type and the `todo/write` event stay in `@deepseek-ai/dsh-session` and the TUI's plan rendering stays wired, so both the default (disabled) and opt-in (enabled) paths are first-class. The sibling acp-agent, headless-agent, and jsonrpc-agent examples still ship the tool.
 
 ## Alternatives considered
 

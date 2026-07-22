@@ -1,4 +1,4 @@
-# Agent Note: The dsh CLI and personal config overlays from ~/.config/dsh
+# Agent Note: The dsh CLI and personal config overlays from the Harness home
 
 Status: implemented
 
@@ -14,13 +14,13 @@ Two coupled pieces, aligned with the `apps/` assembly tier proposed by the `dsh 
 
 **The `dsh` CLI (`apps/cli`, npm name `@deepseek-ai/dsh`).** `apps/*` joins the workspaces as the product-assembly tier over `packages/*` libraries. The bin's dispatch reserves `web` and `-p`/`--prompt` for PR #443 (they exit with a pointer) so the two branches merge as a near-union; everything else runs the default surface: the interactive TUI, booting the shipped `examples/tui-agent/cordis.yml` (or an explicit config argument) with the invoking directory as the workspace. The committed `bin/dsh` launcher resolves the checkout through its own real path and runs the bin **from source** via the repo's tsx (with `--expose-internals` for the config's HMR entry), so `ln -sf "$(pwd)/bin/dsh" ~/.local/bin/dsh` installs a command that always executes the current working tree. `pnpm run demo:tui` runs the same entry.
 
-**Personal config (`dsh-app-boot`).** The personal config directory resolves as `$DSH_CONFIG_HOME`, else `$XDG_CONFIG_HOME/dsh`, else `~/.config/dsh` (`resolvePersonalConfigDir`; empty variables read as unset). The dsh TUI surface consumes its two optional files; the demo bins boot their committed trees verbatim:
+**Personal config (`dsh-app-boot`).** The personal overlay lives in the Harness home — `$DSH_HOME`, else `~/.dsh` — resolved by the shared [`resolveDshHome`](../architecture/2026-07-24-single-harness-home-resolver.md) (`@deepseek-ai/dsh-paths`), the same single root skills and AGENTS.md resolve against. The dsh TUI surface consumes its two optional files; the demo bins boot their committed trees verbatim:
 
 - `.env` — loaded after the invoking directory's `.env`; `process.loadEnvFile` never overrides, so precedence is ambient > project `.env` > personal `.env`.
 - `config.yaml` — a top-level YAML array of `@cordisjs/plugin-include` `PatchOptions`, parsed with the include's own `!!js` dialect (`loadPersonalPatches`) and passed to `boot()`, which forwards it as the root include's `patches`. Patch semantics are exactly the committed overlay semantics (the Code Mode overlay is the template): an id-targeted patch replaces the named entry's whole `config`, `insert` appends entries, an unmatched id warns and is skipped.
 - A missing file means no overlay; a present-but-unreadable, unparsable, or non-array file throws at boot (misconfiguration fails loud, never a silent skip).
 
-The PTY smoke's launcher isolates `DSH_CONFIG_HOME` to a per-test directory, exactly as it already isolates `DSH_HOME`/`DSH_AGENTS_HOME`, so a developer's real personal overlay cannot leak into fixtures; only the dsh CLI reads personal config, so no other test launcher needed changes.
+The PTY smoke's launcher isolates `$DSH_HOME` to a per-test directory, exactly as it already isolates `DSH_AGENTS_HOME`, so a developer's real personal overlay cannot leak into fixtures; only the dsh CLI reads personal config, so no other test launcher needed changes.
 
 Hot-reload interplay: the include re-applies its `patches` on every config re-read (the [config hot-reload resilience Agent Note](../bug-fix/2026-07-20-config-hot-reload-resilience.md)), so a live `cordis.yml` edit keeps the personal overlay applied.
 
@@ -41,9 +41,9 @@ Hot-reload interplay: the include re-applies its `patches` on every config re-re
 - `dsh` from any directory (and `pnpm run demo:tui`) boots the personal provider/model with zero repo changes; verified end-to-end against a personal Anthropic proxy with Opus 4.8, including a bash tool round trip.
 - Because an id-targeted patch replaces the whole `config`, a personal override restates the base fields it keeps and can drift when the base entry changes shape; the loader's entry-not-found/name-mismatch warnings are the only diagnostics.
 - Personal patches resolve ids against the booted file's own tree, so nested-include overlays (Code Mode) are not personalized; live-run parity for those leaves is deferred.
-- `dsh-app-boot` gains a real dependency (`js-yaml`) and a load-only copy of the include's `!!js` YAML type.
+- `dsh-app-boot` depends on `js-yaml` (plus a load-only copy of the include's `!!js` YAML type) and, like `apps/cli`, on `@deepseek-ai/dsh-paths` for `resolveDshHome`.
 - When PR #443 lands, `apps/cli/src/bin.ts`'s dispatch chain and `apps/cli/package.json`'s dependency list conflict textually; both resolve as unions (their `web`/`-p` branches plus our default-TUI branch).
 
 ## Testing
 
-`packages/ui/app-boot/tests/personal-config.spec.ts` pins directory precedence (including empty-variable fallback), `!!js` preservation and end-to-end interpolation through a booted tree, insert entries, the absent/empty no-op paths, and the three fail-loud shapes (unreadable, unparsable, non-array). `examples/tui-agent/tests/tui-keyless-smoke.e2e.ts` boots the dsh bin in a PTY three ways: default config with no overlay, a personal `.env` + `config.yaml` chain whose patched welcome renders in the banner, and an invalid personal file failing the boot loudly. The pre-existing smokes and snapshot suites pass on a machine whose real `~/.config/dsh` overlay would change the booted model — the isolation, not luck.
+`packages/ui/app-boot/tests/personal-config.spec.ts` pins `!!js` preservation and end-to-end interpolation through a booted tree, insert entries, the default directory resolving from `$DSH_HOME`, the absent/empty no-op paths, and the three fail-loud shapes (unreadable, unparsable, non-array). `examples/tui-agent/tests/tui-keyless-smoke.e2e.ts` boots the dsh bin in a PTY three ways: default config with no overlay, a personal `.env` + `config.yaml` chain whose patched welcome renders in the banner, and an invalid personal file failing the boot loudly. The pre-existing smokes and snapshot suites pass on a machine whose real `~/.dsh` overlay would change the booted model — the isolation, not luck.

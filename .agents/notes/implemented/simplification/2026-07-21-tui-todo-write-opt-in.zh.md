@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-tui-agent `cordis.yml` 不再加载 `tool-todo`；`todo_write` 改为可选启用。`code-mode.cordis.yml` 覆盖配置继承基础组合，因此它生成的 SDK 同样不再包含 `todo_write`。启用它只需一条配置项——把 `@deepseek-ai/dsh-tool-todo` 加入 `cordis.yml`（或 `~/.config/dsh` 的个人覆盖配置）——此后模型照旧记录整份清单的 `todo/write` 快照，TUI 照旧渲染该计划。`TodoItem` 类型与 `todo/write` 事件仍留在 `@deepseek-ai/dsh-session`，TUI 的计划渲染也保持接线，因此默认（禁用）与可选启用（启用）两条路径都是一等公民。同类的 acp-agent、headless-agent、jsonrpc-agent 示例仍然出厂携带该工具。
+tui-agent `cordis.yml` 不再加载 `tool-todo`；`todo_write` 改为可选启用。`code-mode.cordis.yml` 覆盖配置继承基础组合，因此它生成的 SDK 同样不再包含 `todo_write`。启用它只需一条配置项——把 `@deepseek-ai/dsh-tool-todo` 加入 `cordis.yml`（或 `~/.dsh` 的个人覆盖配置）——此后模型照旧记录整份清单的 `todo/write` 快照，TUI 照旧渲染该计划。`TodoItem` 类型与 `todo/write` 事件仍留在 `@deepseek-ai/dsh-session`，TUI 的计划渲染也保持接线，因此默认（禁用）与可选启用（启用）两条路径都是一等公民。同类的 acp-agent、headless-agent、jsonrpc-agent 示例仍然出厂携带该工具。
 
 ## Alternatives considered
 
