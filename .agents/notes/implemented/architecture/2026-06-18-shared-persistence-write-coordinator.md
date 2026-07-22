@@ -16,11 +16,10 @@ The coordinator retires each live session from its `session/disposed` notificati
 
 ### The hook interface (`PersistenceBackend<TornMarker>`)
 
-Six methods (five required + an optional lifecycle hook) — the only seam between the coordinator and storage:
+Five required members plus an optional lifecycle hook form the only boundary between the coordinator and storage:
 
 - `name` — backend label for the dispose-failure `AggregateError`.
-- `loadStored(id)` — read a stored prefix by id, scanning ANY storage scope (every JSONL cwd bucket; SQLite's id is globally unique). Used by resume/load and, via `!== undefined`, the create-collision probe.
-- `loadLive(id, cwd)` — read a stored prefix SCOPED to `cwd`. **Deliberately distinct from `loadStored`**: HMR live-adoption must only adopt a persisted log at the SAME cwd as the live session; a same-id log at a different cwd is a collision, not a resume. Collapsing the two reintroduces a cross-cwd adoption bug. SQLite ignores `cwd`.
+- `loadStored(id)` — read one stored prefix by id across every storage scope (every JSONL cwd bucket; SQLite's id is globally unique). Resume/load, live adoption, and the create-collision probe share this lookup. The coordinator asserts the returned id and rejects a stored/live cwd mismatch before repair or state publication.
 - `appendBatch(meta, events, isMaterialized)` — durably append a contiguous batch, lazily materializing the session ATOMICALLY when not yet materialized (the materialize-write and the first event batch must commit together — a crash between them must not leave a materialized-but-empty session; this is why there is no separate `materialize` hook).
 - `commitRepair(meta, tornMarker, closers)` — make a crash repair durable: truncate the torn tail (iff `tornMarker !== undefined`) and append `closers`. **NOT required to be atomic** — JSONL legitimately truncates-then-appends in two fsync'd steps, SQLite does DELETE+INSERT in one transaction. Used by `load` (truncate + synthetic closers) and live-adoption (truncate only, `closers = []`).
 - `list()` — list all stored metadata.
@@ -37,8 +36,8 @@ The shared `runPersistenceContract` (public-API contract) keeps running for ever
 ## Alternatives considered
 
 - **A base class the backends extend** — rejected for composition: a backend exposes only the hooks, cannot reach the coordinator's private orchestration state, and a third-party backend may still implement the abstract service directly without the coordinator at all.
-- **A wider hook surface** — each candidate hook folded away: there is no separate `materialize` hook (the materialize-write must commit atomically with the first event batch inside `appendBatch`), no separate create-collision probe (it is `loadStored(id) !== undefined`), and no coordinator pass-through for `list()` (listing needs none of the orchestration).
+- **A wider hook surface** — each candidate hook folds away: there is no scope-specific live lookup because `loadStored` plus the coordinator's cwd check preserves the collision boundary, no storage-locator generic because validated JSONL metadata reproduces its path while SQLite is already id-bound, no separate `materialize` hook because the first batch must commit atomically with materialization, no separate create-collision probe because it is `loadStored(id) !== undefined`, and no coordinator pass-through for `list()` because listing needs none of the orchestration.
 
 ## Consequences
 
-The coordinator adds one indirection, an opaque torn marker, and detached session-retirement tasks, but centralizes correctness-heavy orchestration previously duplicated by every backend. Session disposal remains an observe-only event, so the session owner does not await persistence retirement; the coordinator contains failures, preserves uncommitted buffers, and makes backend teardown the quiescence boundary. Its hook surface stays narrow: collision checks reuse `loadStored`, materialization stays atomic inside `appendBatch`, and listing bypasses the coordinator. New backends implement storage primitives rather than copy the event-buffer-flush lifecycle.
+The coordinator adds one indirection, an opaque torn marker, and detached session-retirement tasks, but centralizes correctness-heavy orchestration previously duplicated by every backend. Session disposal remains an observe-only event, so the session owner does not await persistence retirement; the coordinator contains failures, preserves uncommitted buffers, and makes backend teardown the quiescence boundary. Its hook surface stays narrow: identity, adoption, and collision checks reuse `loadStored`; materialization stays atomic inside `appendBatch`; and listing bypasses the coordinator. New backends implement storage primitives rather than copy the event-buffer-flush lifecycle.
