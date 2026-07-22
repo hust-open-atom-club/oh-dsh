@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-17-ts-build-config.zh.md)
+
 ## Problem
 
 The current TypeScript build and typecheck setup had these issues:

@@ -1,4 +1,4 @@
-# RFC: 对提供方请求强制携带 `User-Agent` 归属标识
+# Agent Note: 对提供方请求强制携带 `User-Agent` 归属标识
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-LLM（大语言模型）提供方请求应当标识发出请求的产品。这对提供方侧的技术支持、滥用调查、兼容性调试和流量分析都有价值。在本 RFC 之前，harness 只做了部分工作：手写的 DeepSeek 适配器发送了一个手动复制的 `User-Agent` 常量（`packages/llm/llm-deepseek/src/adapter.ts`），而基于 pi-ai 的孪生适配器则完全不发送 harness 自有的头部（`packages/llm/llm-pi-ai/src/adapter.ts`）。因此新适配器可以悄无声息地省略归属标识，而基于库的适配器也可能与手写适配器产生偏差——尽管[孪生适配器 RFC](2026-06-13-twin-llm-adapters.md) 的存在正是为了让两种实现在提供方 seam 上保持诚实。
+LLM（大语言模型）提供方请求应当标识发出请求的产品。这对提供方侧的技术支持、滥用调查、兼容性调试和流量分析都有价值。在本 Agent Note 之前，harness 只做了部分工作：手写的 DeepSeek 适配器发送了一个手动复制的 `User-Agent` 常量（`packages/llm/llm-deepseek/src/adapter.ts`），而基于 pi-ai 的孪生适配器则完全不发送 harness 自有的头部（`packages/llm/llm-pi-ai/src/adapter.ts`）。因此新适配器可以悄无声息地省略归属标识，而基于库的适配器也可能与手写适配器产生偏差——尽管[孪生适配器 Agent Note](2026-06-13-twin-llm-adapters.md) 的存在正是为了让两种实现在提供方 seam 上保持诚实。
 
 直接触发因素来自 OpenRouter 的 [App Attribution](https://openrouter.ai/docs/app-attribution) 文档。OpenRouter 根据 `HTTP-Referer` 加上 display/category 头部来创建应用页面和排名。这有价值，但它不是 HTTP 标准中的应用身份机制。风险在于：把 OpenRouter 的精确头部集当作通用标准来采纳，然后将提供方特有的头部泄漏到直连 DeepSeek 的请求、未来的 OpenAI/Anthropic/Vertex 适配器、测试服务器或无限期记录未知字段的代理中。
 
@@ -26,11 +26,11 @@ LLM（大语言模型）提供方请求应当标识发出请求的产品。这�
 
 在 LLM 适配器边界，提供方请求归属是强制的，且仅使用标准 `User-Agent` 头部。规则：每个生产 LLM 适配器在每个提供方 HTTP 请求上发送一个静态、非机密的应用身份，且每个适配器都有测试证明 `User-Agent` 到达了线路（mock 服务器断言收到的头部；对于基于库的适配器，通过库的头部钩子馈入同一个 mock 服务器断言）。
 
-本 RFC **不**实现 OpenRouter 应用归属。`HTTP-Referer`、`X-OpenRouter-Title`、`X-Title` 和 `X-OpenRouter-Categories` 是 OpenRouter 特有的产品展示头部，不是提供方无关的模型请求归属。它们可以后续由 OpenRouter 适配器或显式 OpenRouter 模式提出，附带自己的隐私/产品决策、测试和文档。在此之前，即使请求指向 OpenRouter，也只发送本 RFC 定义的共享 `User-Agent` 归属。
+本 Agent Note **不**实现 OpenRouter 应用归属。`HTTP-Referer`、`X-OpenRouter-Title`、`X-Title` 和 `X-OpenRouter-Categories` 是 OpenRouter 特有的产品展示头部，不是提供方无关的模型请求归属。它们可以后续由 OpenRouter 适配器或显式 OpenRouter 模式提出，附带自己的隐私/产品决策、测试和文档。在此之前，即使请求指向 OpenRouter，也只发送本 Agent Note 定义的共享 `User-Agent` 归属。
 
 提供方无关的身份由 `dsh-llm`（`packages/llm/llm/src/attribution.ts`）拥有，而非各适配器。`AppIdentity` 仅包含构建 `User-Agent` 所需的公开产品事实，默认的 `APP_IDENTITY` 确定了提案中留待决定的值：
 
-- `User-Agent` 的产品 token：`deepseek-harness`（与 RFC 之前的线路值及仓库/组织身份保持连续性）
+- `User-Agent` 的产品 token：`deepseek-harness`（与 Agent Note 之前的线路值及仓库/组织身份保持连续性）
 - 版本：通过 `createRequire` 从所属包的 manifest 读取，绝不手动复制常量
 - 应用 URL：`https://github.com/deepseek-ai/deepseek-harness-sdk`——计划中的公开主页；`attribution.ts` 中的 `FIXME` 标记在该仓库实际存在之前阻塞发布
 
@@ -42,10 +42,10 @@ LLM（大语言模型）提供方请求应当标识发出请求的产品。这�
 |---|---|
 | 所有基于 HTTP 的适配器 | `User-Agent: {product}/{version} (+{url})`——括号中的 `+url` 注释符合 RFC 9110 保守的 product/comment 语法。 |
 | 直连 DeepSeek 端点 | `User-Agent`；除非 DeepSeek 文档化了等效契约，否则不发送 OpenRouter 特有头部。 |
-| OpenRouter 端点 | 目前仅 `User-Agent`。本 RFC 下不发送 `HTTP-Referer`、`X-OpenRouter-Title`、`X-Title` 或 `X-OpenRouter-Categories`。 |
-| 未来提供方 | 仅 `User-Agent`，除非后续提供方特有的 RFC 接受额外头部。不要类比复用 `HTTP-Referer`。 |
+| OpenRouter 端点 | 目前仅 `User-Agent`。本 Agent Note 下不发送 `HTTP-Referer`、`X-OpenRouter-Title`、`X-Title` 或 `X-OpenRouter-Categories`。 |
+| 未来提供方 | 仅 `User-Agent`，除非后续提供方特有的 Agent Note 接受额外头部。不要类比复用 `HTTP-Referer`。 |
 
-端点检测不在本 RFC 范围内，因为此处不接受任何端点特有的映射。如果后续支持 OpenRouter，检测必须是显式的：要么是专门的 OpenRouter 提供方包，要么是显式的 `provider: 'openrouter'` / `attributionTarget: 'openrouter'` 配置，而非任意路径片段或模型名称。
+端点检测不在本 Agent Note 范围内，因为此处不接受任何端点特有的映射。如果后续支持 OpenRouter，检测必须是显式的：要么是专门的 OpenRouter 提供方包，要么是显式的 `provider: 'openrouter'` / `attributionTarget: 'openrouter'` 配置，而非任意路径片段或模型名称。
 
 ## 验证
 
@@ -55,19 +55,19 @@ LLM（大语言模型）提供方请求应当标识发出请求的产品。这�
 - 共享辅助函数（`attributionHeaders` / `userAgent`）从包元数据构建应用身份和标准 `User-Agent` 值，适配器无需手动复制版本常量。
 - `dsh-llm-deepseek` 在每个请求上发送共享的 `User-Agent`，其 mock 服务器套件断言精确值。
 - `dsh-llm-pi-ai` 通过 pi-ai 的 `StreamOptions.headers` 钩子发送相同的 `User-Agent`，其 mock 服务器套件断言精确值。
-- 本 RFC 下没有适配器发送 OpenRouter 特有的归属头部（`HTTP-Referer`、`X-OpenRouter-Title`、`X-Title`、`X-OpenRouter-Categories`）。
+- 本 Agent Note 下没有适配器发送 OpenRouter 特有的归属头部（`HTTP-Referer`、`X-OpenRouter-Title`、`X-Title`、`X-OpenRouter-Categories`）。
 - 没有应用归属字段携带机密、本地路径、会话 id、提示词文本、模型输出、用户邮箱或逐用户的稳定标识符。
 - 适配器 README 声明了 `User-Agent` 归属策略，并明确避免将 OpenRouter 应用归属记录为已实现的行为。
 
 ## 曾考虑的替代方案
 
-**现在就实现 OpenRouter 应用归属。** 本 RFC 否决。发送 `HTTP-Referer` 加 `X-OpenRouter-Title` 可以满足 OpenRouter 排名，但这些头部是提供方特有的产品功能，不是本 RFC 试图标准化的提供方无关的模型请求归属。支持它们应当是后续显式的 OpenRouter 适配器/模式决策，而非隐藏在首个共享归属辅助函数中。
+**现在就实现 OpenRouter 应用归属。** 本 Agent Note 否决。发送 `HTTP-Referer` 加 `X-OpenRouter-Title` 可以满足 OpenRouter 排名，但这些头部是提供方特有的产品功能，不是本 Agent Note 试图标准化的提供方无关的模型请求归属。支持它们应当是后续显式的 OpenRouter 适配器/模式决策，而非隐藏在首个共享归属辅助函数中。
 
 **向所有提供方发送 OpenRouter 头部。** 否决。这会把一份自定义的 OpenRouter 契约当作通用标准，并向未要求这些字段的提供方发送语义误导的头部。还有风险将 `HTTP-Referer` 当作通用应用 URL 字段使用，尽管标准 HTTP 已有 `User-Agent` 用于产品身份、`Referer` 用于不同的浏览上下文概念。
 
 **仅使用提供方账户/项目身份。** 否决。组织/项目头部、API key、云账户和计费项目标识的是谁付费或谁拥有请求，而非哪个应用在发送流量。它们也不暴露公开的应用标题/类别，无法帮助 OpenRouter 等网关构建应用排名。
 
-**终端用户 `user`/`metadata` 字段。** 本 RFC 否决。这些对滥用监控和客户支持有价值，但描述的是请求背后的人或租户。应用归属必须是静态的产品身份，且可安全地在每个请求上发送。
+**终端用户 `user`/`metadata` 字段。** 本 Agent Note 否决。这些对滥用监控和客户支持有价值，但描述的是请求背后的人或租户。应用归属必须是静态的产品身份，且可安全地在每个请求上发送。
 
 **仅配置启用的归属。** 否决。默认关闭的设置正是适配器不断漂移的原因。策略是强制默认归属加可覆盖的公开值，而非可选归属。
 

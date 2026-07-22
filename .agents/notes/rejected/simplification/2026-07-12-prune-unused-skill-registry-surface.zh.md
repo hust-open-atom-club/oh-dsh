@@ -1,4 +1,4 @@
-# RFC: 裁剪 skill 注册表中未使用的接口
+# Agent Note: 裁剪 skill 注册表中未使用的接口
 
 Status: rejected — Direct runtime skill registration is an intentional extension path for third-party plugins.
 
@@ -10,13 +10,13 @@ skill（技能）服务的嵌入式运行时子系统中，`ctx.skills.register(
 
 ## 提案
 
-移除 `SkillService.register()`、`SkillRegistration`、运行时伪提供方及保留名称规则、运行时 revision/缓存分支，以及仅用于运行时的 source/rank 规范化逻辑。需要嵌入式 skill 的测试改为注册一个小型真实提供方。保留 `providerRevision` 作为进行中的发现 epoch，但已完成的目录缓存仅以 cwd 为键：每次提供方变更同步清除缓存，await 之后的 revision 比较已能阻止插入陈旧结果。从 skill 契约和 local-provider 副本中移除 `whenToUse`、`SkillCandidate.path` 与 `SkillDefinition.path`，同时保留提供方的 locator/root 路径；保留 `metadata`、`disableModelInvocation`、`source`、`provider`、`locator` 和 `resourceBase`，因为它们要么是有意开放的扩展词汇，要么是生产消费的字段。
+移除 `SkillService.register()`、`SkillRegistration`、运行时伪提供方及保留名称规则、运行时 revision/缓存分支，以及仅用于运行时的 source/rank 规范化逻辑。需要嵌入式 skill 的测试改为注册一个小型真实提供方。保留 `providerRevision` 作为进行中的发现 epoch，但已完成的目录缓存仅以 cwd 为键：每次提供方变更同步清除缓存，await 之后的 revision 比较已能阻止插入陈旧结果。从 skill 契约和本地提供方副本中移除 `whenToUse`、`SkillCandidate.path` 与 `SkillDefinition.path`，同时保留提供方的 locator/root 路径；保留 `metadata`、`disableModelInvocation`、`source`、`provider`、`locator` 和 `resourceBase`，因为它们要么是有意开放的扩展词汇，要么是生产消费的字段。
 
-同步修订 skill 系统 RFC、README、JSDoc、目录文件与测试。agent（智能体）作用域的系统提示词段、工具提供方和变量明确不在本提案范围内：[agent 作用域贡献者契约](../../implemented/architecture/2026-07-08-agent-scope-contexts.md)有意允许在 `setup(agentCtx)` 期间通过 agent 拥有的上下文注册这三者，因此仓库内没有固定的作用域注册并不能证明它们未被使用。
+同步修订 skill 系统 Agent Note（agent 决策记录）、README、JSDoc、目录文件与测试。agent（智能体）作用域的系统提示词段、工具提供方和变量明确不在本提案范围内：[agent 作用域贡献者契约](../../implemented/architecture/2026-07-08-agent-scope-contexts.md)有意允许在 `setup(agentCtx)` 期间通过 agent 拥有的上下文注册这三者，因此仓库内没有固定的作用域注册并不能证明它们未被使用。
 
 ## 曾考虑的替代方案
 
-**保留面向嵌入方的运行时 skill 注册。** 这是已实现的 skill RFC 中有意提供的同步直接定义便利接口。一个小型提供方包装层可以在 effect 拥有的生命周期下暴露相同的嵌入数据，但它必须实现异步 `list()`/`get()`、携带提供方身份，并接受提供方的重复语义。本提案选择只保留一条统一的提供方路径，而非维护第二套排序、校验、缓存失效与查找路径。
+**保留面向嵌入方的运行时 skill 注册。** 这是已实现的 skill Agent Note 中有意提供的同步直接定义便利接口。一个小型提供方包装层可以在 effect 拥有的生命周期下暴露相同的嵌入数据，但它必须实现异步 `list()`/`get()`、携带提供方身份，并接受提供方的重复语义。本提案选择只保留一条统一的提供方路径，而非维护第二套排序、校验、缓存失效与查找路径。
 
 ## 验收标准
 

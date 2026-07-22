@@ -1,4 +1,4 @@
-# RFC: 将持久化接口合并进 dsh-session
+# Agent Note: 将持久化接口合并进 dsh-session
 
 Status: rejected — the separate persistence interface package is the intended modular capability seam for durable backends. Folding it into `dsh-session` would reduce package count at the cost of a cleaner backend boundary.
 
@@ -28,4 +28,4 @@ Status: rejected — the separate persistence interface package is the intended 
 
 `dsh-session` 变得更重：它同时拥有内存日志和持久化接口。这就是代价。如果第三方持久化后端已经形成公开生态，独立的接口包会是更清晰的 SDK 边界；但在预发布阶段，在尚无外部消费方时，多出的包看起来更像是过早的抽象。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

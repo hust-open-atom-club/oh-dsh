@@ -1,4 +1,4 @@
-# RFC: Web 能力 seam——稳定的工具覆盖多个提供方
+# Agent Note: Web 能力 seam——稳定的工具覆盖多个提供方
 
 Status: implemented
 
@@ -16,7 +16,7 @@ harness 需要面向模型的 web 工具，但不能将模型契约绑定到某�
 
 ## 决策
 
-Web 访问是一个一等能力 seam，遵循[能力 seam RFC](../../implemented/architecture/2026-06-13-capability-seams.md)：
+Web 访问是一个一等能力 seam，遵循[能力 seam Agent Note](2026-06-13-capability-seams.md)：
 
 1. `@deepseek-ai/dsh-web`（`packages/web/web`）拥有 `ctx.web`、提供方注册、提供方选择、共享的请求/结果词汇，以及 web 特有的错误。
 2. 提供方包实现具体后端并向 `ctx.web` 注册能力，例如 `@deepseek-ai/dsh-web-search-exa`、`@deepseek-ai/dsh-web-search-perplexity`、`@deepseek-ai/dsh-web-search-deepseek` 和 `@deepseek-ai/dsh-web-fetch-local`。
@@ -34,7 +34,7 @@ Web 访问是一个一等能力 seam，遵循[能力 seam RFC](../../implemented
 
 这使模型 schema 保持稳定，而不将插件加载顺序、凭证状态或 HMR（热模块替换）时序纳入面向模型的契约。如果 web 搜索已启用但不存在可用的搜索提供方，`web_search` 仍然可见，执行时以结构化的 `WebError`（如 `WEB_PROVIDER_UNAVAILABLE` 或 `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`）失败。如果某个提供方在 `dsh-tool-web` 之后出现，下一次执行即可使用它而无需更改 schema。如果某个提供方在调用过程中消失，执行以结构化的 `WebError` 失败，而不是静默选择另一个提供方或回退到 `UNKNOWN_TOOL`。
 
-该 seam 刻意不暴露任何观察面——没有注册表变更事件，也没有聚合的能力状态查询。不可用性是调用方通过执行观察到的事实：`search()`/`fetch()` 在调用时解析提供方，并抛出命名了失败原因的结构化 `WebError`。[观察面 RFC](../simplification/2026-07-04-drop-unconsumed-web-observation-surface.md) 记录了这一判断：基于调用的派生选择与基于启用的注册使得没有消费方需要变更信号或独立于执行和错误路由的可用性探测；未来的提供方状态面板会重新引入它实际消费的最小信号或查询。
+该 seam 刻意不暴露任何观察面——没有注册表变更事件，也没有聚合的能力状态查询。不可用性是调用方通过执行观察到的事实：`search()`/`fetch()` 在调用时解析提供方，并抛出命名了失败原因的结构化 `WebError`。[观察面 Agent Note](../simplification/2026-07-04-drop-unconsumed-web-observation-surface.md) 记录了这一判断：基于调用的派生选择与基于启用的注册使得没有消费方需要变更信号或独立于执行和错误路由的可用性探测；未来的提供方状态面板会重新引入它实际消费的最小信号或查询。
 
 ## 包拓扑
 
@@ -77,6 +77,8 @@ flowchart LR
 `ctx.web` 是一个提供方注册表加上一个带提供方选择的执行面。注册表部分与 `LlmService` 保持接近：每种能力类别一个 `Map<id, provider>`，`registerSearchProvider`/`registerFetchProvider` 方法返回 disposer，重复 id 抛出 `WebError`，执行时解析在选定提供方缺失或不可用时抛出异常。权威签名见 `packages/web/web/src/types.ts`；seam 的形状：
 
 ```ts
+import type { WebFetchRequest, WebFetchResult, WebSearchRequest, WebSearchResult } from '@deepseek-ai/dsh-web'
+
 interface WebSearchProvider {
   readonly id: string
   available(): boolean
@@ -208,18 +210,18 @@ seam 请求刻意不包含逐调用超时、`format`、`prompt` 或提供方特�
 HTTP 状态码是已获取资源状态的一部分，不自动构成工具失败。成功的网络获取一个 `404` 或 `500` 响应会返回带有状态码和有界解码正文（当内容类型受支持时）的 `WebFetchResult`。`WebError` 用于无法安全获取或表示资源的失败：无效或被阻断的 URL、重定向策略违规、超时、abort、响应过大、不支持的内容类型、提供方失败或网络失败。
 
 ```ts
-interface WebFetchRequest {
+export interface WebFetchRequest {
   readonly url: string
 }
 
-interface WebFetchResult {
+export interface WebFetchResult {
   readonly url: string
   readonly statusCode: number
   readonly body: WebFetchBody
   readonly truncated: boolean
 }
 
-type WebFetchBody =
+export type WebFetchBody =
   | { readonly kind: 'html'; readonly content: string }
   | { readonly kind: 'text'; readonly content: string }
 ```
@@ -278,7 +280,7 @@ prompt 引导解释了语义分工——`web_search` 用于发现和获取当前
 
 ## 测试
 
-每一层在自己的 seam 处固定：`dsh-web` 中的注册/选择/截断/abort 契约与 `WebError` 码；每个提供方基于录制的 fixture（测试前置数据）的请求/响应映射（Perplexity fixture 包含纯 URL 引用，以保持可选 source 字段的诚实性），加上每个真实提供方的自跳过带密钥冒烟测试；`web-fetch-local` 中的真实本地 HTTP 行为；`dsh-tool-web` 中通过真实工具注册表的启用驱动注册、结构化执行错误和结果格式化。一个真实 Loader 冒烟测试守护两种导出形状（[事后分析 0001](../../../postmortem/0001-acp-default-export-drops-inject.md)）：`dsh-web` 是默认导出的服务，而提供方和 `tool-web` 是命名空间插件，误加 `export default` 会丢失 `inject`。
+每一层在自己的 seam 处固定：`dsh-web` 中的注册/选择/截断/abort 契约与 `WebError` 码；每个提供方基于录制的 fixture（测试前置数据）的请求/响应映射（Perplexity fixture 包含纯 URL 引用，以保持可选 source 字段的诚实性），加上每个真实提供方的自跳过带密钥冒烟测试；`web-fetch-local` 中的真实本地 HTTP 行为；`dsh-tool-web` 中通过真实工具注册表的启用驱动注册、结构化执行错误和结果格式化。一个真实 Loader 冒烟测试守护两种导出形状（[事后分析 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)）：`dsh-web` 是默认导出的服务，而提供方和 `tool-web` 是命名空间插件，误加 `export default` 会丢失 `inject`。
 
 ## 曾考虑的替代方案
 

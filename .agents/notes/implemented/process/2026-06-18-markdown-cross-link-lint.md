@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-18-markdown-cross-link-lint.zh.md)
+
 ## Problem
 
 Docs in this repo link to each other by relative path — `[topic](../implemented/2026-…-….md)`, `[the cookbook](adding-a-tool.md)`, `[architecture.md](../../architecture.md)`. Nothing verified those targets exist. A rename or a move silently breaks every inbound link, and the break is invisible until a reader clicks it. [Doc-sync enforcement](2026-06-11-doc-sync-enforcement.md) already mechanized two classes of doc drift (uncompilable code blocks, a stale event-taxonomy table) and [verify-md-wrap](2026-06-11-doc-sync-enforcement.md) a third (hard-wrapped prose) — but a dead cross-link is a fourth, equally mechanical class that was still verified by eyeball.

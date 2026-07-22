@@ -1,4 +1,4 @@
-# RFC: 通过工具调用流式传输工作流进度
+# Agent Note: 通过工具调用流式传输工作流进度
 
 Status: proposed
 

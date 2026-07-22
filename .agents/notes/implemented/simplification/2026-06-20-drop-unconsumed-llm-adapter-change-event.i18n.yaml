@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-20-drop-unconsumed-llm-adapter-change-event.md: 657e5f08c02e1e03eedeccf8a30b8bc851201615
-2026-06-20-drop-unconsumed-llm-adapter-change-event.zh.md: fbc2248c8357dbff3f5f5008647c14c23a66d5b0
+2026-06-20-drop-unconsumed-llm-adapter-change-event.md: a3c7c089d7dfa1a4cd6a891c416bf270dc7eff3d
+2026-06-20-drop-unconsumed-llm-adapter-change-event.zh.md: 8839a4c263462f2bae75d8698b20007e8348d903

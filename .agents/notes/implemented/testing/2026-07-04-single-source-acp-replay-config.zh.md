@@ -1,4 +1,4 @@
-# RFC: 将 acp-agent 回放配置改为单一来源
+# Agent Note: 将 acp-agent 回放配置改为单一来源
 
 Status: implemented
 
@@ -6,13 +6,13 @@ Status: implemented
 
 ## 问题
 
-`examples/acp-agent` 曾维护两份手写配置：`cordis.yml`（正式运行树）和 `cordis.snapshot.yml`（逐条镜像前者，仅替换 LLM（大语言模型）后端）。去掉注释后，全部差异只是八行的 `llm-deepseek` 段落换成两行的 `llm-replay` 段落。每次应用结构变更都要改两遍，且没有门禁保障对称性：一旦两份副本漂移，快照层就会悄悄测试一个与实际交付不同的应用——正是快照层本要消除的["单元测试全绿、产品却坏了"这类缺口](../../../postmortem/0001-acp-default-export-drops-inject.md)，在上一层被重新引入，唯一的防线是评审者的警觉。
+`examples/acp-agent` 发布了两份手工维护的配置：`cordis.yml`（实时树）和逐条镜像它、只替换 llm 后端的 `cordis.snapshot.yml`——去除注释后，两者的全部差异就是八行 `llm-deepseek` stanza 与两行 `llm-replay` stanza。每次应用形状变化都必须修改两遍，也没有任何机制约束对称性：如果副本发生漂移，快照层会悄然覆盖与已发布应用不同的应用——快照层本就是为了弥合[“单元测试绿色，产品损坏”这类缺口](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)，如今同类缺口在上一层重新出现，只能依靠评审者警惕。
 
 ## 决策
 
 `cordis.snapshot.yml` include 正式配置，通过 id 和 name 禁用指定的 DeepSeek 适配器，并插入回放适配器。其余所有条目因此来自正式运行树。回放时选择 overlay；录制仍然启动 `cordis.yml`，加载守卫允许被有意禁用的条目。
 
-overlay 依赖一个 vendor 插件的事实，这是有意为之：include 在加载文件时应用 `patches`，其 `refresh()`/`internal/update` 路径重读时不会重新打补丁。这恰好满足一次性回放启动的需要（回放应用不加载 `hmr`，也没有东西在运行中改写配置）。快照套件即为证明：所有场景在 overlay 上原样通过，包括逐字节一致的 golden 文件。
+overlay 有意依赖一项 vendored 插件事实：include 加载文件时会应用 `patches`，而其 `refresh()`/`internal/update` 路径会重新读取但不重新打补丁——这恰好足以满足一次性重放启动（重放应用不加载 `hmr`，运行中也没有内容重写配置）。快照套件就是证明：所有场景都能在 overlay 上原样通过，包括逐字节相同的预期输出。
 
 ## 曾考虑的替代方案
 

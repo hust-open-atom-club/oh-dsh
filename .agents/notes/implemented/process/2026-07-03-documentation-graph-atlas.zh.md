@@ -1,4 +1,4 @@
-# RFC: 面向维护者与 SDK 用户的文档关系图索引
+# Agent Note: 面向维护者与 SDK 用户的文档关系图索引
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-仓库已有若干高可信度的文档面，各自覆盖不同维度：[module-graph.md](../../../module-graph.md) 由包（package）的 `peerDependencies` 生成；生成的 [Cordis events](../../../cordis-catalog/events.md) 与 [services](../../../cordis-catalog/services.md) 目录由 Cordis 的 `Events` 和 `Context` 声明生成；[tool-catalog.md](../../../tool-catalog.md) 通过启动已发布的 tool 插件生成；[core-data-structures/](../../../core-data-structures/core.md) 使用 `ts type-equiv` 块保持粘贴的类型定义与源码同步。
+仓库已经有若干高可信文档表面，各自覆盖不同维度：[module-graph.md](../../../../docs/module-graph.md) 根据包的 `peerDependencies` 生成；生成式 [Cordis 事件](../../../../docs/cordis-catalog/events.md)和[服务](../../../../docs/cordis-catalog/services.md)目录根据 Cordis `Events` 和 `Context` 声明生成；[tool-catalog.md](../../../../docs/tool-catalog.md) 通过启动已发布工具插件生成；[core-data-structures/](../../../../docs/core-data-structures/core.md) 则使用 `ts type-equiv` 块使粘贴的类型定义与源码保持同步。
 
 这些参考文档是准确的，但大多是目录式的。维护者仍需自行综合关系：哪些包构成一个能力 seam、哪个应用组装了具体的主干、哪些事件是持久的而哪些是实时的、钩子或策略插件在哪里可以拦截工作、以及哪个面向模型的工具依赖哪个服务。SDK 用户从另一个角度面临同样的问题：「我想要某种行为，应该安装或加载哪个包？应该扩展哪个事件/服务/工具？」
 
@@ -14,7 +14,7 @@ Status: implemented
 
 ## 决策
 
-新增生成的关系图文档，索引位于 [docs/graph-atlas.md](../../../graph-atlas.md)，由专用生成器产出，并通过 `pnpm run verify-doc-graphs` 及既有的目录新鲜度检查（作为 `doc-sync` 的一环）进行验证。
+新增生成式关系图文档，由聚焦的生成器产出并在 [docs/graph-atlas.md](../../../../docs/graph-atlas.md) 建立索引；作为 `doc-sync` 的一部分，通过 `pnpm run verify-doc-graphs` / 现有目录新鲜度检查进行验证。
 
 该索引是既有目录之上的关系层。它不取代精确的参考文档，而是链接到它们并解释各部分如何组合在一起。
 
@@ -28,20 +28,21 @@ Status: implemented
 
 ### 首批发布的索引
 
-首批索引链接十个关系面。包拓扑与工具-包能力映射位于已有的生成目录中（这些目录已拥有相应事实）；其余聚焦图表由 `scripts/gen-doc-graphs.ts` 生成。
+该索引链接十一种关系表面。包拓扑和工具包所提供的功能位于已经拥有这些事实的现有生成式目录中；其余聚焦图表由 `scripts/gen-doc-graphs.ts` 生成。
 
 | 关系图 | 维护模式 | 真源 |
 |---|---|---|
-| [模块依赖图](../../../module-graph.md) | generated | `packages/*/*/package.json` 的 peer dependencies 加包分组路径 |
-| [工具 schema 目录与包映射](../../../tool-catalog.md) | generated | 启动收集的工具 schema 加工具-包的服务/副作用元数据 |
-| [能力 seam 与核心服务](../../../capability-seams.md) | hybrid generated | Cordis 服务声明加 `gen-doc-graphs.ts` 中的角色 manifest |
-| [echo-agent 应用组合](../../../../examples/echo-agent/composition.md) | hybrid generated | `examples/echo-agent/cordis.yml` 插件列表加人工策划的应用/bundle 展开 |
-| [coding-agent 应用组合](../../../../examples/coding-agent/composition.md) | hybrid generated | `examples/coding-agent/cordis.yml` 插件列表加人工策划的应用/bundle 展开 |
+| [模块依赖图](../../../../docs/module-graph.md) | 生成式 | `packages/*/*/package.json` 的 peer dependency 与包分组路径 |
+| [工具 schema 目录与包映射](../../../../docs/tool-catalog.md) | 生成式 | 启动后采集的工具 schema，以及工具包服务/效应元数据 |
+| [能力接缝与核心服务](../../../../docs/capability-seams.md) | 混合生成式 | Cordis 服务声明，以及 `gen-doc-graphs.ts` 中的角色清单 |
+| [tui-agent 应用组合](../../../../examples/tui-agent/composition.md) | 混合生成式 | `examples/tui-agent/cordis.yml` 插件列表，以及人工维护的应用/bundle 展开 |
+| [headless-agent 应用组合](../../../../examples/headless-agent/composition.md) | 混合生成式 | `examples/headless-agent/cordis.yml` 插件列表，以及人工维护的应用/bundle 展开 |
+| [cordis-agent 应用组合](../../../../examples/cordis-agent/composition.md) | 混合生成式 | `examples/cordis-agent/cordis.yml` 插件列表，以及人工维护的应用/bundle 展开 |
 | [acp-agent 应用组合](../../../../examples/acp-agent/composition.md) | hybrid generated | `examples/acp-agent/cordis.yml` 插件列表加人工策划的应用/bundle 展开 |
-| [事件生产者/消费者矩阵](../../../event-producer-consumer.md) | hybrid generated | Cordis 事件声明、AST 扫描的 `ctx.on/emit/parallel/serial/waterfall` 调用点，以及显式的动态分发覆盖 |
-| [agent 轮次与步骤生命周期](../../../agent-lifecycle.md) | curated | architecture.md 的循环生命周期、Cordis 目录链接与会话事件语义 |
-| [工具执行流水线](../../../tool-execution-pipeline.md) | curated | 工具流水线语义与 `tools/execute` waterfall（瀑布式事件） |
-| [ACP 快照回放](../../../../packages/ui/acp/snapshot-replay.md) | curated | 快照 harness 行为 |
+| [事件生产者/消费者矩阵](../../../../docs/event-producer-consumer.md) | 混合生成式 | Cordis 事件声明、经 AST 扫描的 `ctx.on/emit/parallel/serial/waterfall` 位置，以及显式动态分派覆盖 |
+| [agent turn 与 step 生命周期](../../../../docs/agent-lifecycle.md) | 人工维护 | architecture.md 循环生命周期、Cordis 目录链接，以及 session 事件语义 |
+| [工具执行管线](../../../../docs/tool-execution-pipeline.md) | 人工维护 | 工具管线语义与 `tools/execute` waterfall（瀑布式事件）|
+| [ACP（Agent Client Protocol）快照回放](../../../../packages/ui/acp/snapshot-replay.md) | curated | 快照 harness 行为 |
 
 ### 为什么由生成器拥有文档
 

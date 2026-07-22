@@ -1,4 +1,4 @@
-# RFC: 移除未使用的会话血缘元数据
+# Agent Note: 移除未使用的会话血缘元数据
 
 Status: rejected — `parentSession` is part of the documented fork/sub-agent seam and is already preserved by the agent/session resume path. The field is future-facing, but it is not accidental dead state.
 
@@ -12,7 +12,7 @@ Status: rejected — `parentSession` is part of the documented fork/sub-agent se
 
 ## 提案
 
-从 `SessionHeader` 中移除 `parentSession`，直到真正的 fork/恢复功能需要血缘信息时再引入。如果存在相应 API，fork 仍然可以用先前事件来初始化新会话，但持久化的父指针应当与读取它的功能和解释它的 UX 一同引入。
+移除 `parentSession`，使其不再属于 `SessionHeader`，直到真正的 fork/恢复功能需要血缘信息时再引入。如果存在相应 API，fork 仍然可以用先前事件来初始化新会话，但持久化的父指针应当与读取它的功能和解释它的 UX 一同引入。
 
 如果血缘信息回归，届时再决定它应放在不可变 header 中、会话图索引中，还是作为一等事件。当前字段不应预先锁定那个设计。
 
@@ -28,4 +28,4 @@ Status: rejected — `parentSession` is part of the documented fork/sub-agent se
 
 代码库失去了一个为未来 fork/subagent UX 预备的现成血缘钩子。这是有意为之。该字段在功能存在时很容易重新引入，而未发布的立场允许格式变更无需迁移。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

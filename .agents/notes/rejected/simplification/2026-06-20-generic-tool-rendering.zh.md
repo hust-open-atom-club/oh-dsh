@@ -1,4 +1,4 @@
-# RFC: 收拢工具自有的 UI 展示逻辑
+# Agent Note: 收拢工具自有的 UI 展示逻辑
 
 Status: rejected — tool-owned presentation should wait for more real tools before being generalized or deleted. Bash and ACP currently need the existing richer presentation path.
 
@@ -24,7 +24,7 @@ Status: rejected — tool-owned presentation should wait for more real tools bef
 - `ToolCallPresentation`、`ToolResultPresentation`、`ToolTerminal` 和 `ToolCallKind` 消失，除非一个最小的通用 UI 类型仍需要其中之一。
 - ACP 不再维护 presenter pending 状态，也不再在实时流式输出/加载回放期间调用工具回调。
 - `dsh-tool-bash` 不再解析渲染文本来恢复退出状态以供 UI pill 使用。
-- 快照 golden 文件展示通用工具卡片和文本结果。
+- 快照预期输出展示通用工具卡片和文本结果。
 
 ## 放弃了什么
 
@@ -32,4 +32,4 @@ Bash 失去其自定义的终端风格卡片和模型生成描述的放置位置
 
 ## 相关
 
-这是[移除 ACP terminal 元数据](2026-06-20-drop-acp-terminal-meta.md)的宽泛版本。如果本 RFC 被接受，那个更窄的 RFC 就不再必要。
+这是[移除 ACP terminal 元数据](2026-06-20-drop-acp-terminal-meta.md)的宽泛版本。如果本 Agent Note（agent 决策记录）被接受，那个更窄的 Agent Note 就不再必要。

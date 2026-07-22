@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-remove-redundant-snapshot-log-expected-output.zh.md)
+
 ## Problem
 
 Model-driving ACP snapshot scenarios ship both `session.jsonl` and `session.expected.jsonl`. For normal recorded scenarios, `session.jsonl` is the replay fixture harvested from a real run, and the replay test normalizes the newly persisted log and compares it to `session.expected.jsonl`. In the current fixtures, the two normalized logs are identical for ordinary recorded scenarios.

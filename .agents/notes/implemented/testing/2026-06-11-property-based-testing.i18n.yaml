@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-11-property-based-testing.md: 153584d3a2b77c8f2d103db02646f18a9d424b57
-2026-06-11-property-based-testing.zh.md: e11d11f7db9eee97ab81bc678afab5d0fea36bf9
+2026-06-11-property-based-testing.md: ac35591cb76c1d4243ecba153e8e143290716926
+2026-06-11-property-based-testing.zh.md: 4a0def2d28ef828fd68b78e4c1e100ce7f85d4f0

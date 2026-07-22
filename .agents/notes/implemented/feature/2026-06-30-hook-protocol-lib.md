@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-30-hook-protocol-lib.zh.md)
+
 ## Problem
 
 The hooks subsystem ships two bridge plugins: one that runs a user's existing Claude Code (CC) hooks, one for Codex hooks. Studying the reference implementations (`~/repos/refs/claude-code`, `~/repos/refs/codex`) surfaced a decisive fact: **Codex deliberately reimplements a SUBSET of the CC hook protocol.** Its engine reads the same `hooks.json`, uses the same matcher-group shape, the same exit-code/structured-stdout output contract, and the same command-hook execution model — Codex's source even names the engine after Claude's and comments where it "intentionally diverges." So the two bridges would otherwise duplicate the bulk of the protocol.

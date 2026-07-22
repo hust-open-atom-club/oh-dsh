@@ -1,4 +1,4 @@
-# RFC: 深度只读的公开接口
+# Agent Note: 深度只读的公开接口
 
 Status: rejected — the pervasive `DeepReadonly<T>` type flip is replaced by source-owned runtime immutability in `Session` plus relational development assertions. See [source-owned session immutability and dev-mode invariants](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.md).
 
@@ -26,4 +26,4 @@ Status: rejected — the pervasive `DeepReadonly<T>` type flip is replaced by so
 
 `DeepReadonly` 类型在 waterfall 边界处（突变本身就是 API 的地方）可能产生噪音较大的错误。应将可变/只读边界精确地划在「已记录 vs 进行中」，并在 session README 中加以说明。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

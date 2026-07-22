@@ -1,4 +1,4 @@
-# RFC: 模型边界处的运行时参数校验
+# Agent Note: 模型边界处的运行时参数校验
 
 Status: implemented
 
@@ -21,4 +21,4 @@ Status: implemented
 - `ToolArgsError` 目前是带 `code` 字段的普通 `Error`；如果日后引入 harness 级别的错误分类体系，它将变为子类，但不影响读取 `.message` 的调用方。
 - 校验开销相对于一次模型调用可忽略不计。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

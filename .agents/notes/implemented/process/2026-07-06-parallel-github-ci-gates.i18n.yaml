@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-06-parallel-github-ci-gates.md: 6a9bd339304c8efac7a29bdbe745270ab9661396
-2026-07-06-parallel-github-ci-gates.zh.md: 24fdf27822aac7640fbeaf602fa8dd84277083fa
+2026-07-06-parallel-github-ci-gates.md: 5c276f6a75936021369bc5ad9494c9aa6e4e3fc3
+2026-07-06-parallel-github-ci-gates.zh.md: f96606ba2b58b856b3833e758853e9fa3a62bff3

@@ -1,4 +1,4 @@
-# RFC: 微内核——通过 Cordis 事件分类体系实现扩展，唯一具体循环
+# Agent Note: 微内核——通过 Cordis 事件分类体系实现扩展，唯一具体循环
 
 Status: implemented
 
@@ -12,8 +12,8 @@ Status: implemented
 
 纯 Cordis 事件分类体系。agent loop（智能体循环）的扩展 seam 是带类型的事件，具有明确的分发模式：
 
-- **waterfall（瀑布式事件）**（around-middleware）：插件可变换、否决或包装：`agent/prompt-submit`、`agent/request`、`agent/step-result`、`agent/turn-continuation`、`tools/pre-execute`、`tools/execute`、`tools/post-execute`、`llm/stream`、`system-prompt/assemble`。
-- **serial**（按监听器顺序依次 await；bail 值会阻止后续监听器执行）：用于有序检查点。所有 `agent/pre-step` 监听器在全部弃权时才继续运行，而 `agent/turn-stop` 返回的第一个 stop 值即为最终的终止决策。
+- **waterfall（瀑布式事件）**（around-middleware）：插件可变换、否决、恢复或包装：`agent/prompt-submit`、`agent/request`、`agent/request-error`、`agent/step-result`、`agent/turn-continuation`、`tools/pre-execute`、`tools/execute`、`tools/post-execute`、`llm/stream`、`system-prompt/assemble`。
+- **serial**（按监听器顺序依次 await；bail 值会阻止后续监听器执行）：用于有序检查点。所有 `agent/pre-step` 和 `agent/post-step` 监听器在全部弃权时才继续运行，而 `agent/turn-stop` 返回的第一个 stop 值即为最终的终止决策。
 - **parallel**（await 扇出）：每个监听器都必须获得独立执行的机会：`session/flush` 持久性检查点。
 - **emit**（同步 fire-and-forget）：用于通知：轮次/步骤边界、流分片、生命周期、错误，以及包含不可变 `tools/result` 观测的事件。
 
@@ -25,7 +25,7 @@ Status: implemented
 
 ## 后果
 
-- 每个 MVP 功能都映射到一个监听器（[功能→机制映射](../../../cookbook/extension-cookbook.md#the-feature--mechanism-map)是证明义务，保持更新）。
+- 每个 MVP 功能都映射到一个监听器（[功能→机制映射](../../../../docs/cookbook/extension-cookbook.md#the-feature--mechanism-map)是证明义务，保持更新）。
 - HMR 与 dispose 无需额外工作：监听器和注册均为 Cordis effect。
 - waterfall 语义（调用 `next()` 或短路）不直观，需要教学——在 AGENTS.md 中记录，并由组合测试覆盖。
 - 循环必须具备防御性：插件异常在轮次级别被隔离，任何 seam 发出的 steering（中途引导）永远不会被搁置（有回归测试保障）。

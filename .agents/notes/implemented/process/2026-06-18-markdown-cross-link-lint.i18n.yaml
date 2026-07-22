@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-18-markdown-cross-link-lint.md: f7ab6a4fd2b2c5cadaeabd5ef0c89f1097b5b44d
-2026-06-18-markdown-cross-link-lint.zh.md: 61187042a3a0d3535479ffe3a796b6c1fdb82f5e
+2026-06-18-markdown-cross-link-lint.md: 2e3b0f1fcd03f244756b0030f2da758c516a2bbb
+2026-06-18-markdown-cross-link-lint.zh.md: cfe973ae939eceb50d6381ecf35c80df508907c3

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-persistence-log-catalog.zh.md)
+
 ## Problem
 
 `SessionEventMap` is the on-disk vocabulary, but its declarations are split across the owning session package and declaration merges. The generated persistence catalog is the single reference for every event, its complete payload declaration and source JSDoc, and the shared `SessionEvent` envelope; hand-maintained tables drift and are removed. These records are not Cordis events—observers receive them through the single `session/event` bus event—so the Cordis catalog cannot cover them. The generator discovers all declarations and the doc-sync freshness gate rejects omissions or stale output.

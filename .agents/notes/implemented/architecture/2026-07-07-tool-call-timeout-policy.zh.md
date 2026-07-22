@@ -1,4 +1,4 @@
-# RFC: 工具调用超时策略作为插件
+# Agent Note: 工具调用超时策略作为插件
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[超时/截止时间 RFC](2026-07-06-timeout-deadline-library.md) 将计时与分类原语提取到了 `@deepseek-ai/dsh-timeout`，但超时策略仍然附着在各个能力和面向模型的 schema 上。`bash` 暴露了 `timeoutMs`；`web_fetch` 暴露了 `timeout_ms`；`web_search` 没有面向模型的超时参数，尽管提供方已经遵循 `exec.signal`；未来的 grep/glob 工具要么直接导入超时库，要么自行发明超时策略。对于一个插件 SDK 来说，这是错误的编写范式：工具作者通常只需将 `exec.signal` 转发给其调用的实现，而部署策略来决定预算。
+[超时/截止时间 Agent Note](2026-07-06-timeout-deadline-library.md) 将计时与分类原语提取到了 `@deepseek-ai/dsh-timeout`，但超时策略仍然附着在各个能力和面向模型的 schema 上。`bash` 暴露了 `timeoutMs`；`web_fetch` 暴露了 `timeout_ms`；`web_search` 没有面向模型的超时参数，尽管提供方已经遵循 `exec.signal`；未来的 grep/glob 工具要么直接导入超时库，要么自行发明超时策略。对于一个插件 SDK 来说，这是错误的编写范式：工具作者通常只需将 `exec.signal` 转发给其调用的实现，而部署策略来决定预算。
 
 与此同时，仓库中并非所有超时都是面向模型的工具调用预算。钩子通过直接调用 `ctx.bash` 执行命令钩子，而非通过 `ctx.tools.execute()`；`bash` 模型工具通过同一个后端复用前台执行、后台启动、后台轮询和钩子调用。一步到位地将所有超时移入工具插件会混淆这些路径，并有破坏钩子超时语义的风险。
 
@@ -52,9 +52,9 @@ catch 是基础 `next`（而非 waterfall 之外的东西）这一点至关重�
     searchTimeoutMs: 30000
 ```
 
-超时放在工具定义上而非自由文本名称映射中，消除了拼错名称导致策略不生效的问题。`defineTool` 校验预算为正有限数。分发期间，执行器派生截止信号，之后恢复调用方信号，并将自身的超时转换为 `TOOL_TIMEOUT`；没有预算的工具原样通过。
+超时放在工具定义上而非自由文本名称映射中，消除了拼错名称导致策略不生效的问题。`defineTool` 校验预算为正有限数。分发期间，执行器派生截止信号并将其赋给 `exec.signal`；注册表依据[工具取消契约](2026-07-19-cooperative-tool-cancellation.md)，在执行工具体之前将该截止信号与调用方的原始信号融合。执行器随后恢复调用方信号，并将自身的超时转换为 `TOOL_TIMEOUT`；没有预算的工具原样通过。
 
-信号替换采用**就地修改 `exec.signal`** 的方式，而非向 `next()` 传递新对象。Cordis 的 waterfall `next()` 忽略传入的任何参数，并以共享的 payload 数组重新调用下游监听器（`vendor/cordis/src/events.ts`），因此 Cordis 的惯用方式——修改共享对象再委托——是唯一能到达分发的机制。插件在 `finally` 中将 `exec.signal` 恢复为调用方的原始值，使 `tools/post-execute` 永远不会看到本插件的（可能已中止的）截止信号。
+信号替换采用**就地修改 `exec.signal`** 的方式，而非向 `next()` 传递新对象。Cordis 的 waterfall `next()` 忽略传入的任何参数，并以共享的 payload 数组重新调用下游监听器（`vendor/cordis/src/events.ts`），因此修改共享对象是包装器向注册表提供截止信号的方式。注册表会在进入工具体前再次融合已捕获的调用方信号；插件则在 `finally` 中将 `exec.signal` 恢复为调用方的原始值，使 `tools/post-execute` 永远不会看到本插件的截止信号。
 
 `timeout-policy` 拥有 `TOOL_TIMEOUT` 代码的两种用途：传递给 `deadline()`/`timeoutOf()` 的内部截止代码（有作用域，使嵌套的外层截止读为普通取消）和结构化工具结果错误代码。其替换结果为：
 
@@ -80,13 +80,13 @@ function toolTimeoutResult(timeoutMs: number): ToolExecutionResult {
 
 `bash` 保持当前的后端超时路径。`dsh-tool-bash` 继续暴露 `timeoutMs` 和 `run_in_background`；`dsh-bash-local` 继续使用 `@deepseek-ai/dsh-timeout` 处理 `BASH_TIMEOUT`；钩子桥接继续调用 `runHook()` 并通过 `ctx.bash` 传递 `timeoutMs`。这保持了前台/后台/钩子行为的稳定。
 
-`read`、`write`、`edit`、`todo_write`、`bash_output` 和 `bash_kill` 不加入工具调用超时：它们是本地文件系统或短暂的注册表/会话操作，截止时间对它们而言要么只能尽力而为，要么没有必要。
+`read`、`write`、`edit`、`todo_write`、`task_list` 和 `task_kill` 不加入工具调用超时。`task_output` 自己拥有有界等待，因为等待超时是成功的实时状态结果，而非工具失败。
 
 未来面向模型的 grep/glob 工具可以基于 `ctx.bash` 实现而无需导入 `@deepseek-ai/dsh-timeout`：它将 `exec.signal` 转发给 `ctx.bash`，并声明自己的 `timeoutMs`（来自其插件配置）供执行器应用。如果 bash-local 的后端超时对这类工具造成问题，bash seam 可以后续添加调用方自有截止模式；这不在本次范围内。
 
 ## 曾考虑的替代方案
 
-**将插件命名为 `tool-timeout`。** 字面的 RFC 名称匹配了 `gen-tool-catalog` 完整性守卫的 `packages/*/tool-*` glob，该 glob 要求每个匹配项注册一个面向模型的工具。本插件不注册任何工具——它是一个 `tools/execute` 包装器——因此 `tool-*` 名称要么导致 `verify-tool-catalog` 失败，要么强制产生一个误导性的启动条目。包（package）为 `@deepseek-ai/dsh-timeout-policy`，位于新的 `packages/timeout/` 组；cordis.yml 的 `id` 仍可为 `timeout-policy`。
+**将插件命名为 `tool-timeout`。** 字面的 Agent Note 名称匹配了 `gen-tool-catalog` 完整性守卫的 `packages/*/tool-*` glob，该 glob 要求每个匹配项注册一个面向模型的工具。本插件不注册任何工具——它是一个 `tools/execute` 包装器——因此 `tool-*` 名称要么导致 `verify-tool-catalog` 失败，要么强制产生一个误导性的启动条目。包（package）为 `@deepseek-ai/dsh-timeout-policy`，位于新的 `packages/timeout/` 组；cordis.yml 的 `id` 仍可为 `timeout-policy`。
 
 **仅保留逐工具的超时处理。** 这是 `bash` 和 `web_fetch` 的既有形态，也与 Claude Code 和 Codex 对 shell 命令的做法一致。它对 web 类工具不利，因为每个新的支持超时的工具都必须自行选择校验方式、上限语义、文档、快照和分类。插件集中了策略和分类，让每个工具的 schema 专注于业务输入。
 
@@ -100,12 +100,12 @@ function toolTimeoutResult(timeoutMs: number): ToolExecutionResult {
 
 **使用 `tools/pre-execute` 加 `tools/post-execute` 代替新的环绕 seam。** pre 监听器可以启动截止时间并修改 `exec.signal`；post 监听器可以分类并替换。这样做的问题是截止时间的生命周期会跨越两个独立的 waterfall：需要 call-id 映射、在每条 pre-deny/tool-throw/post-throw/dispose 路径上清理，以及与其他监听器的排序规则。`tools/pre-execute` 也是允许/拒绝门禁，而非执行包装器。`tools/execute` 给超时一个词法作用域：启动、委托、分类、释放。
 
-**使用 `Promise.race` 对非协作工具强制超时。** 与超时库 RFC 相同的理由否决：它在底层进程、fetch 或提供方操作可能仍在运行时就将控制权返回给调用方。插件只发送信号；终止仍是实现方的责任。
+**使用 `Promise.race` 对非协作工具强制超时。** 与超时库 Agent Note 相同的理由否决：它在底层进程、fetch 或提供方操作可能仍在运行时就将控制权返回给调用方。插件只发送信号；终止仍是实现方的责任。
 
 ## 后果
 
 - `@deepseek-ai/dsh-tools` 在有意拆分 pre/post 工具钩子的拦截 seam 之后，获得了一个环绕分发的表面。其契约是狭窄的——包装注册表分发，而非替代 pre 门禁或 post 结果策略——且基础 `next()` 是带规范化的分发，因此包装器永远不会看到原始的工具抛出。
 - 多个 `tools/execute` 监听器按普通 Cordis waterfall 顺序组合：调用 `next()` 的监听器包装下游监听器加分发；不调用 `next()` 直接返回的监听器短路它们。一个同时组合超时与未来重试/沙箱/指标包装器的部署通过注册顺序选择语义（「超时覆盖整个重试」vs「超时覆盖每次尝试」）。
-- 按声明加入是一个有意的误配置风险：工具可以声明 `timeoutMs` 但不遵循 `exec.signal`，这样的工具在超时时不会停止。插件契约声明：声明预算意味着协作；web 工具在已转发信号的工具上验证了这一模式。
+- 按声明加入是一个有意的误配置风险：工具可以声明 `timeoutMs` 但不遵循 `exec.signal`，这样的工具在超时时不会停止。注册表会等待这一未达静止状态的工具体，而不是竞速它；同时插件契约声明：声明预算意味着协作；web 工具在已转发信号的工具上验证了这一模式。
 - 过渡期间 `bash` 和已迁移的 web 工具有意使用不同的超时路径：`TOOL_TIMEOUT` 是面向模型的工具调用预算，而 `BASH_TIMEOUT` 仍是 bash 和钩子使用的 bash 后端超时。
-- 与字面提案的偏差，按 implemented-RFC 规则记录：插件包为 `@deepseek-ai/dsh-timeout-policy`（而非 `tool-timeout`）；信号替换是在 `next()` 之前就地修改 `exec.signal`（而非 `next({ ...exec, signal })`，Cordis 会忽略后者）；逐工具预算声明在 `ToolDefinition` 上（`timeoutMs`，由拥有该工具的插件从其配置中设置），而非在本插件配置中按工具名映射——因此执行器是零配置的，拼错工具名不可能发生。以上三点均在上文 `## Decision` 中描述。
+- 与字面提案的偏差，按 implemented-Agent Note 规则记录：插件包为 `@deepseek-ai/dsh-timeout-policy`（而非 `tool-timeout`）；信号替换是在 `next()` 之前就地修改 `exec.signal`（而非 `next({ ...exec, signal })`，Cordis 会忽略后者）；逐工具预算声明在 `ToolDefinition` 上（`timeoutMs`，由拥有该工具的插件从其配置中设置），而非在本插件配置中按工具名映射——因此执行器是零配置的，拼错工具名不可能发生。以上三点均在上文 `## Decision` 中描述。

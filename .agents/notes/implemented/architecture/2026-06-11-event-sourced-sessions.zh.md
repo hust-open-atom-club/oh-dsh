@@ -1,4 +1,4 @@
-# RFC: 事件溯源的会话与派生消息历史
+# Agent Note: 事件溯源的会话与派生消息历史
 
 Status: implemented
 

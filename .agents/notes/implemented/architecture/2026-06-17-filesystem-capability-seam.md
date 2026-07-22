@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-17-filesystem-capability-seam.zh.md)
+
 ## Problem
 
 The harness has a concrete `bash` capability seam (`dsh-bash` / `dsh-bash-local` / `dsh-tool-bash`), but filesystem operations are about to be added as model-facing tools without an equivalent seam. If `read`, `write`, and `edit` directly use `node:fs`, the model-facing tool package will own filesystem execution policy, local path resolution, atomic write behavior, text decoding, symlink behavior, and edit semantics all at once.
@@ -122,7 +124,7 @@ The root plugin registers the full suite by composing the per-tool registration 
 
 ## Testing
 
-Tests follow the package boundary, not only the user-visible tools: the service seam in `dsh-fs`; real filesystem behavior through the `ctx.fs` interface in `dsh-fs-local` (resolution, symlinks, streaming, binary/UTF-8 rejection, unconditional and version-guarded writes, literal-edit semantics, line-ending preservation, structured `FsError` codes); the consumer surface in `dsh-tool-fs` against the real local provider (mock only the model/clock, never the collaborator); and integration through `ctx.tools.execute()` with and without `dsh-fs-policy`, world-verified by reading files back from disk rather than trusting either the canonical value or rendered content. The observed-state/owner-derivation policy is tested in `dsh-fs-policy`, not here.
+Tests follow the package boundary, not only the user-visible tools: the service seam in `dsh-fs`; real filesystem behavior through the `ctx.fs` interface in `dsh-fs-local` (resolution, symlinks, streaming, binary/UTF-8 rejection, unconditional and version-guarded writes, literal-edit semantics, line-ending preservation, structured `FsError` codes); the consumer surface in `dsh-tool-fs` against the real local provider (mock only the model/clock, never the collaborator); and integration through `ctx.tools.execute()` with and without `dsh-fs-policy`, world-verified by reading files back from disk rather than trusting the returned `ContentBlock[]`. The observed-state/owner-derivation policy is tested in `dsh-fs-policy`, not here.
 
 The defensive-pattern classes this repo has been bitten by are pinned directly:
 

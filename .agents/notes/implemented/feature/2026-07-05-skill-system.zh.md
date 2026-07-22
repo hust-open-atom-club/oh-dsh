@@ -1,4 +1,4 @@
-# RFC: Skill 系统——面向 agent 的渐进式指令披露
+# Agent Note: Skill 系统——面向 agent 的渐进式指令披露
 
 Status: implemented
 
@@ -26,7 +26,7 @@ DeepSeek Harness 使用同一原语，使项目特定的评审、插件编写和
 
 `skill({ name })` 工具为当前 agent cwd 加载一个完整 skill，返回包含 `<skill_content name="...">`、`<skill_resources>` 和 `<skill_instructions>` 的工具结果。`resourceBase` 提供一个目录、URL 或不透明的提供方管理的基路径，用于显式引用的脚本、参考资料和资产；资源仅按需加载，不进行目录枚举。无法解析的名称报告该 skill 未知或不再可用；无效名称和标记了 `disableModelInvocation` 的 skill 保留不同的工具错误。工具结果是面向模型的可见披露路径。
 
-数据结构与目录/工具契约记录在 [skills.md](../../../core-data-structures/skills.md) 中，服务签名见生成的[服务目录](../../../cordis-catalog/services.md)。
+数据结构与目录/工具契约记录在 [skills.md](../../../../docs/core-data-structures/skills.md) 中，服务签名见生成的[服务目录](../../../../docs/cordis-catalog/services.md)。
 
 ## 曾考虑的替代方案
 
@@ -52,4 +52,4 @@ agent-core 主干包含一个 session-prefix 贡献者、一个本地提供方�
 
 ## 延后
 
-Fork 的 skill 上下文（`context: fork`）、直接用户/斜杠调用（`user-invocable`）、参数声明与提示（`arguments` 和 `argument-hint`）、以及逐 skill 的工具约束（`allowed-tools` 和 `disallowed-tools`）不在已交付的契约范围内。注册表、本地提供方和面向模型的工具不解析、不广播、也不执行这些字段。
+Fork 的 skill 上下文（`context: fork`）、参数声明与提示（`arguments` 和 `argument-hint`）、以及逐 skill 的工具约束（`allowed-tools` 和 `disallowed-tools`）不在已交付的契约范围内。注册表、本地提供方和面向模型的工具不解析、不广播、也不执行这些字段，`user-invocable` frontmatter 字段同样不会被解析。直接用户调用本身则作为消费方层面的能力交付：TUI 前门基于注册表现有的 `list()` 与 `get()` 方法提供手动 `/skill:<name>` 命令，无需变更注册表、提供方或工具契约——见 [TUI skill 斜杠命令](2026-07-21-tui-skill-slash-command.md)。

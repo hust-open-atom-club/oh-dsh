@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-20-truncate-interrupted-turns.md: dd8475771fcd9fdd0910bd37480a50679e87911c
-2026-06-20-truncate-interrupted-turns.zh.md: 7fcd7292c8c53ebf4d784cdb79a1be58960f763c
+2026-06-20-truncate-interrupted-turns.md: af18618ad4c41af125e37c51b9fd971dd8eae64e
+2026-06-20-truncate-interrupted-turns.zh.md: 4deebfcc7417dd860c655813230d3a79b2d98c50

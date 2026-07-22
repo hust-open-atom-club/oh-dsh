@@ -1,4 +1,4 @@
-# RFC: 使用 pnpm 替代 Yarn 4 作为包管理器
+# Agent Note: 使用 pnpm 替代 Yarn 4 作为包管理器
 
 Status: implemented
 
@@ -8,7 +8,7 @@ Status: implemented
 
 本仓库最初使用 **Yarn 4** 搭配 `node-modules` 链接器启动。这是一个刻意保守的选择：行为类似 npm 的扁平布局，同时享有 Yarn 的 workspaces 和 `yarn constraints`。它能正常工作。但 Yarn 4 源自 Plug'n'Play 的血统，使得 `node-modules` 链接器成为非主流模式；而更广泛的 JS 生态——工具默认值、CI action、Corepack 示例、贡献者的熟悉度——正日益以 pnpm 为中心。对于一个主要由 agent（智能体）构建、偶尔有人类贡献者阅读的仓库而言，「大多数工具和人所期望的包管理器」具有实际价值：更少的意外、更成熟的故障路径、更多可直接复用的解答。
 
-切换成本目前处于最低点。本仓库尚无任何包（package）发布（每个包都是 `private: true`）；开发/测试/演示全部通过 tsx **未构建**运行，因此包管理器只需做到：(a) 解析并链接 `node_modules`，(b) 运行 workspace 脚本，(c) 强制执行 workspace 约束。唯一的 Yarn 特有资产是 `yarn.config.cjs`（`@yarnpkg/types` 约束引擎），体量小且可机械地重新表达。这与 [tsdown 决策](2026-06-11-tsdown-over-dumble.md)的逻辑一致：在爆炸半径尚小时，将承重工具换为生态更健康的选项。
+切换成本目前处于最低点。本仓库尚无任何包（package）发布（每个包都是 `private: true`）；开发/测试/演示全部通过 tsx **未构建**运行，因此包管理器只需做到：（a）解析并链接 `node_modules`，（b）运行 workspace 脚本，（c）强制执行 workspace 约束。唯一的 Yarn 特有资产是 `yarn.config.cjs`（`@yarnpkg/types` 约束引擎），体量小且可机械地重新表达。这与 [tsdown 决策](2026-06-11-tsdown-over-dumble.md)的逻辑一致：在爆炸半径尚小时，将承重工具换为生态更健康的选项。
 
 ## 决策
 
@@ -40,4 +40,4 @@ Status: implemented
 
 在快速本地磁盘上，pnpm 的内容寻址 store 通常在冷/热安装中胜出，尤其在多个检出之间的**磁盘占用**方面优势明显（一个全局 store 通过硬链接接入每个 `node_modules`，而 Yarn 每个 worktree 复制约 279 MB——部分开发者经常为本仓库保持约 10 个或更多 worktree）。该去重优势在上述迁移时数据中**未能**体现，因为测试 store 和 `node_modules` 位于不同文件系统，硬链接失效；在单文件系统的开发机或 CI 缓存上则适用。诚实的总结：在我们的 NFS 开发文件系统上，安装速度在噪声范围内不分伯仲；迁移的理由是生态对齐、幻影依赖安全性和跨检出磁盘去重，而非原始安装时间的胜出。
 
-所有质量门禁（constraints、typecheck、lint、doc-sync、test:coverage 100%、build、knip、publint、echo-agent 演示冒烟测试）在 pnpm 上原样通过，这是链接器切换未引入幻影依赖破坏的正确性证明。
+所有质量门禁（constraints、类型检查、lint、doc-sync、达到 100% 的 test:coverage、构建、knip、publint 以及已构建应用的冒烟测试）均在 pnpm 下通过，证明更换 linker 没有引入幽灵依赖故障。

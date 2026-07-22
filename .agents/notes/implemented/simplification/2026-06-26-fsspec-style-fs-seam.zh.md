@@ -1,4 +1,4 @@
-# RFC: 拆分文件系统 seam——提供方文本变更操作与 `dsh-fs-policy` 插件
+# Agent Note: 拆分文件系统 seam——提供方文本变更操作与 `dsh-fs-policy` 插件
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[filesystem-capability-seam](../../implemented/architecture/2026-06-17-filesystem-capability-seam.md) 中引入的文件系统能力目前让一个抽象的 `FileSystem` 服务承担两类不同的职责：
+[文件系统能力接缝](../architecture/2026-06-17-filesystem-capability-seam.md)中的文件系统能力目前让一个抽象 `FileSystem` 服务同时负责两项不同工作：
 
 1. **提供方操作**——解析目标、stat/版本元数据、文本读取/流式读取、原子写入，以及受保护的字面编辑。
 2. **面向 agent（智能体）的策略**——行窗口、字面编辑语义，以及读后写/编辑的观测状态。
@@ -15,7 +15,7 @@ Status: implemented
 
 这还造成了一个真实的用户体验死胡同：窗口化读取记录 `view: partial`，而 partial 视图无法授权 `edit`。一个模型读取了大文件的第 100-150 行，如果想编辑第 120 行，就必须先获取一次 `full` 读取，而对于超过读取上限的文件这可能做不到。字面编辑实际上只需要新鲜度：被匹配的字节仍然来自模型所读取的那个版本即可。
 
-旧 RFC 已经推迟了独立的 `@deepseek-ai/dsh-fs-policy` 包（package）。本 RFC 构建该层，并让 `ctx.fs` 贴近 fsspec 风格的存储原语（`info`/`cat`/`open`），但不将其变成完整的 fsspec。
+旧 Agent Note（agent 决策记录）已经推迟了独立的 `@deepseek-ai/dsh-fs-policy` 包。本 Agent Note 构建该层，使 `ctx.fs` 保持接近 fsspec 风格的存储原语（`info`/`cat`/`open`），但不把它变成完整的 fsspec。
 
 ## 决策
 
@@ -30,14 +30,14 @@ provider      dsh-fs-local      local implementation of ctx.fs
 
 `dsh-tool-fs` 保持相同的面向模型的 `read`/`write`/`edit` schema。它是执行器：注入 `fs`（不是策略服务）并直接访问 `ctx.fs`，拥有读取窗口化逻辑，并分发 `fs/*` 事件以便 `dsh-fs-policy` 进行门控和记录。
 
-本 RFC 决定了四层拆分、提供方契约和新鲜度策略。工具↔策略的耦合方式随后由[事件门控 RFC](../architecture/2026-06-26-file-context-as-event-gate.md) 细化：`dsh-fs-policy` 是一个门控插件，通过 `fs/*` 事件参与而非提供 `ctx.fileContext` 方法服务，因此工具不与它产生方法耦合，读取窗口化与 fs I/O 留在 `dsh-tool-fs` 中。本文描述的是最终落地的事件门控形态；提供方的版本守卫是可选的（省略 = 无条件裸提供方）。
+本 Agent Note 决定了四层拆分、provider 契约和新鲜度策略。随后，[事件门禁 Agent Note](../architecture/2026-06-26-file-context-as-event-gate.md) 细化了工具↔策略耦合：`dsh-fs-policy` 是通过 `fs/*` 事件参与的门禁插件，而非 `ctx.fileContext` 方法服务，因此工具不会在方法层与其耦合；读取窗口和 fs I/O 位于 `dsh-tool-fs`。本文描述已经落地的事件门禁形状；provider 的版本守卫可选（省略即无条件裸 provider）。
 
 ## 提供方契约
 
 `@deepseek-ai/dsh-fs` 收缩为提供方文本 IO 加受保护的文本变更：
 
 ```ts ignore-check
-abstract resolve(path: string): Promise<FsTarget>
+abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget>
 abstract stat(target: FsTarget, signal?: AbortSignal): Promise<FsInfo | undefined>
 abstract readText(target: FsTarget, signal?: AbortSignal): Promise<string>
 abstract streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>>
@@ -65,11 +65,11 @@ type FsWriteIntent =
 
 这是一个*文本存储* seam，刻意比字节级 fsspec（`cat`/`open` 返回原始字节）高半个层次。UTF-8 解码、二进制/NUL 拒绝、受保护的全文件写入和受保护的字面文本编辑都在提供方内完成，因此策略层从不接触原始字节、不重新实现跨分片解码、也不将陈旧检查与变更临界区分离。面向模型的概念仍然不下沉到提供方：行窗口、带行号的行、渲染的页脚、观测状态存储都不会泄漏下去。
 
-从 `dsh-fs` 中删除的内容：`readPage`、`FsExpectation`、`FsView`、`FsStateSource`、`FsReadRequest`、`FsTextLine`、行/窗口常量、`formatReadBody`，以及观测状态 `WeakMap`。`applyEdit` 被更窄的提供方原语 `editText` 取代，后者的契约是版本守卫的字面文本变更，而非策略层的读取授权。`FS_PARTIAL_OBSERVATION` 错误码也从 `FsErrorCode` 分类体系中移除：新鲜度授权没有 partial/full 之分，因此没有什么能触发它。`FsTargetKey` 和 `FsVersion` 按照既有的 [branded-ids RFC](../../implemented/architecture/2026-06-20-branded-ids.md) 成为品牌化的不透明 id。
+从 `dsh-fs` 删除：`readPage`、`FsExpectation`、`FsView`、`FsStateSource`、`FsReadRequest`、`FsTextLine`、行/窗口常量、`formatReadBody` 和 observed-state `WeakMap`。`applyEdit` 由更窄的 provider 原语 `editText` 取代，其契约是带版本守卫的字面文本变更，而非策略层读取授权。`FS_PARTIAL_OBSERVATION` code 也从 `FsErrorCode` 分类中移除：新鲜度授权没有部分/完整之分，因此没有任何路径会抛出它。`FsTargetKey` 和 `FsVersion` 按现有[品牌化 id Agent Note](../architecture/2026-06-20-branded-ids.md) 成为品牌化不透明 id。
 
 ## 策略契约
 
-`@deepseek-ai/dsh-fs-policy` 是一个插件，不是服务：它不注册任何 `ctx.*` 键，也不注入任何东西。它拥有写入/编辑新鲜度策略和观测状态，这些不属于 `FileSystem` 提供方基类（否则沙箱/远程后端会继承它无需承载的面向模型的观测策略）。它通过执行器分发的 `fs/*` 事件门控贡献该策略。（本 RFC 最初提出了一个具体的 `ctx.fileContext` 方法服务，带有 `read`/`write`/`edit` 方法；[事件门控 RFC](../architecture/2026-06-26-file-context-as-event-gate.md) 将其改造为此处描述的门控插件，使工具从不与策略产生方法耦合。）
+`@deepseek-ai/dsh-fs-policy` 是插件，而非服务：它不注册任何 `ctx.*` 键，也不注入任何内容。它拥有不应位于 `FileSystem` provider 基类上的写入/编辑新鲜度策略和 observed state（否则 sandbox/远程后端会继承不该由其承载的面向模型观察策略）。它通过 executor 分派的 `fs/*` 事件门禁贡献该策略。（本 Agent Note 最初提议带有 `read`/`write`/`edit` 方法的具体 `ctx.fileContext` 服务；[事件门禁 Agent Note](../architecture/2026-06-26-file-context-as-event-gate.md) 将其细化为本文所述插件，使工具永远不会在方法层与策略耦合。）
 
 观测状态以 `WeakMap<owner, Map<targetKey, FsVersion>>` 的形式存放于此。当且仅当 owner 读取、写入或编辑过该目标时，条目才存在（每次成功都会发出 `fs/observed`），因此条目的存在*本身就是*先前观测的记录——没有单独的 `hasRead` 标志。owner 从不透明的事件 actor（`{ agent?: { session? } }`）结构化派生，该形状定义在 `dsh-fs-policy` 中而非 `dsh-fs` 中。
 
@@ -99,7 +99,7 @@ type FsWriteIntent =
 
 ## 取代
 
-本 RFC 逆转了 [filesystem-capability-seam](../../implemented/architecture/2026-06-17-filesystem-capability-seam.md) 中的两项决策，并收窄了第三项：
+本 Agent Note 推翻[文件系统能力接缝](../architecture/2026-06-17-filesystem-capability-seam.md)中的两项决策，并收窄第三项：
 
 - 读后写/编辑策略从 `ctx.fs` 移出，进入 `dsh-fs-policy` 插件（通过 `fs/*` 事件门控）。
 - 文本读取不再返回后端编号的行记录或 `full`/`partial` 视图；授权基于版本新鲜度，因此窗口化读取在文件未变时即可授权编辑。
@@ -113,12 +113,12 @@ type FsWriteIntent =
 
 ## 后续扩展
 
-该 seam 后来由 [Add direct directory listing to the filesystem seam](../architecture/2026-07-03-filesystem-directory-listing-seam.md) 扩展了直接目录列表功能。该后续工作单独跟踪，以使本 RFC 的验收标准继续描述最初交付的 fsspec 风格重构。
+后来，[为文件系统接缝添加直接目录列表](../architecture/2026-07-03-filesystem-directory-listing-seam.md)进一步扩展了该接缝。该后续工作单独跟踪，使本 Agent Note 的验收标准继续描述最初落地的 fsspec 风格改造。
 
 ## 曾考虑的替代方案
 
 - **字节级 fsspec（`cat`/`open` 返回原始字节）**：否决。该 seam 刻意定位为文本存储，比字节级高半个层次，这样 UTF-8 解码、二进制/NUL 拒绝和受保护的文本变更只在提供方实现一次，策略层从不接触原始字节，也不将陈旧检查与变更临界区分离。
-- **具体的 `ctx.fileContext` 方法服务**：本 RFC 最初的策略形态；被[事件门控 RFC](../architecture/2026-06-26-file-context-as-event-gate.md) 改造为门控插件，使工具从不与策略产生方法耦合。
+- **具体的 `ctx.fileContext` 方法服务**——本 Agent Note 最初的策略形状；[事件门禁 Agent Note](../architecture/2026-06-26-file-context-as-event-gate.md) 将其重做为门禁插件，使工具永远不会在方法层与策略耦合。
 - **在提供方保留 `readPage` 和 `full`/`partial` 视图授权**：「取代」一节所逆转的重构前形态。视图完整性不是编辑安全所需的，版本新鲜度才是；而视图规则使超过读取上限的大文件无法编辑。
 
 ## 后果

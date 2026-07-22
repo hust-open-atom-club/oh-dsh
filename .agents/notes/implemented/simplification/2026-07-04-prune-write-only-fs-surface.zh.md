@@ -1,4 +1,4 @@
-# RFC: 从 fs seam 中移除只写字段与一个无效的路由旋钮
+# Agent Note: 从 fs seam 中移除只写字段与一个无效的路由旋钮
 
 Status: implemented
 
@@ -15,7 +15,7 @@ Status: implemented
 
 ## 决策
 
-删除 fs-local 的常量及其重导出，以及 `streamMinSize` 旋钮（`FsIoInternals` 中剩余的旋钮确实被原子写入测试使用）；从 `FsTarget` 中移除 `inputPath`；将 `FsEditOutcome` 精简为 `{ version, before, after }`，并将 `replaceAll` 从解析后的参数传入 `formatEditOutput`；从 `FileReadOutcome` 中移除 `limit`/`version`。[filesystem.md](../../../core-data-structures/filesystem.md) 中的粘贴内容、`packages/fs/fs/README.md`，以及那些不得不为已移除字段编造值的测试 mock，都随类型一起缩减。
+删除 fs-local 常量、其再导出和 `streamMinSize` 配置项（其余 `FsIoInternals` 配置项确实由原子写入测试使用）；从 `FsTarget` 删除 `inputPath`；将 `FsEditOutcome` 收窄为 `{ version, before, after }`，并把解析参数中的 `replaceAll` 传给 `formatEditOutput`；从 `FileReadOutcome` 删除 `limit`/`version`。[filesystem.md](../../../../docs/core-data-structures/filesystem.md) 中的粘贴、`packages/fs/fs/README.md`，以及不得不虚构已删除字段的测试 fake 都随类型一同收窄。
 
 ## 曾考虑的替代方案
 
@@ -25,7 +25,7 @@ Status: implemented
 
 ## 验证
 
-被移除的接口已消失——`dsh-fs-local` 中的 `STREAM_MIN_SIZE`/`streamMinSize`、`FsTarget.inputPath`、`FsEditOutcome.replacements`/`.replaceAll`，以及 `FileReadOutcome.limit`/`.version`——而请求侧的 `replaceAll`（`FsEditRequest`）和其他 outcome 类型上的 version 字段未受影响；测试 mock 随类型一起缩减。`formatEditOutput` 在 `replace_all` 两个分支下输出的文本不变，因此没有快照黄金文件被搅动。
+已删除表面不复存在——`dsh-fs-local` 中的 `STREAM_MIN_SIZE`/`streamMinSize`、`FsTarget.inputPath`、`FsEditOutcome.replacements`/`.replaceAll`，以及 `FileReadOutcome.limit`/`.version`——而请求侧 `replaceAll`（`FsEditRequest`）和其他 outcome 类型上的版本字段保持不变；测试 fake 随类型一同收窄。`formatEditOutput` 在两个 `replace_all` 分支中生成的文本都没有变化，因此没有快照预期输出发生改动。
 
 ## 后果
 

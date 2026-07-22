@@ -1,4 +1,4 @@
-# RFC: 结果时刻的 applied-hunk diff 用于文件变更
+# Agent Note: 结果时刻的 applied-hunk diff 用于文件变更
 
 Status: implemented
 
@@ -8,7 +8,7 @@ Status: implemented
 
 [tagged render-intent union](2026-07-02-tool-render-intent-union.md) 为 `dsh-tool-fs` 的 write/edit 在调用时刻提供了 `card:'diff'`，纯粹从工具参数推导：write ⇒ `{oldText:null, newText:content}`（整个新文件），edit ⇒ `{oldText:old_string, newText:new_string}`（裸替换片段）。编辑器将其渲染为行内 diff，但这是一个**无上下文**的 diff：裸的 `old_string`→`new_string` 没有周围行，而一次触及五个分散位置的 `replace_all` 仍然渲染为一对片段。
 
-在对接 `claude-agent-acp` 自身的 ACP（Agent Client Protocol） bridge 时可以看到完整编辑器 diff 的样子：变更应用后，它发出第二个 `tool_call_update`，其 diff 是**带 ±3 行上下文的 applied hunk**（`replace_all` 的每个变更位置各一个 hunk），由工具的 `structuredPatch` 重建。这个结果时刻的 hunk 正是让 Zed 在文件中*原位*显示变更（而非浮动片段）的关键。我们的工具止步于调用时刻的片段；完成后的结果只携带纯文本 "updated successfully"，没有 diff。
+在对接 `claude-agent-acp` 自身的 ACP（Agent Client Protocol） bridge 时可以看到完整编辑器 diff 的样子：变更应用后，它发出第二个 `tool_call_update`，其 diff 是**带 ±3 行上下文的 applied hunk**（`replace_all` 的每个变更位置各一个 hunk），由工具的 `structuredPatch` 重建。这个结果时刻的 hunk 正是让 Zed 在文件中*原位*显示变更（而非浮动片段）的关键。我们的工具止步于调用时刻的片段；完成后的结果只携带纯文本「updated successfully」，没有 diff。
 
 障碍在于一个 seam 边界：`presentResult(args, result)` 是 **`args` + 面向模型的 `result`（`{content, isError}`）的纯函数**——它在实时流式输出和会话日志回放中都会运行，因此必须具备回放确定性且不能做 I/O。它看不到文件的前后内容，而 `FsEditOutcome`/`FsWriteOutcome` 只携带替换计数和版本号，没有文本。因此无法计算——甚至无法携带——applied hunk 给 presenter。
 
@@ -26,7 +26,7 @@ type ToolExecuteReturn = ContentBlock[] | { content: ContentBlock[]; meta?: unkn
 
 `meta` 是工具自有的 `unknown`，core 持久化但不解释。`Session.append` 拒绝非 JSON 值，回放时将存储的载荷回传给 `presentResult`；因此展示无需 I/O 或重新计算即可复现。运行时校验避免了向 tools core 添加共享的 serializable-value 依赖。
 
-这是通用形态（"工具附加持久化的结果展示"），而非 fs 特有的——任何工具都可以使用。
+这是通用形态（「工具附加持久化的结果展示」），而非 fs 特有的——任何工具都可以使用。
 
 ### 2. 工具计算 hunk；后端返回 before/after（fs）
 
@@ -56,6 +56,6 @@ type ToolExecuteReturn = ContentBlock[] | { content: ContentBlock[]; meta?: unkn
 
 ## 相关
 
-- 补全了 [Tagged render-intent union](2026-07-02-tool-render-intent-union.md) 中作为非目标列出的最后一项表示差异——该 RFC 的「非目标」一节已更新，记录 applied-hunk diff 在此处交付。
+- 补全了 [Tagged render-intent union](2026-07-02-tool-render-intent-union.md) 中作为非目标列出的最后一项表示差异——该 Agent Note 的「非目标」一节已更新，记录 applied-hunk diff 在此处交付。
 - 基于[文件系统 capability seam](2026-06-17-filesystem-capability-seam.md)（before/after 是后端返回的存储事实）和[事件溯源会话](2026-06-11-event-sourced-sessions.md)（`meta` 载荷持久化在 `tool/result` 事件上，因此回放可复现卡片）。
 - `meta` 通道有意设计为通用的：未来的工具（结构化搜索、数据表结果）可以附加自己的持久化结果展示而无需再改 core。

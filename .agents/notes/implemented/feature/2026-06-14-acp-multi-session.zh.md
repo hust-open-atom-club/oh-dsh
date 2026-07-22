@@ -1,4 +1,4 @@
-# RFC: 在单个连接上多路复用并发 ACP 会话
+# Agent Note: 在单个连接上多路复用并发 ACP 会话
 
 Status: implemented
 
@@ -10,15 +10,23 @@ Status: implemented
 
 ## 决策
 
-ACP 桥接层将活跃会话存储在 `Map<SessionId, SessionRecord>` 中，并维护一个 `WeakMap<Agent, SessionId>` 反向索引，用于 agent 作用域的回调。一条记录拥有其 agent 句柄、进行中的 prompt、活跃的工具调用展示状态、待处理的空闲配置切换、会话 cwd 以及客户端能力快照。一个独立的 loading-id 集合在异步恢复之前预留每个 id，使两个流水线化的加载请求无法构造出重复的 agent；不同 id 可以并发加载。
+ACP 桥接层将活跃会话存储在 `Map<SessionId, SessionRecord>` 中。agent 作用域的回调使用 `ownedRecord`：在正向 map 中查找 `agent.session.id`，且仅当该记录拥有精确的 agent 对象时才接纳它，使外部的同 id 对象无法冒领会话。一条记录拥有其 agent 句柄、进行中的 prompt、活跃的工具调用展示状态、待处理的空闲配置切换、会话 cwd 以及客户端能力快照。一个独立的 loading-id 集合在异步恢复之前预留每个 id，使两个流水线化的加载请求无法构造出重复的 agent；不同 id 可以并发加载。
 
 每个 `session/event` 和 `agent/status` 回调在发送或结算任何内容之前，先解析出所属记录。每个会话独立允许一个进行中的 prompt。prompt 记录一个日志水位线，捕获自己的 `turn/start`，并仅在匹配的 `turn/end` 到达时结算；来自已取消的前一轮次的迟到 end 不能 resolve 更新的 prompt。`session/cancel` 定位到一条记录，只调用该 agent 的队列感知取消路径。
 
-权限归属使用同一个反向索引。ACP `approval/request` 应答器只向拥有发起请求的 agent 的编辑器会话发起提示，并将外部请求委托出去。用户交互引出同样按 agent 归属路由。每会话的沙箱和审批配置值只折叠该会话自身的事件，待处理的空闲切换存储在该记录上，直到下一轮次将其锚定。
+权限归属使用对正向 map 的同一精确 agent 检查。ACP `approval/request` 应答器只向拥有发起请求的 agent 的编辑器会话发起提示，并将外部请求委托出去。用户交互引出同样按 agent 归属路由。每会话的沙箱和审批配置值只折叠该会话自身的事件，待处理的空闲切换存储在该记录上，直到下一轮次将其锚定。
 
 后台 bash 任务携带一个不透明的 owner token，其值等于所属会话 id。`bash_output` 和 `bash_kill` 在读取或终止之前，将调用方的 token 与执行器的任务归属进行比较；仅凭可预测的 task id 不能获得访问权。归属信息与执行器任务一起存储，因此工具插件重载不会擦除它。
 
 连接拆除时清空活跃 map，将每个待处理的 prompt 以取消状态结算，并并行 dispose（资源释放）所有 `AgentHandle`。每个句柄停止并等待其循环完成、在仍然附着时刷新会话、注销 agent 并移除会话。拆除操作被 memoize 化，由客户端断连和插件 dispose 共享。
+
+## 协议与工作区作用域
+
+[ACP v1 明确允许一个连接上存在多个并发会话](https://github.com/agentclientprotocol/agent-client-protocol/blob/01beb5fb5eec60e9f516a80d85eb03594bac61e3/docs/get-started/architecture.mdx#L16-L24)，每个新会话都携带自己的主 `cwd`。本桥实现该会话级多路复用，其中包括[按会话 cwd 决策](../architecture/2026-07-02-fs-per-session-cwd.md)所记录的不同主工作区；它不会为每个会话创建一个 agent 子进程。
+
+一个会话内部的多根项目是另一项可选能力：ACP 把[有效根目录定义为主 `cwd` 加 `additionalDirectories`](https://github.com/agentclientprotocol/agent-client-protocol/blob/01beb5fb5eec60e9f516a80d85eb03594bac61e3/docs/protocol/v1/session-setup.mdx#L313-L367)。[Zed 仅在 agent 公布该能力时发送其余项目工作目录](https://github.com/zed-industries/zed/blob/ea77ca2818f3e059a2b61ecc7e63b67e01e1cec5/crates/agent_servers/src/acp.rs#L1139-L1145)，否则会[从会话请求中丢弃这些目录](https://github.com/zed-industries/zed/blob/ea77ca2818f3e059a2b61ecc7e63b67e01e1cec5/crates/agent_servers/src/acp.rs#L1454-L1472)。如其[已知限制](../../../../packages/ui/acp/README.md#known-limitations-and-deferred-work)所记录，桥不公布该能力，并拒绝非空值，因此当前 Zed 多根项目到达桥时只携带第一个工作目录。
+
+[标准传输是每个 stdio 连接一个由编辑器启动的 agent 子进程](https://github.com/agentclientprotocol/agent-client-protocol/blob/01beb5fb5eec60e9f516a80d85eb03594bac61e3/docs/protocol/v1/transports.mdx#L17-L42)；多个编辑器连接因此需要多个子进程或自定义传输，而本决策保证的是一个连接内部存在多个会话。在该连接内，`ctx.sandboxPolicy` 把每个会话的 `cwd` 解析为其自己的 `workspace-write` 根目录，因此共享的 bash 和文件系统服务可以服务并发项目而不授予跨项目写入。这不会添加 ACP `additionalDirectories`；它只是从已经支持的「每会话一个主根目录」路径中移除了进程级根目录限制。
 
 ## 曾考虑的替代方案
 

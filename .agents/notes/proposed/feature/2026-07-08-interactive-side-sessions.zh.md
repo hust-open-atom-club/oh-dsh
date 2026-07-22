@@ -1,4 +1,4 @@
-# RFC: 交互式侧会话与合并回写
+# Agent Note: 交互式侧会话与合并回写
 
 Status: proposed
 
@@ -15,9 +15,9 @@ Status: proposed
 - **Fork 并绑定：** 以父会话的平衡已完成轮次前缀创建子会话，并在其元数据中标记 `parentSession` 与 `seedLength`。这组合了 `ctx.agents.create({ seed, meta })`；不新增核心服务或 session-store 方法。
 - **顾问定位：** 创建后注入一条插件来源的 `context/message`，告知子会话只做解释，不执行变更或继续任务。保持系统提示词逐字节一致，可在继承的历史上保留提供方的前缀缓存。
 - **合并回写：** 向子会话请求一条有长度上限的 handback，然后向父会话注入一条插件来源的 `context/message`。父会话的下一次请求在其日志位置看到该消息，保持回放与[请求可重建性](../../implemented/architecture/2026-07-05-reconstructable-requests.md)，无需新增会话事件。
-- **呈现：** 调用方式、会话切换与 handback 渲染属于首个客户端拥有的界面。本 RFC 仅规定与界面无关的机制。
+- **呈现：** 调用方式、会话切换与 handback 渲染属于首个客户端拥有的界面。本 Agent Note 仅规定与界面无关的机制。
 
-回退产品化、会话树视图、面向模型的侧会话工具，以及 `forkName`/`mergedInto` 元数据均不在本 RFC 范围内。一次 live-adapter spike 已验证了源日志隔离、继承上下文、多轮子会话交互，以及合并回写在父会话下一轮次中的可见性。
+回退产品化、会话树视图、面向模型的侧会话工具，以及 `forkName`/`mergedInto` 元数据均不在本 Agent Note 范围内。一次 live-adapter spike 已验证了源日志隔离、继承上下文、多轮子会话交互，以及合并回写在父会话下一轮次中的可见性。
 
 ## 曾考虑的替代方案
 

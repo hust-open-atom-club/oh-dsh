@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-04-prune-producerless-vocabulary-variants.md: f1b80e35b9004e40fb0ffdd08310310848912d09
-2026-07-04-prune-producerless-vocabulary-variants.zh.md: 9e7b55256ba5bda0474fd9056eea9a96beaf8096
+2026-07-04-prune-producerless-vocabulary-variants.md: 34492e6906cd2d795f880310b1bcd120e3953fcf
+2026-07-04-prune-producerless-vocabulary-variants.zh.md: 710f64d7e848bcabb8a1bc0c0c8be9af7b2ca1b0

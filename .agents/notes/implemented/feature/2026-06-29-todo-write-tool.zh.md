@@ -1,4 +1,4 @@
-# RFC: `todo_write` 工具——将模型任务列表作为事件溯源的会话状态
+# Agent Note: `todo_write` 工具——将模型任务列表作为事件溯源的会话状态
 
 Status: implemented
 
@@ -22,7 +22,7 @@ harness 为模型提供了 bash 和 subagent 工具，却没有办法记录结�
 
 ### 不是 surface 事件
 
-`todo/write` 被有意排除在 `SurfaceEventType` 之外。surface 是产出 LLM 消息历史（`deriveMessages()`）的投影；todo write 不产生对话消息。因此它不携带 `surfaceOp`，不加入 surface 链表，不进入 `deriveMessages()`——它是持久、可回放的 *UI* 状态，与对话并行传输但不属于对话的一部分。（dev-mode 不变式仍要求它位于一个打开的轮次内，而它始终如此：它在工具调用的步骤中途追加。）
+`todo/write` 被有意排除在 `SurfaceEventType` 之外。surface 是产出 LLM 消息历史（`deriveMessages()`）的投影；todo write 不产生对话消息。因此它不携带 `surfaceOp`，不加入有序 surface，不进入 `deriveMessages()`——它是持久、可回放的 *UI* 状态，与对话并行传输但不属于对话的一部分。（dev-mode 不变式仍要求它位于一个打开的轮次内，而它始终如此：它在工具调用的步骤中途追加。）
 
 ### Priority 仅在 ACP 边界合成
 
@@ -51,7 +51,7 @@ schema 强制 type/required/enum。在此之上，`execute` 拒绝为空或重�
 - **真实 Loader 路径**——插件通过 `Loader.unwrapExports` 运行，断言命名空间导出形状存活（它有 `inject`，因此一个意外的 default 导出会在加载时崩溃——postmortem/0001）。
 - **全循环集成**——一个脚本化的 mock 模型通过真实 agent loop（智能体循环）调用 `todo_write`；`todo/write` 事件落地，第二次调用替换它。
 - **`session/load` 回放**——持久化的 `todo/write` 在新的 ACP bridge 加载会话时重新发出 `plan` 更新。
-- **带密钥 e2e + 快照**——真实 prompt 诱导一次 `todo_write`；快照 golden 获得 `plan` 通知和日志事件。
+- **带密钥 e2e + 快照**——真实 prompt 诱导一次 `todo_write`；快照预期输出获得 `plan` 通知和日志事件。
 
 ## 曾考虑的替代方案
 

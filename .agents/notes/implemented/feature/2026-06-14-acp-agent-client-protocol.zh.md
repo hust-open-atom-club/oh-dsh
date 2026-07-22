@@ -1,4 +1,4 @@
-# RFC: Agent Client Protocol（ACP）支持——从外部编辑器驱动编码 agent
+# Agent Note: Agent Client Protocol（ACP）支持——从外部编辑器驱动编码 agent
 
 Status: implemented
 
@@ -50,7 +50,7 @@ harness 最初仅通过 readline 循环暴露 agent。该接口能传输文本�
 
 编辑器可以通过一条 ACP 连接创建、加载、提交 prompt、取消、渲染、询问和重新配置多个 harness 会话，无需依赖特定的循环实现。会话事件日志仍是回放、prompt 结算、cwd 与每会话配置的持久真源。工具展示与人工回答通道仍是可扩展的插件契约，而非 ACP 专属行为。
 
-桥接层有意不实现会话列表/删除/恢复/关闭能力、MCP 透传、附加目录、图片/音频/嵌入资源 prompt、运行时模型选择、plan、斜杠命令、用量更新、编辑器文件系统委托或 ACP 终端执行子协议。功能清单将这些记录为不支持，而非静默接受。
+桥接层有意不实现会话列表/删除/恢复/关闭能力、MCP 透传、附加目录、图片/音频/嵌入资源 prompt、plan、斜杠命令、用量更新、编辑器文件系统委托或 ACP 终端执行子协议。后续已通过标准会话配置选项加入运行时模型选择，见 [LLM 目录与 ACP 选择 Agent Note](../architecture/2026-07-15-llm-model-catalog-and-acp-selection.md)。
 
 空闲时的配置选择在实时响应中是真实的，但在下一次 `agent/prompt-submit` 将其锚定到开放轮次之前不具持久性。在该边界之前崩溃会丢失待定选择；这是保持会话事件封闭于轮次内且回放安全的代价。
 

@@ -1,4 +1,4 @@
-# RFC: 对协议形态代码进行基于属性的测试
+# Agent Note: 对协议形态代码进行基于属性的测试
 
 Status: implemented
 
@@ -22,8 +22,8 @@ Status: implemented
 ## 后果
 
 - 生成器质量是价值杠杆——生成器偏向小索引池和短字符串，使碰撞与交错频繁发生。
-- **已经产出回报：** BlockAssembler 流测试发现了一个真实 bug——同一索引的重复 `block-end` 覆盖了已刷出的块，导致流式前缀与最终 `blocks()` 不一致。已修复（首次关闭生效，与既有的滞后分片规则一致），并附带一个专门的回归测试。
+- **它已经带来回报：** BlockAssembler 流发现了一个真实 bug——同一索引处重复的 `block-end` 会改写已经完成的块。现已修复（首次关闭优先，与现有迟到项规则一致），并加入专用回归测试。
 - 属性测试因超时而 flake 是一个发现，不应通过重试消除。循环属性测试在设计上是确定性的（通过 `agent/status` settle），因此挂起即为真实缺陷。
 - 属性测试是对示例测试的补充而非替代；示例测试固定特定分支，服务于 100% 覆盖率门禁。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

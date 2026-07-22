@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-20-rfc-classification.md: 6975b74dbaa9ca9379f23b537133323cb694958a
-2026-06-20-rfc-classification.zh.md: 423d5c87eb9e2cb07ed18834f4c15ffa1ac1983e
+2026-06-20-agent-note-classification.md: 094233ed108e35e390cdc66b419179249c2d9173
+2026-06-20-agent-note-classification.zh.md: b424b07e051507a894c8f5961feb5fe24a9da3c6

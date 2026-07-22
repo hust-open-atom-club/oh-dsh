@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-12-drop-unconsumed-skill-provider-events.md: 90157c03e5df05c98b992ce1dbefea26f4865ce7
-2026-07-12-drop-unconsumed-skill-provider-events.zh.md: 19fec4b827b89b4127b749a9c77715baf39dd00a
+2026-07-12-drop-unconsumed-skill-provider-events.md: b0ed7585882328b6abdcf57974200053d9c26048
+2026-07-12-drop-unconsumed-skill-provider-events.zh.md: 557e7ee2155969530a109280d9324b2525e3144a

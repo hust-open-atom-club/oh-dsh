@@ -1,4 +1,4 @@
-# RFC: 富 ACP bash 渲染——通过 `_meta` 约定实现终端卡片
+# Agent Note: 富 ACP bash 渲染——通过 `_meta` 约定实现终端卡片
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-ACP（Agent Client Protocol）桥接层允许每个工具通过 `presentCall`/`presentResult` 自行控制调用渲染（见 [tool-call UI presentation](../../implemented/feature/2026-06-14-acp-agent-client-protocol.md) 与 `packages/core/tools`）。对于 `bash`，我们将确切命令作为 `tool_call` 标题呈现，模型的 `description` 作为一个内容文本块，`kind: 'execute'`，完成后的输出包裹在 ` ```console ` 围栏文本块中。
+ACP（Agent Client Protocol）桥接层允许每个工具通过 `presentCall`/`presentResult` 自行控制调用渲染（见 [tool-call UI presentation](2026-06-14-acp-agent-client-protocol.md) 与 `packages/core/tools`）。对于 `bash`，我们将确切命令作为 `tool_call` 标题呈现，模型的 `description` 作为一个内容文本块，`kind: 'execute'`，完成后的输出包裹在 ` ```console ` 围栏文本块中。
 
 参考编辑器将终端元数据渲染为一张专用卡片，包含 cwd、命令、实时风格的输出和退出状态；纯文本则丢失了这些结构。命令之所以作为标题，是因为执行卡片隐藏原始输入，而人类可读的描述保留为卡片上方的独立块。
 
@@ -45,4 +45,4 @@ Zed 侧（`crates/agent_servers/src/acp.rs`，已验证）：收到 `ToolCall` �
 
 ## 超出范围 / 非目标
 
-文本块基线仍为无能力声明时的默认行为。以下两项后续工作有意不在此处构建，各自需要单独的 RFC：**实时增量流式传输**（在分片到达时发出 `_meta.terminal_output_delta`，需要在 `dsh-bash` 上新增增量输出 seam）；**命令分类**（将 `cat`/`sed` 解析为带文件位置的 `read` 卡片，将 `grep` 解析为 `search`，回退到终端卡片——仅展示，绝不改变实际执行内容）。
+文本块基线仍为无能力声明时的默认行为。以下两项后续工作有意不在此处构建，各自需要单独的 Agent Note：**实时增量流式传输**（在分片到达时发出 `_meta.terminal_output_delta`，需要在 `dsh-bash` 上新增增量输出 seam）；**命令分类**（将 `cat`/`sed` 解析为带文件位置的 `read` 卡片，将 `grep` 解析为 `search`，回退到终端卡片——仅展示，绝不改变实际执行内容）。

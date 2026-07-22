@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-30-subagent-observe-enrich.md: 1e20ddff5473a23f3ed560246fbd06f8090852ae
-2026-06-30-subagent-observe-enrich.zh.md: 6bc00c9a8f1d3656fbbfc482e3e6b66020298dd9
+2026-06-30-subagent-observe-enrich.md: a07cef95630689d1ca8cacd3eb7c50e691cb304a
+2026-06-30-subagent-observe-enrich.zh.md: ce8374b4f046e97c1366256c5c6626013aa8c73f

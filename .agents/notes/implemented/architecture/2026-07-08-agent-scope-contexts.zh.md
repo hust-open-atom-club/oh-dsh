@@ -1,4 +1,4 @@
-# RFC: agent 即注册作用域
+# Agent Note: agent 即注册作用域
 
 Status: implemented
 
@@ -16,7 +16,7 @@ Status: implemented
 
 每个存活的 agent 拥有一个扁平的注册层，通过 `agent.ctx` 暴露。代码通过拥有某项贡献的 context 进行注册；具备作用域感知的服务将部署全局注册与恰好一个匹配的 agent 层合并；操作从其真实 agent 选择该层；该层在 agent 的完整发布生命周期内存在。
 
-Cordis 是 SDK 底层的插件框架。Cordis **context** 是插件用来访问服务和注册效果的对象，效果的清理跟随该 context。[Cordis 入门](../../../cordis-primer.md)对该框架有更详细的说明。
+Cordis 是 SDK 底层的插件框架。Cordis **context** 是插件用来访问服务和注册效果的对象，效果的清理跟随该 context。[Cordis 入门](../../../../docs/cordis-primer.md)对该框架有更详细的说明。
 
 对大多数贡献者而言，完整契约是四条规则：
 
@@ -45,7 +45,7 @@ flowchart LR
 
 缺失的交叉边即隔离规则：Agent A 的本地注册不会进入 Agent B 的视图，父级的注册也不会仅因父级拥有子级的生命周期就进入子级。
 
-配套的[运行时设计 RFC](2026-07-12-agent-scope-runtime-design.md) 阐述了实现与正确性推理。[subagent 组合控制 RFC](../feature/2026-07-12-subagent-persona-tool-filter-and-depth.md) 负责独立的 `persona`、`toolFilter` 和 `maxDepth` 功能。
+配套的[运行时设计 Agent Note](2026-07-12-agent-scope-runtime-design.md) 阐述了实现与正确性推理。[subagent 组合控制 Agent Note](../feature/2026-07-12-subagent-persona-tool-filter-and-depth.md) 负责独立的 `persona`、`toolFilter` 和 `maxDepth` 功能。
 
 ### 注册来源决定可见性与清理
 
@@ -62,8 +62,7 @@ flowchart LR
 
 ```js
 const handle = await ctx.agents.create({
-  agentId: AgentId('reviewer'),
-  sessionId: SessionId('reviewer-session'),
+  sessionId: SessionId('reviewer'),
   agentOptions: { model: 'model-name' },
   setup(agentCtx) {
     agentCtx.systemPrompt.section({
@@ -105,7 +104,7 @@ setup 接收一个完整的受信 Cordis context，因此可以组合普通插�
 
 在 Cordis 层面，`Scoped<T>` 是一个不透明的路由接收器。它携带用于选择监听器的过滤器，但本身不是领域对象。因此事件签名将真实的 `Agent`、工具执行、审批请求或其他主体作为显式参数保留，供监听器检查。
 
-以 `{ global: true }` 注册的监听器有意绕过上下文受众过滤，但其清理仍跟随注册 context。注册表成员变更通知保持不过滤，因为它们描述的是共享注册表状态而非某个 agent 的操作。生成的[事件目录](../../../cordis-catalog/events.md)是详尽的事件参考。
+以 `{ global: true }` 注册的监听器有意绕过上下文受众过滤，但其清理仍跟随注册 context。注册表成员变更通知保持不过滤，因为它们描述的是共享注册表状态而非某个 agent 的操作。生成的[事件目录](../../../../docs/cordis-catalog/events.md)是详尽的事件参考。
 
 ### 创建最后发布，dispose 最后撤销
 

@@ -1,4 +1,4 @@
-# RFC: 导出表面 JSDoc 门禁
+# Agent Note: 导出表面 JSDoc 门禁
 
 Status: implemented
 
@@ -28,7 +28,7 @@ Status: implemented
 - **插件协议槽位。** 顶层的 `name`/`inject`/`reusable`/`Config` 常量和 `apply` 入口，以及插件类上的同名静态成员，属于框架协议：其形状由 Cordis 固定，模块文档注释加 `interface Config` 承载插件的真实语义。
 - **构造函数**，与 Cordis 门禁一致：插件类由框架构造，类文档承载全部说明。
 
-`collectExportJsdocViolations()` 返回违规列表（CLI 在非空时以 1 退出），因此 `packages/core/agent/tests/verify-export-jsdoc.spec.ts` 中的负路径测试直接断言发现项，通过 fixture（测试前置数据）包驱动每一种拒绝和每一种豁免。
+`collectExportJsdocViolations()` 返回违规列表（CLI（命令行界面）在非空时以 1 退出），因此 `packages/core/agent/tests/verify-export-jsdoc.spec.ts` 中的负路径测试直接断言发现项，通过 fixture（测试前置数据）包驱动每一种拒绝和每一种豁免。
 
 ## 曾考虑的替代方案
 
@@ -38,7 +38,7 @@ Status: implemented
 
 ## 后果
 
-- 新增导出不能在无文档的情况下合入：`verify-export-jsdoc` 使 `doc-sync` 失败，而 pre-push 和 CI 已运行该门禁。采纳时发现的 203 处缺口在同一个变更中补齐，门禁以绿色状态落地。
+- 新导出不能在缺少文档的情况下落地：`verify-export-jsdoc` 会使 `doc-sync` 和 CI 失败。采纳时发现的 203 处缺口已在同一变更中补齐，因此门禁以绿色状态落地。
 - 导出函数必须标注返回类型（采纳时已全面满足，现在成为门禁依赖），并在 `@param` 需要命名参数时使用标识符参数。
 - seam 文档是权威的：实现从其继承链继承文档，值得保留在实现上的行为说明是补充，而非必需。
 - 门禁构建一个 `ts.Program`（约 6 秒）——唯一需要类型解析的文档门禁；在已编译文档片段的 `doc-sync` 内可以接受。

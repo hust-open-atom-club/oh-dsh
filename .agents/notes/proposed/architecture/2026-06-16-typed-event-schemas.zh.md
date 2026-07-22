@@ -1,4 +1,4 @@
-# RFC: 事件词汇的运行时 schema（Zod 与 merge-extensible-map 模式之辩）
+# Agent Note: 事件词汇的运行时 schema（Zod 与 merge-extensible-map 模式之辩）
 
 Status: proposed
 
@@ -6,7 +6,7 @@ Status: proposed
 
 ## 问题
 
-harness 将其核心词汇——内容块、消息来源、结束原因、轮次触发器、轮次结束原因与会话事件——建模为 **merge-extensible map**：一个 TypeScript `interface`（如 `SessionEventMap`、`ContentBlockMap`），插件通过声明合并对其扩展，公开联合类型则以 `Map[keyof Map]` 派生。这是本仓库的通用扩展模式，记录在 [docs/architecture.md](../../../architecture.md) 中（"The same merge-extensible-map pattern is used for `MessageSource`, `FinishReason`, `TurnTrigger`, and `TurnEndReason`"），`defineTool` 的 `InferArgs` DSL 和 `assertNever` 穷举约定都依赖于它。
+harness 将其核心词汇——内容块、消息来源、结束原因、轮次触发器、轮次结束原因与会话事件——建模为 **merge-extensible map**：一个 TypeScript `interface`（如 `SessionEventMap`、`ContentBlockMap`），插件通过声明合并对其扩展，公开联合类型则以 `Map[keyof Map]` 派生。这是本仓库的通用扩展模式，记录在 [docs/architecture.md](../../../../docs/architecture.md) 中（「The same merge-extensible-map pattern is used for `MessageSource`, `FinishReason`, `TurnTrigger`, and `TurnEndReason`」），`defineTool` 的 `InferArgs` DSL 和 `assertNever` 穷举约定都依赖于它。
 
 该模式**仅存在于编译期**。类型在运行时消失：没有 schema 对象可供校验传入值、解析不可信输入或在运行时枚举变体。[会话持久化契约](../../implemented/architecture/2026-06-14-session-persistence.md)暴露了两个后果：
 
@@ -15,7 +15,7 @@ harness 将其核心词汇——内容块、消息来源、结束原因、轮次
 
 由此引出问题：事件词汇是否应迁移到 **Zod** 或其他运行时 schema 库，使持久化和插件边界拥有运行时 schema 而非被擦除的类型。
 
-本 RFC 界定该问题的范围，不提出具体实现。
+本 Agent Note 界定该问题的范围，不提出具体实现。
 
 ## 为什么这不是一个持久化层的改动
 
@@ -30,16 +30,16 @@ harness 将其核心词汇——内容块、消息来源、结束原因、轮次
 - **六个 merge-extensible map**（约 370 行核心类型）：`ContentBlockMap`、`MessageSourceMap`、`FinishReasonMap`（位于 `dsh-llm`）；`TurnTriggerMap`、`TurnEndReasonMap`、`SessionEventMap`（位于 `dsh-session`）。
 - **约 10 处 `declare module` 扩展点**，分布在 `dsh-agent`、`dsh-agent-loop`、`dsh-bash`、`dsh-llm`、`dsh-session`、`dsh-session-persistence`、`dsh-system-prompt`、`dsh-tools` 各包中——每处都将从声明合并改为运行时 `register()` 调用。
 - **事件生产者**——agent loop（智能体循环）中 16 处 `session.append(...)` 调用——形状不变，但现在在边界处被校验。
-- **约 7 个 switch 消费方**，对这些联合类型进行分支：`deriveMessages`（`dsh-session`）、`BlockAssembler`（`dsh-llm`）、`dsh-invariants` 插件、两个 LLM（大语言模型）适配器（`dsh-llm-deepseek`、`dsh-llm-pi-ai`）以及工具 schema 层（`dsh-tools`）。`assertNever` 对封闭联合类型的穷举 vs 对可扩展联合类型的 fall-through 约定（一条已记录的 lint 规则）需要重新考量——运行时变体在静态层面不可穷举。
+- **约 7 个 switch 消费方**，对这些联合类型进行分支：`deriveMessages` 与包自有的不变式 companion（`dsh-session`）、`BlockAssembler`（`dsh-llm`）、两个 LLM（大语言模型）适配器（`dsh-llm-deepseek`、`dsh-llm-pi-ai`）以及工具 schema 层（`dsh-tools`）。`assertNever` 对封闭联合类型的穷举 vs 对可扩展联合类型的 fall-through 约定（一条已记录的 lint 规则）需要重新考量——运行时变体在静态层面不可穷举。
 - **`defineTool` 的 `InferArgs` DSL**（`dsh-tools`），它从编译期 schema 规范派生出零类型转换的 `execute` 参数类型——这是当前方案的标杆用例。
-- **文档**：architecture.md（该模式被描述为基础性的）、[dev-mode invariants](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.md)，以及所有引用该模式的 RFC。
+- **文档**：architecture.md（该模式被描述为基础性的）、[dev-mode invariants](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.md)，以及所有引用该模式的 Agent Note。
 
 这是一次仓库级别的词汇重新设计，而非持久化的实现细节。
 
 ## 曾考虑的替代方案
 
 ### A. 维持现状——merge-extensible 类型 + 持久化边界处 `isJsonValue`
-保留编译期模式。持久化继续使用不透明 JSON + 可序列化性守卫。插件通过声明合并扩展；事件*形状*的正确性由生产者负责，编译期由 TypeScript 保证，开发模式下由 `dsh-invariants` 插件的结构检查保证。
+保留编译期模式。持久化继续使用不透明 JSON + 可序列化性守卫。插件通过声明合并扩展；事件*形状*的正确性由生产者负责，并由 TypeScript 在编译期保证。启用包自有的不变式 companion 后，它们会检查选定的跨记录关系，但不提供通用运行时形状 schema。
 
 - **优点**：零变动；插件扩展只需一行 `interface` 增补，享有完整类型推断，无需运行时注册仪式；无新运行时依赖；`defineTool` DSL 与 `assertNever` 穷举继续工作。
 - **缺点**：持久化边界和插件 seam 处无运行时结构校验；格式错误但仍为合法 JSON 的数据被延迟捕获。
@@ -58,11 +58,11 @@ harness 将其核心词汇——内容块、消息来源、结束原因、轮次
 
 ## 提案
 
-推迟。如果需要在持久化边界做运行时校验，**方案 B**（对封闭的头部和元数据形状使用 schemastery）是现有约定下的适度步骤。**方案 C** 是一个架构决策，需要自己的实现 RFC，其中包括 Zod 与 schemastery 之间的选择。
+推迟。如果需要在持久化边界做运行时校验，**方案 B**（对封闭的头部和元数据形状使用 schemastery）是现有约定下的适度步骤。**方案 C** 是一个架构决策，需要自己的实现 Agent Note，其中包括 Zod 与 schemastery 之间的选择。
 
 ## 验收标准
 
-- 方案 C 只能通过自己的实现 RFC 推进，绝不能作为持久化的附带改动。
+- 方案 C 只能通过自己的实现 Agent Note 推进，绝不能作为持久化的附带改动。
 - 如果采纳方案 B，封闭的头部/元数据形状（JSONL 的 `isHeaderLine` 守卫及同类）改用 schemastery 校验，替代手写守卫，merge-extensible map 保持不动。
 
 ## 风险
@@ -74,4 +74,4 @@ harness 将其核心词汇——内容块、消息来源、结束原因、轮次
 
 - 如果采用注册表，库选 **schemastery**（已在仓库中，已作为配置 schema 库）还是 **Zod**（生态更丰富，目前仅为传递依赖）？同时维护两个 schema 库本身就是一种成本。
 - 能否采用混合方案：保留编译期推断（使 `defineTool` 和插件开发体验不受影响），同时为每个变体添加*可选*的运行时 schema，仅在持久化/协议边界校验，而非每次进程内 append 都校验？
-- `dsh-invariants` 插件在开发模式下是否已覆盖了足够多的运行时形状缺口，使得边界校验仅在面对真正不可信输入（重新加载外部修改过的日志）时才有必要？
+- `ctx.invariants` 服务启用后是否已覆盖了足够多的运行时形状缺口，使得边界校验仅在面对真正不可信输入（重新加载外部修改过的日志）时才有必要？

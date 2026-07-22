@@ -1,4 +1,4 @@
-# RFC: Agent 作用域运行时设计与正确性
+# Agent Note: Agent 作用域运行时设计与正确性
 
 Status: implemented
 
@@ -14,13 +14,13 @@ Status: implemented
 
 ## 决策
 
-运行时对每个独立事实使用一种机制。作用域路由有一个不透明载体；每个活跃的注册表对象有一条入口记录；每个创建或恢复操作有一个事务；类型化的同进程调用借用 readonly 值；真实数据边界只物化一次；协作式 prompt 组装的结果即为权威；worker/进程代码仅在不同所有者确实可能竞争时才保留独立的终止态和静默态。
+运行时对每个独立事实使用一种机制。作用域路由有一个不透明载体与共享 layer store；每个活跃的注册表对象有一条入口记录；每个创建或恢复操作有一个事务；类型化的同进程调用借用 readonly 值；真实数据边界只物化一次；协作式 prompt 组装的结果即为权威；worker/进程代码仅在不同所有者确实可能竞争时才保留独立的终止态和静默态。
 
 该设计可概括为七项选择：
 
 | 问题 | 权威机制 |
 |---|---|
-| 选择全局加某个 agent 的注册 | 不透明作用域键与路由载体 |
+| 选择全局加某个 agent 的注册 | 不透明作用域键、路由载体与共享 layer store |
 | 拥有一个活跃的 agent 或会话 | 由其 disposer 捕获的单条注册表入口 |
 | 协调创建/恢复 | 单个 `AgentCreationTransaction` |
 | 保护持久化、队列、模型或协议格式数据 | 在该边界处一次性物化 |
@@ -28,9 +28,9 @@ Status: implemented
 | 组合模型可见的 prompt 与工具表面 | 单个共享工具视图加权威的 assembly-waterfall 结果 |
 | 协调 subagent、worker 和进程关闭 | 单个取消信号加该边界独立的终止态/静默态事实 |
 
-本 RFC 余下部分按依赖顺序展开这些选择：Cordis 机制、作用域路由、创建与会话提交、工具与 prompt、subagent 与工作流，最后是可执行检查。
+本 Agent Note 余下部分按依赖顺序展开这些选择：Cordis 机制、作用域路由、创建与会话提交、工具与 prompt、subagent 与工作流，最后是可执行检查。
 
-[7 月 8 日 RFC](2026-07-08-agent-scope-contexts.md) 仍然是贡献者契约。独立的 [subagent 组合控制 RFC](../feature/2026-07-12-subagent-persona-tool-filter-and-depth.md) 拥有 `persona`、`toolFilter` 和 `maxDepth`；本文仅讨论它们的 setup 如何融入生命周期。
+[7 月 8 日 Agent Note](2026-07-08-agent-scope-contexts.md)仍然是贡献者契约。独立的 [subagent 组合控制 Agent Note](../feature/2026-07-12-subagent-persona-tool-filter-and-depth.md)拥有 `persona`、`toolFilter` 和 `maxDepth`；本文仅讨论它们的 setup 如何融入生命周期。
 
 ## Cordis 模型：context、fiber、effect、receiver 与 waterfall
 
@@ -70,11 +70,11 @@ scope 包实现了 Cordis 路由所需的最小对象。其载体仅持有一个
 
 Receiver 是一个小型载体而非领域对象的透明代理。需要 agent 的代码接收显式的事件参数；需要注册所有权的代码接收 `agent.ctx`。
 
-### 注册表读取叠加一个精确映射
+### 注册表读取叠加一个精确 layer
 
-作用域感知的注册表将全局贡献与按标识键索引的局部贡献分开存储。读取解析全局层和至多一个局部层；它从不遍历父级链。
+作用域感知的注册表使用 `ScopedLayers`，拥有一个即时创建的全局 aggregate 和按标识键惰性创建的 aggregate。读取解析全局 layer 和至多一个精确局部 layer；它不创建状态，也从不遍历父级链。注册可见性与 Cordis effect 所有权都从同一个 context 派生，而回收会等待具体 layer 的完整 aggregate 变空（见[决策](2026-07-12-scoped-layers-store.md)）。
 
-每个服务保留其领域规则。命名 prompt 值和工具使用局部遮蔽，工具限制在添加局部工具之前过滤全局，事件选择监听器受众而非注册数据。Scope 提供标识和所有权，而非通用的合并算法。
+每个服务保留其领域规则。命名 command 和 prompt 视图使用共享的、保持插入顺序的 shadow merge；工具保留更丰富的 resolver，因为限制会在加入局部工具前过滤全局工具，保留的 Code Mode transport 则单独插入。Prompt 变量和工具 guard 保持实时迭代，而工具提供方成员关系按每次 assembly 物化。Scope 提供存储生命周期和命名遮蔽，而非通用的注册表视图。
 
 ### 融合 dispatch 辅助函数防止主体漂移
 
@@ -208,7 +208,7 @@ Session 头部、种子和追加的事件是无损 JSON 数据。Session 构造�
 
 私有解析器应用当前展示模式、活跃的全局限制、精确的局部叠加和局部遮蔽。Schema、查找、执行、Code Mode SDK 生成和限制验证都使用该解析器或其限制前的全局名称视图。
 
-[subagent 组合控制 RFC](../feature/2026-07-12-subagent-persona-tool-filter-and-depth.md#tool-filtering-is-one-live-global-view-rule) 拥有用户可见的 allow/deny 语义。实现要求是一致性：被过滤掉的全局工具不能通过另一条查找路径仍可执行，局部遮蔽的定义就是被展示和执行的同一个定义。
+[subagent 组合控制 Agent Note](../feature/2026-07-12-subagent-persona-tool-filter-and-depth.md#tool-filtering-is-one-live-global-view-rule)拥有用户可见的 allow/deny 语义。实现要求是一致性：被过滤掉的全局工具不能通过另一条查找路径仍可执行，局部遮蔽的定义就是被展示和执行的同一个定义。
 
 `ToolRestriction` 接受 readonly 的 allow/deny 名称并将其编译为内部集合。多个限制取交集。公开的 `visible()` 和 `knownNames()` 方法是不必要的，因为只有注册表需要中间视图。
 
@@ -324,19 +324,19 @@ TypeScript 无法管控 JavaScript 强制转换、直接 Cordis dispatch、进�
 
 ### 运行时不变式覆盖跨服务事实
 
-不变式插件验证每个声明的作用域事件使用带标记的载体，以及暴露主体的事件族使用匹配的键。Session trace 验证在追加提交前暂存，并在同一事件提交后推进。
+`dsh-scope/invariant` 配套插件在被选用时验证每个声明的作用域事件使用带标记的载体，以及暴露主体的事件族使用匹配的键。独立的 `dsh-session/invariant` 贡献在追加提交前暂存 trace 验证，并在同一事件提交后推进；二者都通过 `ctx.invariants` 注册。
 
 该插件不通过扫描注册表来管控可信 setup，也不拒绝通过强制转换构造的 prompt assembly 对象。这些检查会将组合契约变成推测性的运行时机制，却不保护真实的外部边界。
 
 ### 生成的产物使公开契约保持对齐
 
-事件目录、服务目录、生产者/消费者矩阵、配置目录、模块图、工具目录、type-equiv 块和作用域事件解析器映射都是从源码生成或受新鲜度门禁约束的。[TypeScript 语义门禁 RFC](../process/2026-07-14-typescript-program-backed-semantic-gates.md) 拥有 Program 构造、语义事件发现和解析器生成规则。
+事件目录、服务目录、生产者/消费者矩阵、配置目录、模块图、工具目录、type-equiv 块和作用域事件解析器映射都是从源码生成或受新鲜度门禁约束的。[TypeScript 语义门禁 Agent Note](../process/2026-07-14-typescript-program-backed-semantic-gates.md)拥有 Program 构造、语义事件发现和解析器生成规则。
 
 行为测试固定了作用域路由和 dispose、最终入口碰撞清理、发布回滚、有序静默、持久化前/后提交行为、跨展示和执行的活跃工具过滤、协作式 prompt 组装、原生和 Code Mode 中的结构化输出提交、异步 subagent 启动和信号取消、worker 终端仲裁、ACP 结算和进程拆除。
 
 ## 曾考虑的替代方案
 
-[7 月 8 日 RFC](2026-07-08-agent-scope-contexts.md#alternatives-considered) 拥有公开扁平作用域契约的替代方案。此处的替代方案关注实现形态。
+[7 月 8 日 Agent Note](2026-07-08-agent-scope-contexts.md#alternatives-considered)拥有公开扁平作用域契约的替代方案。此处的替代方案关注实现形态。
 
 ### 使用透明代理作为作用域载体
 

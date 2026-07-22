@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-20-unify-agent-and-session-id.md: 9cec898a2df9418b3533c776779c88fc50bc7dcb
-2026-06-20-unify-agent-and-session-id.zh.md: 39e78db0b886d1e0b13afe2337697a184af478ed
+2026-06-20-unify-agent-and-session-id.md: c55152f4f13fe0acb530503e84f465799007cff7
+2026-06-20-unify-agent-and-session-id.zh.md: 46e786a8f65b33e071fe689922ab396be90a184a

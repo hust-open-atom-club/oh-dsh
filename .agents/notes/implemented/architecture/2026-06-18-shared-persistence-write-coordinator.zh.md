@@ -1,4 +1,4 @@
-# RFC: 共享持久化写入协调器
+# Agent Note: 共享持久化写入协调器
 
 Status: implemented
 
@@ -12,7 +12,9 @@ Status: implemented
 
 将一个后端无关的 `PersistenceCoordinator` 提取到 `dsh-session-persistence` 中。协调器统一拥有编排逻辑；每个第一方后端组合一个协调器实例（`new PersistenceCoordinator(ctx, this)`），实现一个小型 `PersistenceBackend` 钩子接口，并将其四个公开服务方法（`create`/`append`/`load`/`list`）委托给协调器。
 
-组合，而非继承。协调器是后端持有的具体类，不是后端继承的基类。本 RFC 的风险——「协调器不得让非常规后端与继承层级作斗争」——由此规避：后端只暴露钩子；它无法触及协调器的私有编排状态，且公开的 `SessionPersistence` 服务形状不变，因此第三方后端仍然可以完全不使用协调器、直接实现抽象服务。
+组合，而非继承。协调器是后端持有的具体类，不是后端继承的基类。本 Agent Note 的风险——「协调器不得让非常规后端与继承层级作斗争」——由此规避：后端只暴露钩子；它无法触及协调器的私有编排状态，且公开的 `SessionPersistence` 服务形状不变，因此第三方后端仍然可以完全不使用协调器、直接实现抽象服务。
+
+协调器通过每个存活会话的 `session/disposed` 通知将其退役：等待该 Session 对象自身的初始化，串行执行最后一次排空，随后移除其拥有的状态、缓冲区和初始化条目。排空失败时保留缓冲区，供后端 teardown（拆除）重试。每个 id 的已结算链尾仅在其仍是当前链尾时才移除自身，因此旧操作完成后不会抹除同一 id 的新操作。后端 teardown 会先注销写入路径监听器，再等待所有已准入的退役、剩余缓冲区和链，最后关闭后端。
 
 ### 钩子接口（`PersistenceBackend<TornMarker>`）
 
@@ -28,11 +30,11 @@ Status: implemented
 
 ### 不透明的 torn marker
 
-保持 seam 整洁的唯一设计选择：崩溃修复中「损坏尾部在哪里」的 token 对协调器是不透明的。协调器计算合成 closers（它拥有来自 `dsh-session` 的 `interruptedTurnClosers`），但它只测试 `tornMarker !== undefined` 并将值原样传回 `commitRepair`——从不检视其内容。每个后端选择自己的 marker 类型：JSONL 使用要截断到的字节偏移，SQLite 使用要从其开始删除的 seq（两者恰好都是 `number`）。JSONL 后端将其 `committedBytes < buffer.byteLength` 比较折叠在钩子内部，因此返回的 marker 已经是 `number | undefined`；如果不做这层折叠，协调器就必须了解字节长度。
+保持 seam 整洁的唯一设计选择：崩溃修复中「损坏尾部在哪里」的 token 对协调器是不透明的。协调器计算合成 closers（它拥有来自 `dsh-session` 的 `interruptedTurnClosers`），但它只测试 `tornMarker !== undefined` 并将值原样传回 `commitRepair`——从不检视其内容。每个后端选择自己的 marker 类型：JSONL 携带要截断到的字节偏移，以及从不完整最终帧中解码出的任何完整事件；SQLite 则携带要从其开始删除的 seq。协调器因此既不了解字节长度，也不了解帧恢复状态。
 
 ## 测试
 
-共享的 `runPersistenceContract`（公开 API 契约）继续为每个后端运行。新增的 `runCoordinatorContract`（`tests/coordinator-contract.ts`）覆盖写入路径编排——接管、HMR、碰撞、dispose 排空、崩溃尾部修复——通过 `CoordinatorFixture`（内存参考实现 + jsonl + sqlite）为每个后端运行一次。各后端自身的测试规格缩减为仅覆盖存储机制（JSONL：路径安全、fsync 回滚、bucket 列举；SQLite：schema 版本、`scanRows`、事务回滚）。每个真实后端有一个经由协调器的 torn-tail→load→`commitRepair` 测试（通过 `corruptTail` fixture（测试前置数据）钩子），确保协调器的 torn-marker 修复分支在 100% per-file 门禁下被覆盖——契约崩溃测试只产生合成 closers 而不产生 torn marker，因此无法触达该分支。
+共享的 `runPersistenceContract`（公开 API 契约）继续为每个后端运行。`runCoordinatorContract`（`tests/coordinator-contract.ts`）覆盖写入路径编排——接管、HMR、碰撞、会话与后端 dispose 排空，以及崩溃尾部修复——通过 `CoordinatorFixture`（内存参考实现 + jsonl + sqlite）为每个后端运行一次。协调器专属测试固定退役 map 清理、同 id 链尾竞态、排空失败后的重试，以及关闭顺序。各后端自身的测试规格只保留存储机制（JSONL：路径安全、fsync 回滚、bucket 列举；SQLite：schema 版本、`scanRows`、事务回滚）。每个真实后端有一个经由协调器的 torn-tail→load→`commitRepair` 测试（通过 `corruptTail` fixture（测试前置数据）钩子），确保协调器的 torn-marker 修复分支在 100% per-file 门禁下被覆盖——契约崩溃测试只产生合成 closers 而不产生 torn marker，因此无法触达该分支。
 
 ## 曾考虑的替代方案
 
@@ -41,4 +43,4 @@ Status: implemented
 
 ## 后果
 
-协调器增加了一层间接和一个不透明的 torn marker，但将此前每个后端重复的、对正确性要求很高的编排逻辑集中到一处。其钩子面保持窄小：碰撞检查复用 `loadStored`，物化保持在 `appendBatch` 内原子完成，列举绕过协调器。新后端只需实现存储原语，而无需复制事件-缓冲区-flush 生命周期。
+协调器增加了一层间接、一个不透明的 torn marker 和脱离会话生命周期的退役任务，但将此前每个后端重复的、对正确性要求很高的编排逻辑集中到一处。会话 dispose 仍是仅观察事件，因此会话所有者不会等待持久化退役；协调器会收容失败、保留未提交的缓冲区，并以后端 teardown 为静止状态边界。其钩子面保持窄小：碰撞检查复用 `loadStored`，物化保持在 `appendBatch` 内原子完成，列举绕过协调器。新后端只需实现存储原语，而无需复制事件-缓冲区-flush 生命周期。

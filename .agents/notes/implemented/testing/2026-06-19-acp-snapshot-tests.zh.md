@@ -1,4 +1,4 @@
-# RFC: ACP 快照测试——一次录制 / 确定性回放
+# Agent Note: ACP 快照测试——一次录制 / 确定性回放
 
 Status: implemented
 
@@ -6,19 +6,21 @@ Status: implemented
 
 ## 问题
 
-单元测试无法覆盖完整的 ACP（Agent Client Protocol）子进程 transcript（文本记录），而真实 API 测试既不确定又需要密钥。因此，面向编辑器的 `session/update` 输出可能在单元覆盖率全绿的情况下发生回归，正如 [default-export 事后分析](../../../postmortem/0001-acp-default-export-drops-inject.md)所揭示的那样。
+单元测试不会覆盖完整的 ACP（Agent Client Protocol）子进程 transcript（文本记录），而真实 API 测试不具确定性且受密钥门控。因此，即使单元覆盖率为绿色，面向编辑器的 `session/update` 输出仍可能回归，[默认导出事后分析](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)已经证明了这一点。
 
-全 transcript 测试的阻塞因素在于模型：agent 的输出由非确定性的 LLM（大语言模型）驱动，而每次运行都命中真实 API 的密钥门控测试既不确定也无法在 CI 中运行。我们需要真实运行的保真度与 fixture（测试前置数据）的确定性兼得。
+全 transcript 测试的阻塞因素在于模型：agent（智能体）的输出由非确定性的 LLM（大语言模型）驱动，而每次运行都命中真实 API 的密钥门控测试既不确定也无法在 CI 中运行。我们需要真实运行的保真度与 fixture（测试前置数据）的确定性兼得。
 
-本 RFC 记录了新增第三层测试——**快照测试**——的决策，以及使其具备确定性、CI 中无需密钥、维护成本低的设计选择。
+本 Agent Note（agent 决策记录）记下了新增第三层测试——**快照测试**——的决策，以及让它具备确定性、在 CI 中无需密钥、且维护成本低廉的设计选择。
 
 ## 决策
 
-快照测试启动真实的 ACP 示例，通过确定性脚本驱动其 stdio 协议，并将归一化后的输出与已提交的 golden 文件比对。一次从真实 API 录制的会话日志为后续所有模型流提供数据。fixture 就是产品正常持久化的 JSONL。
+快照测试会启动真实 ACP 示例，通过确定性脚本驱动其 stdio 协议，并将规范化输出与已提交的预期输出比较。从真实 API 一次记录的 session log 为后续所有模型流提供数据。fixture 就是产品普通的持久化 JSONL。
 
 ### fixture 即持久化的会话 JSONL
 
-每个场景的 `session.jsonl` 从一次真实运行中采集。`assistant/chunk` 事件重现模型流；tool、message 和 boundary 事件捕获 harness 行为。一份普通的会话产物因此同时充当回放源和行为 golden。
+每个场景的 `session.jsonl` 都从真实运行中采集。`assistant/chunk` 事件复现模型流；工具、消息和边界事件捕获 harness 行为。因此，一份普通 session 产物同时充当重放来源和行为预期输出。
+
+当场景固定另一种物理存储布局时，其 fixture 会从真实的未打包对应项机械派生。场景测试要求包含每一种预期存储行类型，并在解码后逐事件精确相等；随后，普通重放与日志比较才会证明组合后的进程能够消费并复现该布局。
 
 ### 回放从日志推导模型脚本
 
@@ -30,7 +32,7 @@ Status: implemented
 
 ```
 { kind: 'chunks', chunks: StreamChunk[] }
-| { kind: 'throw', chunks: StreamChunk[], message: string, code: string, status?: number }
+| { kind: 'throw', chunks: StreamChunk[], message: string, code: string }
 | { kind: 'hang' }
 ```
 
@@ -42,24 +44,24 @@ Status: implemented
 
 ### 录制采集日志；无密钥回放需要无提供方的配置
 
-录制使用真实的 `llm-deepseek` 适配器和 JSONL 持久化后端运行场景，然后将产出的 `.jsonl` 复制到场景目录。逐事件追加是持久的，但 harness 在采集前会优雅关闭子进程（关闭 stdin → `await ctx.dispose()`），确保最终事件已刷盘。`llm-replay` 本身不做录制，它只负责回放。
+记录模式使用真实 `llm-deepseek` adapter 和配置为 `persistenceCompression: 'none'` 的 JSONL 持久化后端运行场景，再把生成的 `.jsonl` 复制到场景目录。显式 raw 模式让已提交重放 fixture 保持逐行可读，而普通部署使用后端的压缩默认值。逐事件追加具有持久性，但 harness 会在采集前优雅关闭子进程（关闭 stdin → `await ctx.dispose()`），以确保最终事件已刷出。`llm-replay` 本身不执行记录——它只负责重放。
 
-回放使用 `cordis.snapshot.yml` 覆盖配置，将真实适配器替换为 `llm-replay`，同时保留活跃的组合。录制使用普通配置和 harness 提供的持久化根目录。回放模式跳过 `.env` 加载，因此一个意外存在的 API key 不会触发真实调用。见[单源配置 RFC](2026-07-04-single-source-acp-replay-config.md)。
+重放使用 `cordis.snapshot.yml` overlay，以 `llm-replay` 替换真实 adapter，同时保留实时组合。记录使用普通配置和由 harness 提供的持久化根目录。重放模式跳过 `.env` 加载，因此意外存在的 API 密钥不会触发实时调用。参见[单一来源配置 Agent Note](2026-07-04-single-source-acp-replay-config.md)。
 
 ### 两个表面：归一化后比对
 
 快照运行断言**两个**归一化后的表面，因为 harness 的外部表面是不同的：
 
-1. **stdout transcript**——编辑器看到的带帧 `session/update` JSON-RPC。捕获 ACP bridge 事件→update 转换（`streamSessionEventUpdate`）中的回归。与已提交的 `stdout.golden.jsonl` 比对。
-2. **重新持久化的会话 JSONL**，归一化后与 `session.jsonl` 比对。同一份 fixture 既是回放源也是预期日志。提示词文本被擦除；每个 header 类别一个场景固定可读的 prompt 和 tool 内容，见 [header-pinning RFC](2026-07-06-pin-request-header-content-in-one-scenario.md)。覆盖场景的模型行为完全来自其伴随文件。
+1. **stdout transcript**——编辑器看到的、经过 framing 的 `session/update` JSON-RPC。用于捕获 ACP bridge 中事件→更新转换（`streamSessionEventUpdate`）的回归。与已提交的 `stdout.expected.jsonl` 比较。
+2. **重新持久化的 session JSONL**，经过规范化后与 `session.jsonl` 比较。同一 fixture 同时作为重放来源和预期日志。Prompt 文本会被清理；按照[请求头固定 Agent Note](2026-07-06-pin-request-header-content-in-one-scenario.md)所述，每种请求头类别由一个场景固定可读 prompt 与工具内容。Override 场景仅从其 sidecar 派生模型行为。
 
 两个表面互补：stdout 覆盖 bridge 投影，JSONL 覆盖投影所省略的 loop、tool 和 boundary 结构。
 
-归一化替换 session、cwd、protocol-id、时间戳、路径和进程相关的易变值，同时保留确定性序列号。场景将真实 bash 使用限制在稳定命令范围内。stdout golden 保持协议格式（wire format）的 JSONL，每一行原始数据必须可解析为 JSON。Vitest 只更新 stdout golden；归一化后的会话相等性检查从不覆盖回放 fixture。
+规范化会替换 session、cwd、协议 id、时间戳、路径和进程易变值，同时保留确定性序号。场景把真实 bash 使用限制在稳定命令上。stdout 预期输出仍是线协议形状的 JSONL，每个原始行都必须可解析为 JSON。Vitest 只更新 stdout 预期输出；规范化 session 相等性检查从不覆盖重放 fixture。
 
 ### 隔离：当前靠归一化，后续可加沙箱
 
-工具的确定性来自临时 cwd、擦除的环境变量、全新的非登录 shell、受限命令和归一化。它不声称具备操作系统级隔离。如果需要更强的隔离层级，可通过既有的[能力 seam](../architecture/2026-06-13-capability-seams.md) 将沙箱执行器替换本地后端。
+工具确定性来自生成的 cwd、清理后的环境、全新的非登录 shell、受限命令和规范化。cwd 默认为平台临时目录；当临时目录是始终可写的策略根，而行为需要独立项目位置时，场景可以改为提供其父目录。并发重放运行各自拥有独立 cwd、持久化目录和由定长场景键区分的 spill 根目录，因此一个场景的拆除无法删除另一个场景仍在进行的完整输出恢复，同时真实路径预览预算保持稳定。该层不声称提供 OS 级隔离。如果需要更强层级，sandbox executor 可以通过现有[能力接缝](../architecture/2026-06-13-capability-seams.md)替换本地后端。
 
 ### 回放插件是独立的包
 
@@ -67,16 +69,16 @@ Status: implemented
 
 ### 两个子命令，回放在默认门禁中
 
-`pnpm run test:snapshot` 无需密钥地回放已提交的 fixture；`test:snapshot:record` 使用真实 API 并重写采集到的会话日志和 stdout golden。fixture 缺失时立即报错。每个场景携带 `input.json`、`stdout.golden.jsonl` 和 `session.jsonl`；无模型场景使用仅含 header 的日志。`replay.override.json` 仅在标记为 `overridden` 的场景中必需，因为它的存在会替换推导出的回放。fixture 守卫拒绝缺失、不匹配和遗留的文件。两个命令均接受场景过滤器。
+`pnpm run test:snapshot` 无需密钥即可重放已提交 fixture；`test:snapshot:record` 使用真实 API，并重写采集的 session log 与 stdout 预期输出。缺少 fixture 时会响亮失败。每个场景都包含 `input.json`、`stdout.expected.jsonl` 和 `session.jsonl`；不调用模型的情况使用仅有请求头的日志。只有标记为 `overridden` 的场景才需要 `replay.override.json`，因为它一旦存在就会取代派生重放。Fixture 守卫会拒绝缺失、不匹配和孤立文件。两个命令都接受场景过滤器。
 
 ## 曾考虑的替代方案
 
-- **手工编写的模型 chunk `llm.json`**：早期草案的做法。复用真实会话日志使 fixture 成为系统的真实产物而非手工构建的 mock，并兼作行为 golden。
+- **手工编写包含模型 chunk 的 `llm.json`**——早期草案；复用真实 session log，使 fixture 成为系统的真实产物而非手工构建的 mock，并让它同时充当行为预期输出。
 - **字节级 HTTP 录制库（Polly/nock/MSW）**：否决。与适配器耦合，处理流式 SSE（Server-Sent Events）时笨拙，且层级低于被测对象。
 - **从 `turn/end {kind:'error'|'aborted'}` 合成 throw/cancel 条目**：否决。这会将 `llm-replay` 耦合到 loop 内部的轮次关闭语义，且 `turn/end` 原因是有损的（无法区分抛出的 401 与 finish-error）；显式的 `replay.override.json` 伴随文件是更清晰的 seam。
 
 ## 后果
 
-新测试层为每个场景增加了经评审的 input、session、stdout、可选 override 和可选 workspace fixture。workspace 种子在录制和回放时都会被复制到临时 cwd。作为回报，该层通过真实的 Loader 和 tool 组合提供确定性的无密钥 transcript 覆盖。子进程、input、workspace、归一化和回放 harness 可以支持 ACP 之外的示例。
+新测试层为每个场景增加经过评审的输入、session、stdout、可选 override 和可选 workspace fixture。记录与重放都会把 workspace seed 复制到生成的 cwd。作为回报，该层通过真实 Loader 和工具组合提供确定性的无密钥 transcript 覆盖。子进程、输入、workspace、规范化和重放 harness 也可以支持 ACP 之外的示例。
 
-本 RFC 与[拟议的确定性 RFC](../../proposed/testing/2026-06-11-deterministic-and-stress-testing.md) 相关但不取代它：该提案的「通用回放 fixture」在每次测试后重新推导会话的*消息历史*（一项内部一致性不变式），而快照测试固定的是*外部协议输出*。二者互补：一个守护事件溯源不变式，另一个守护面向编辑器的契约。
+本 Agent Note 与[拟议的确定性 Agent Note](../../proposed/testing/2026-06-11-deterministic-and-stress-testing.md)相关，但不取代它：该提案的“通用重放 fixture”在每次测试后重新派生 session *消息历史*（内部一致性不变量），而快照测试固定*外部协议输出*。两者相互补充——一个守护事件溯源不变量，另一个守护面向编辑器的契约。

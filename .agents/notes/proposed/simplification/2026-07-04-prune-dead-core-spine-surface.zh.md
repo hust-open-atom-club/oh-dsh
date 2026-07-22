@@ -1,4 +1,4 @@
-# RFC: 裁剪无用的公开与结果接口
+# Agent Note: 裁剪无用的公开与结果接口
 
 Status: proposed
 
@@ -6,29 +6,30 @@ Status: proposed
 
 ## 问题
 
-若干包根导出、结果字段和便利方法没有生产消费方。它们之所以存活，要么是因为测试通过公开入口导入了内部实现，要么是因为某个类型预期了一个从未出现的调用者。每一项单独看都很小，但合在一起，它们扩大了 SDK 契约、生成的 catalog、文档和回归矩阵，却没有支撑任何已交付的路径。
+若干包（package）根导出、结果字段和便利方法没有生产消费方。它们之所以存活，要么是因为测试通过公开入口导入了内部实现，要么是因为某个类型预期了一个从未出现的调用者。每一项单独看都很小，但合在一起，它们扩大了 SDK 契约、生成的 catalog、文档和回归矩阵，却没有支撑任何已交付的路径。
 
-生产语料库是 `packages/*/*/src`、示例源码/配置和运行时脚本。测试、包（package） README 和 RFC 行文是发布的证据，但不是固定调用者。`cordis_inspect` 使 `packages/cordis/tool-cordis/src/api-catalog.ts` 对模型可见，`cordis_mount` 可以通过受保护的真实服务代理调用注入的服务，因此 catalog 中的服务方法和返回形状是真正的动态产品接口。下表因此区分「没有固定的仓库调用者」与「不可达」：涉及 catalog 词汇的行有意收缩模型编写的 mount 能发现和调用的内容，而包根实现辅助函数并不通过该服务门面可达。精确符号搜索得出以下清单：
+生产语料库是 `packages/*/*/src`、示例源码/配置和运行时脚本。测试、包 README 和 Agent Note（agent 决策记录）行文是发布的证据，但不是固定调用者。`cordis_inspect` 使 `packages/cordis/tool-cordis/src/api-catalog.ts` 对模型可见，`cordis_mount` 可以通过受保护的真实服务代理调用注入的服务，因此 catalog 中的服务方法和返回形状是真正的动态产品接口。下表因此区分「没有固定的仓库调用者」与「不可达」：涉及 catalog 词汇的行有意收缩模型编写的 mount 能发现和调用的内容，而包根实现辅助函数并不通过该服务门面可达。精确符号搜索得出以下清单：
 
 | 接口 | 生产证据 | 简化方式 |
 | --- | --- | --- |
 | `SurfaceManager.invalidate()` | 只有其单元测试调用它；seeding 在惰性创建的 manager 存在之前就已完成，且会话从不替换其日志引用。 | 删除它及其不可能触发的整体替换契约。 |
 | `ToolExecutionResult.callId` | 每个钩子已经接收不可变的 `ToolExecution`；循环和 ACP（Agent Client Protocol）通过 call/session 事件关联。没有消费方读取这个重复的结果字段。 | 移除该字段、复制/不匹配守卫，以及证明该重复不可能不一致的测试。 |
 | `ReactLoopAgent` 根导出 | 包外的命名导入都是测试；生产代码面向 `Agent` 编程，通过 `ctx.agents` 创建/恢复。 | 返回/接口类型为 `Agent`，将具体循环类改为包内部；保留有意设计的同步、仅配置的 `AgentLoop.create()` 路径。 |
-| `workflow-workerthread` 的 protocol/runtime/session 再导出与命名的 `WorkerWorkflowEngine` | 每个包名消费方都使用默认引擎；workflow RFC 已将 worker 协议格式（wire format）定义为私有。 | 保留默认插件类/配置契约；移除重复的命名类导出，将协议模块保持为源码私有。 |
+| `workflow-workerthread` 的 protocol/runtime/session 再导出与命名的 `WorkerWorkflowEngine` | 每个包名消费方都使用默认引擎；workflow Agent Note 已将 worker 协议格式（wire format）定义为私有。 | 保留默认插件类/配置契约；移除重复的命名类导出，将协议模块保持为源码私有。 |
 | `code-runtime-worker` 的 protocol/bootstrap 再导出 | 包外的生产/e2e 消费方使用 `WorkerCodeRuntime` 和配置，而非 `BootstrapPort`、`PatchableStream` 或 worker 消息/启动类型。 | 保留运行时类/配置契约，将其协议格式/bootstrap 词汇改为源码私有。 |
 | ACP 的 translation/presenter 根导出 | `agentOptions`、`streamSessionEventUpdate`、`todosToPlan`、`ToolPresenter`、`nullToolPresenter` 和 `TerminalRendering` 只有同文件或 ACP 测试消费方；唯一的包外生产消费方挂载的是插件命名空间。 | 保留 `name`、`inject`、`Config`、`AcpConfig` 和 `apply`；将 translation/presentation 辅助函数改为源码私有，在包内测试。 |
-| `providerWording` 与 `completedTurnPrefix` 根导出 | 各有一个同包生产调用者；只有 balanced-prefix 辅助函数有一个同包白盒测试。 | 改为源码私有，测试 provider 行为。 |
+| `providerWording` 与 `completedTurnPrefix` 根导出 | 各有一个同包生产调用者；只有 balanced-prefix 辅助函数有一个同包白盒测试。 | 改为源码私有，测试提供方行为。 |
 | `depthOf`、`SubagentDepthError`、`SENSITIVE_ENV_PATTERN`、`waitForExit` 与 `exitsWithin` 根导出 | 生产 subagent 后端消费的是进程内 runner 和子进程构造/dispose（资源释放）辅助函数，而非这些强制/测试内部实现。 | 保留深度/环境/退出行为，但将辅助函数和 error/regex 改为源码私有；通过 spawn 和 dispose 测试。 |
 | `PersistenceCoordinator.inits`、后端 `inits` 访问器、`seedCoversPrefix` 与 `assertSerializable` | 访问器为白盒测试而存在；`seedCoversPrefix` 没有包外生产导入者；`assertSerializable` 没有生产调用者，且与 coordinator append 边界的无损快照重复。 | 通过 `session/flush` 观察初始化，将 `seedCoversPrefix` 改为源码私有，删除 `assertSerializable`。保留两个后端、`SessionHeader` 和 SQLite 的版本契约。 |
 | `LlmError.status` 与 replay status | 适配器/replay 填充它，但生产分支基于稳定的 error code/message 判断，从不读取原始 status。 | 移除未读字段和 replay 管道，保留错误分类。 |
 | `BlockAssembler.push()` 返回值 | 两个生产调用者都忽略返回的已完成块。 | 返回 `void`；保留有意公开的 `blocks()`/`message()` 契约。 |
 | `compactRegion` 的独立 `session` 参数 | 固定调用者传入的对象与 `agent.session` 上已有的是同一个；模型可见的 mount API 也能调用该方法，但接受两个身份允许挂载的插件提供不一致的配对。 | 保留手动 region seam，同时有意将其收窄为以 `agent.session` 为唯一真源。 |
 | `CompactionResult.startSeq`、`summarySeq`、`endSeq` 与 `summary` | 生产消费方只读取 shadowed range/seq/token 统计；持久日志拥有 summary 和事件标识。 | 移除四个结果回显，保留两个共享的 transcript（文本记录）渲染器。 |
-| `BasicCompactService` 的 estimation/summarization 可见性 | 没有包外生产调用者调用这五个方法；已实现的 RFC 只将 `estimateContentTokens()` 和 `summarize()` 命名为子类钩子。 | 将这两个方法改为 `protected`，其余三个编排专用的估算器改为 private。 |
+| `BasicCompactService` 的 estimation/summarization 可见性 | 没有包外生产调用者调用这五个方法；已实现的 Agent Note 只将 `estimateContentTokens()` 和 `summarize()` 命名为子类钩子。 | 将这两个方法改为 `protected`，其余三个编排专用的估算器改为 private。 |
 | `CodeLogEntry.source`/`level` 与 `RunCodeMeta.dispatches` | 每个生产消费方都将日志映射为文本；没有 presenter/模型路径读取其他字段或持久化的 dispatch 计数。 | 将 code-runtime 日志改为字符串（或纯文本条目），移除 result-meta 的 dispatch 管道；保留用于生成确定性 dispatch id 的本地计数器。 |
+| `CodeRuntime.language` 与 `CodeRuntime.isolation` | worker 后端提供唯一的生产值，而 Code Mode 及其他所有生产调用方只调用 `run()`。 | 移除未读描述符，同时保留 worker 的语言、隔离、预算、取消与资源释放行为。 |
 | `ToolNotFoundError.toolName`、`SystemPrompt.config` 与 `BashTask.command` | 每个存储的公开值都没有生产读取者。 | 移除未读字段，保留错误消息、已解析的配置行为和任务生命周期。 |
-| 后端包根实现辅助函数 | 下方精确清单仅通过相对路径的同包导入调用。生产命名空间导入挂载的是保留的插件契约，不读取这些属性；命名根消费方都是测试。 | 保留每个适配器/provider/服务及其配置/错误契约；停止在包根导出所列辅助函数/常量。 |
+| 后端包根实现辅助函数 | 下方精确清单仅通过相对路径的同包导入调用。生产命名空间导入挂载的是保留的插件契约，不读取这些属性；命名根消费方都是测试。 | 保留每个适配器/提供方/服务及其配置/错误契约；停止在包根导出所列辅助函数/常量。 |
 | 消费方包根实现辅助函数 | 下方精确清单只有同包生产调用者。生产命名空间导入挂载的是插件契约，不读取辅助属性；命名根消费方都是测试。 | 保留插件契约和稳定的错误码；将测试迁移到包内模块或公开行为，停止在包根导出所列辅助函数。 |
 
 ### 分组辅助导出清单
@@ -48,14 +49,14 @@ Status: proposed
 
 **保留测试便利函数和自包含的结果字段为公开。** 公开辅助函数可以让白盒测试更方便，自包含的结果字段看起来更符合人体工学，未来的嵌入者可能需要具体循环类或枚举方法。这些好处是假设性的；当前它们让每处实现和文档都要解释没有已交付调用者能观察到的状态。真正的消费方可以引入它所需的最小契约，其所有权和失败语义明确。
 
-**保留所有 catalog 成员以供模型编写的 mount 使用。** 自引用工具集是一条真实的通用消费路径，而非生成文档的噪音。然而，它的价值来自准确、可组合的服务接口，而非无限期保留重复字段或不一致的参数对；上述每一项 catalog 收缩都移除了在同一 execution、agent 或 result 上其他位置已可获得的事实，并在同一变更中更新 API 参考。
+**保留所有 catalog 成员以供模型编写的 mount 使用。** 自引用工具集是一条真实的通用消费路径，而非生成文档的噪音。然而，它的价值来自准确、可组合的服务接口，而非无限期保留重复字段或不一致的参数对；上述每一项 catalog 收缩都移除了在同一 execution、agent（智能体）或 result 上其他位置已可获得的事实，并在同一变更中更新 API 参考。
 
 ## 验收标准
 
-- 精确符号搜索显示：在本 RFC 及任何已实现 RFC 修正之外，没有被移除的接口。
-- 本 RFC 列出的每个接口均按指定方式缺失或降级；清单之外有意保留的扩展/测试契约不变。
+- 精确符号搜索显示：在本 Agent Note 及任何已实现 Agent Note 修正之外，没有被移除的接口。
+- 本 Agent Note 列出的每个接口均按指定方式缺失或降级；清单之外有意保留的扩展/测试契约不变。
 - 工具执行、上下文压缩（context compaction）、两个 LLM 适配器、两个持久化后端、workflow 隔离以及 agent 创建/恢复保持其已交付行为。
-- 类型检查、覆盖率、快照、doc-sync、module-graph 校验、构建和 hygiene 通过。
+- 类型检查、覆盖率、快照、doc-sync（文档同步门禁）、module-graph 校验、构建和 hygiene 通过。
 
 ## 风险
 

@@ -1,4 +1,4 @@
-# RFC: 在 CI 中对外部 DeepSeek API 运行真实 API e2e 测试
+# Agent Note: 在 CI 中对外部 DeepSeek API 运行真实 API e2e 测试
 
 Status: implemented
 
@@ -6,11 +6,11 @@ Status: implemented
 
 ## 问题
 
-按照策略，harness 高度依赖真实 API 测试：[docs/testing.md](../../../testing.md) 论证了无密钥套件只能验证管道连通性而非产品本身，[ACP inject 事后分析](../../../postmortem/0001-acp-default-export-drops-inject.md)是现成的证据——178 个无密钥测试全绿，而真实编辑器会话一启动就崩溃。真实 API e2e 套件（`pnpm run test:e2e`，即 `*.e2e.ts` 文件）正是为弥合这一差距而存在的：它驱动 agent（智能体）对接实时 DeepSeek API——真实模型调用、真实 bash 工具、多轮次对话、恢复、ACP-over-stdio。
+根据策略，harness 高度依赖真实 API 测试：[docs/testing.md](../../../../docs/testing.md) 指出，无密钥套件证明的是管线，而非产品；[ACP（Agent Client Protocol）inject 事后分析](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)则是常设证据——178 项无密钥测试保持绿色时，真实编辑器 session 却立即崩溃。真实 API e2e 套件（`pnpm run test:e2e`，即 `*.e2e.ts` 文件）的存在正是为了弥合这一缺口：它针对实时 DeepSeek API 驱动 agent（智能体）——真实模型调用、真实 bash 工具、多 turn、恢复、ACP-over-stdio。
 
 默认门禁（[.github/workflows/ci.yml](../../../../.github/workflows/ci.yml)）刻意无密钥：不携带 secret，可供 fork 运行。`test:e2e` 在无密钥时自动跳过（`describe.skipIf(!process.env.DEEPSEEK_API_KEY)`），因此将其加入该工作流只会报绿而不会真正执行真实套件。要让真实 API 覆盖率成为合并信号，需要一个独立的、携带 secret 的工作流。
 
-本 RFC 记录的决策是：添加一个**第二个、消费 secret 的工作流**来在 CI 中运行真实 API 套件。由于这是向一个未来可能公开的仓库引入首个 CI secret，属于安全/隔离决策，本文同时记录其依赖的威胁模型以及仓库公开后的变化。
+本 Agent Note（agent 决策记录）记下了新增**第二条消费 secret 的工作流**以在 CI 中运行真实 API 套件的决策；由于向未来可能公开的仓库引入第一个 CI secret 属于安全/隔离决策，本文也记录其依赖的威胁模型，以及仓库公开时需要做出的变更。
 
 ## 决策
 
@@ -22,7 +22,7 @@ ci.yml 的价值在于它无密钥、可 fork、始终为绿：任何贡献者�
 
 ### 约束不是成本，而是可靠性
 
-内部推理（inference）成本不是限制因素，因此工作流以覆盖率和信号为优化目标。它在多个触发条件和每个可信 PR（Pull Request）上运行所有匹配的 `*.e2e.ts` 文件，落实 [docs/testing.md](../../../testing.md) 的有密钥策略。
+内部推理成本不是限制因素，因此工作流针对覆盖面和信号优化。它会在多种触发条件和每个受信任 PR（Pull Request）上运行所有匹配的 `*.e2e.ts` 文件，以落实 [docs/testing.md](../../../../docs/testing.md) 的有密钥策略。
 
 ### 触发条件：仅限可信事件
 
@@ -57,6 +57,8 @@ repo secret 命名为 `DEEPSEEK_API_KEY_EXTERNAL`；映射到适配器和测试�
 ### 范围与运行时形态
 
 job 仅在 Node 24 上运行 `test:e2e`；无密钥门禁和版本兼容性属于主 CI 工作流。测试通过 workspace paths 映射以未构建形式运行，使用有界的可配置 worker 池、逐测试重试和 job 超时。被取代的 PR 运行会被取消，而 push 和 schedule 运行完整执行以提供合并后信号。
+
+DeepSeek 原生 `web_search` 探测已注册但会跳过。实时 Anthropic 兼容端点可能返回成功响应却没有结构化来源块，因此对来源存在性的正向断言不是可靠的合并信号；单元覆盖率仍会固定响应解析，但 CI 不会证明实时来源块的线协议形状。
 
 ## 安全性
 
@@ -95,6 +97,6 @@ job 仅在 Node 24 上运行 `test:e2e`；无密钥门禁和版本兼容性属�
 
 新增一个 CI 工作流和仓库的首个需要维护的 secret。真实 API 套件现在作为合并门禁（可信 PR 上的合并前门禁、主分支上的合并后门禁）并每夜运行，因此 agent 与外部 API 交互中的真实故障会在 CI 中浮现，而非仅在开发者的本地运行中出现——代价是每个可信 PR 和合并都会产生真实的（但内部免费的）API 调用。preflight 使 secret 配置错误变为自我通告而非静默禁用安全网。
 
-本设计携带一个记录在案的约束面：`pull_request` 触发器的密钥暴露权衡（移除以加固）、`if:` 门禁对基于作者的 Dependabot 判断的依赖，以及对 `pull_request_target` 的硬性禁止。上述公开清单是运维伴侣——本 RFC 是未来维护者在更改触发器集合或翻转仓库可见性之前应重读的地方，而非从头重新推导 fork/secret 模型。
+该设计带有已记录的约束表面：`pull_request` 触发器在密钥暴露方面的取舍（删除它可加强防护）、`if:` 门禁对基于作者的 Dependabot 检查的依赖，以及对 `pull_request_target` 的严格禁止。上方公开仓库检查清单是操作配套——未来维护者在更改触发器集合或切换仓库可见性之前，应重新阅读本 Agent Note，而不是从头推导 fork/secret 模型。
 
 schedule 触发器在仓库不活跃 60 天后会自动禁用（GitHub 行为）；push/PR/dispatch 是后备，活跃的 monorepo 不会触及此限制。假设 runner 对 `https://api.deepseek.com` 有出站连通性——GitHub 托管的 `ubuntu-latest` 具备此条件；受出站限制的自托管 runner 需要在依赖每夜运行之前确认连通性。

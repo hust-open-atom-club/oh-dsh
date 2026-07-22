@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-18-agent-lifecycle-and-ownership-seams.md: c37578020366dd40250c061e34a86d2de6907e19
-2026-06-18-agent-lifecycle-and-ownership-seams.zh.md: 1f3cb609da5508d22046f445e08a75dc5a7901cd
+2026-06-18-agent-lifecycle-and-ownership-seams.md: 70ebf1c6de97cb14e27377ec1f9bac18fc0766a6
+2026-06-18-agent-lifecycle-and-ownership-seams.zh.md: 2091182b663dfbd1ac306550de60c1f00d12656f

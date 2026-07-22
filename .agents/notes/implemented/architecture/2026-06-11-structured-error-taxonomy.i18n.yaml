@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-11-structured-error-taxonomy.md: 5a5f75038b6124457d2d4d08cbe0bec80415a387
-2026-06-11-structured-error-taxonomy.zh.md: d5a45a447ca00d48cb8366911a10f34c584d915c
+2026-06-11-structured-error-taxonomy.md: 9122193b3d01cf5a4c315e6f7a7218153fd4a60a
+2026-06-11-structured-error-taxonomy.zh.md: cb29503314edf248c90f2eecd54e01f5b203b99c

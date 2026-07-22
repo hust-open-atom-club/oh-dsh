@@ -1,4 +1,4 @@
-# RFC: 使共享示例基础配置与提供方无关
+# Agent Note: 使共享示例基础配置与提供方无关
 
 Status: rejected — superseded by [Extract example apps into packages](../../implemented/architecture/2026-06-20-extract-example-app-packages.md), which moves the spine into a `dsh-agent-spine-demo` bundle and deletes the `base*.yml` files, so there is no shared base YAML left to rename.
 
@@ -22,10 +22,10 @@ Status: rejected — superseded by [Extract example apps into packages](../../im
 - `examples/base-core.yml` 已删除。
 - 真实演示配置显式添加 DeepSeek 适配器。
 - 快照回放配置 include 同一个与提供方无关的基础，并加入其回放适配器。
-- [examples README](../../../../examples/README.md)、各示例 README 及 RFC 引用不再解释「base = base-core 加适配器」。
+- [examples README](../../../../examples/README.md)、各示例 README 及 Agent Note 引用不再解释「base = base-core 加适配器」。
 
 ## 放弃了什么
 
 真实演示失去了一层便利：每个演示都必须显式引入适配器。对于示例而言这是正确的默认行为，因为适配器选择是可变部分，而与提供方无关的接线才是共享的产品核心。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

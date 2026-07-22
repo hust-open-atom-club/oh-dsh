@@ -1,4 +1,4 @@
-# RFC: 生成式工具 schema 目录（启动并采集）
+# Agent Note: 生成式工具 schema 目录（启动并采集）
 
 Status: implemented
 
@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-通过**启动每个工具插件并读取其注册的 schema** 来生成目录，而非解析源码。`scripts/gen-tool-catalog.ts` 将每个已发布的工具包（package）挂载到一个新的 Cordis `Context`（带 `SystemPrompt` + `ToolRegistry` 以及插件 `apply` 所读取的注入 seam），调用 `ctx.tools.schemas()`（即发送给模型的 `ToolSchema[]`），dispose（资源释放）该 context，然后为每个包渲染一个 `## <package>` 小节，每个工具一个 ` ```json ` 的 `parameters` 块。它与 `gen-cordis-catalog` / `gen-module-graph` 的 CLI（命令行界面）形态一致：默认 `--write` 重新生成，`--check` 在已提交副本陈旧时失败，输出是确定性的（按 manifest（元数据清单）排序，工具按名称排序）。`verify-tool-catalog`（即 `--check`）在 `doc-sync`（文档同步门禁）内运行，因此新鲜度门禁在 lefthook pre-push 和 CI 路径中与其他文档门禁一同触发。
+目录通过**启动每个工具插件并读取其已注册 schema** 来生成，而不是解析源码。`scripts/gen-tool-catalog.ts` 在全新的 Cordis `Context` 上挂载每个已发布工具包（带有 `SystemPrompt`、`ToolRegistry` 以及插件 `apply` 所读取的注入接缝），调用 `ctx.tools.schemas()`——也就是发送给模型的确切 `ToolSchema[]`——随后释放上下文，并为每个包渲染一个 `## <package>` 章节，每个工具附带一个 ` ```json ` `parameters` 块。它与 `gen-cordis-catalog` / `gen-module-graph` 的 CLI 形状一致：默认 `--write` 重新生成；提交副本陈旧时 `--check` 失败；输出具有确定性（按清单排序，工具按名称排序）。`verify-tool-catalog`（即 `--check`）在 `doc-sync` 内运行，因此相关文档变更和 CI 会执行同一项新鲜度检查。
 
 ### 为何启动而非解析（核心要点）
 
@@ -21,7 +21,7 @@ Cordis 目录是纯 TypeScript AST 遍历，因为每个事件/服务名都是�
 - `tool-subagent` 的工具名是 `config.toolName ?? 'subagent'`——加载时选定，并非字面量。
 - MCP 插件可以通过 `ctx.tools.register()` 直接注册**原始 JSON Schema**，完全不经过 `defineTool`，因此结构化枚举 `defineTool(` 调用点会遗漏。
 
-唯一忠实的真源是插件加载后注册表实际持有的 schema。启动是[测试策略](../../../testing.md)中「验证世界，而非自我报告」这一原则在文档生成器上的应用：读取已发布的产物，而非对它的再推导。
+唯一忠实的事实来源，是插件加载后注册表实际持有的 schema。启动插件是把[测试策略](../../../../docs/testing.md)中“验证现实，而非自我报告”的准则应用到文档生成器：读取已发布产物，而非重新推导一份。
 
 ### 恢复「不会静默遗漏」的保证
 
@@ -33,7 +33,7 @@ Cordis 目录是纯 TypeScript AST 遍历，因为每个事件/服务名都是�
 
 ### 范围
 
-`packages/*/tool-*` 下已发布的产品工具包，每个以默认配置启动：`dsh-tool-bash`（`bash`、`bash_output`、`bash_kill`）、`dsh-tool-todo`（`todo_write`）、`dsh-tool-subagent`（`subagent`）。`examples/` 下的演示工具（`echo`）被排除，与 Cordis 目录仅覆盖 packages 的范围一致——演示工具不属于读者所查阅的产品接口。
+`packages/*/tool-*` 下已发布的产品工具包，每个都使用默认配置启动，包括 `dsh-tool-bash`（`bash`）、`dsh-tool-tasks`（`task_output`、`task_list`、`task_kill`）和 `dsh-tool-subagent`（`subagent`）。仅供示例使用的工具不在范围内。
 
 目录的单位是包，而非每个配置化的工具实例。每个包以默认配置启动一次；加载时的别名（如 `subagent_fork`）会注明，但不枚举所有部署排列。部署清单是一个独立的、无界的接口。
 
@@ -49,7 +49,7 @@ schema 块使用 ` ```json `，而非自定义的 `ts` 系围栏。`doc-typechec
 
 ## 后果
 
-- 目录不会漂移：工具 schema 变更而已提交文件未反映，`verify-tool-catalog` 会在 pre-push 钩子和 CI 中失败。新 `tool-*` 包未加入 manifest 则完整性守卫直接报错。
+- 目录不会发生漂移：提交文件未反映的工具 schema 变化会使 `doc-sync` 和 CI 中的 `verify-tool-catalog` 失败。新增的 `tool-*` 包若未加入清单，会直接使完整性守卫失败。
 - 工具描述文本有唯一归属——源码中 `defineTool` 的 `description`——生成的条目质量取决于它，与 Cordis 目录对事件 JSDoc 施加的强制力相同。
 - 生成器导入并执行工作区包（这是仓库中第一个这样做的脚本；其他脚本只读文本）。它通过根 `tsconfig` 的 `paths` 映射在 `tsx` 下运行，使用与演示和测试相同的未构建源码路径，因此不需要构建步骤。
 - 未来某个工具背后新增一个能力 seam，意味着 manifest 中需要新增一条配方条目（声明要挂载哪些 seam）。这正是上文指出的有意为之的手写成本；仅在新增工具包时才需变更。

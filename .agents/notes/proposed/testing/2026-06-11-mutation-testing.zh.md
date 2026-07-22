@@ -1,4 +1,4 @@
-# RFC: 变异测试作为覆盖率的制衡手段
+# Agent Note: 变异测试作为覆盖率的制衡手段
 
 Status: proposed
 
@@ -10,16 +10,16 @@ Status: proposed
 
 ## 提案
 
-在 `packages/*/src` 上运行 Stryker（`@stryker-mutator/vitest-runner`）：
+使用 Stryker（`@stryker-mutator/vitest-runner`）对 `packages/*/src` 运行变异测试：
 
-- **PR 范围的增量运行**（仅变更文件），作为一个 CI job。调优后速度足以作为合并门禁。
+- **PR（Pull Request）范围的增量运行**（仅变更文件），作为一个 CI job。调优后速度足以作为合并门禁。
 - **每夜全量运行**，跟踪变异分数；先记录基线，再将阈值设为观测到的基线并只升不降（与覆盖率策略一致：阈值只收紧）。
 - 存活的变异体是待办项：agent 选取一个存活体、编写杀死它的测试、循环往复——一个形态良好的自主循环。
 - 等价变异体（可证明不改变行为的）加注释排除并附理由，与 `/* v8 ignore */` 策略一致。
 
 ## 计划
 
-1. 添加 Stryker 配置，范围限定在一个包（llm：最小、最具算法性），测量运行时间。
+1. 添加 Stryker 配置，范围限定在一个包（package），即 llm（最小、最具算法性），并测量运行时间。
 2. 扩展到所有包；在配置中记录基线分数。
 3. 接入每夜 job；运行时间可接受后再添加 PR 范围的增量 job。
 
@@ -33,4 +33,4 @@ Status: proposed
 
 运行时间：变异测试开销大；逐文件 100% 覆盖率有所帮助（每个变异体至少会被执行到）。如果 PR 范围的运行始终过慢，则保持仅每夜运行，依赖分数只升不降的机制。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

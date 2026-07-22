@@ -1,4 +1,4 @@
-# RFC: 文件系统工具 schema——面向模型的读/写/编辑接口形状
+# Agent Note: 文件系统工具 schema——面向模型的读/写/编辑接口形状
 
 Status: implemented
 
@@ -6,9 +6,9 @@ Status: implemented
 
 ## 问题
 
-[文件系统能力 seam RFC](../architecture/2026-06-17-filesystem-capability-seam.md) 定义了文件系统能力 seam（`ctx.fs`）、包（package）拆分（`dsh-fs`、`dsh-fs-local`、`dsh-tool-fs`，加上 `dsh-fs-policy` 策略插件），以及针对 read-before-write/edit 检查的 observed-file/stale-version 策略——[split-fs-seam](../simplification/2026-06-26-fsspec-style-fs-seam.md) 和 [event-gate](../architecture/2026-06-26-file-context-as-event-gate.md) RFC 后来将其从 `ctx.fs` 移至 `dsh-fs-policy` 插件的 `fs/*` 事件门上。首次文件系统工具交付剩余的决策是面向模型的 schema 接口：模型在 `read`、`write` 和 `edit` 中看到哪些参数。
+[文件系统能力 seam Agent Note](../architecture/2026-06-17-filesystem-capability-seam.md) 定义了文件系统能力 seam（`ctx.fs`）、包（package）拆分（`dsh-fs`、`dsh-fs-local`、`dsh-tool-fs`，加上 `dsh-fs-policy` 策略插件），以及针对 read-before-write/edit 检查的 observed-file/stale-version 策略——[split-fs-seam](../simplification/2026-06-26-fsspec-style-fs-seam.md) 和 [event-gate](../architecture/2026-06-26-file-context-as-event-gate.md) Agent Note 后来将其从 `ctx.fs` 移至 `dsh-fs-policy` 插件的 `fs/*` 事件门上。首次文件系统工具交付剩余的决策是面向模型的 schema 接口：模型在 `read`、`write` 和 `edit` 中看到哪些参数。
 
-该 schema 应足够小，以便在 `dsh-tool-fs` 的首次实现中完成，但又足够稳定，使未来的本地/远程/沙箱文件系统后端不需要改动面向模型的接口。同时应避免从参考系统中照搬所有选项。Claude Code 和 OpenCode 暴露了类似的核心文件工具，但在命名风格和额外 flag 上有所不同；本 RFC 为原型选择最小的共有接口。
+该 schema 应足够小，以便在 `dsh-tool-fs` 的首次实现中完成，但又足够稳定，使未来的本地/远程/沙箱文件系统后端不需要改动面向模型的接口。同时应避免从参考系统中照搬所有选项。Claude Code 和 OpenCode 暴露了类似的核心文件工具，但在命名风格和额外 flag 上有所不同；本 Agent Note 为原型选择最小的共有接口。
 
 ## 决策
 
@@ -105,8 +105,8 @@ schema 测试固定每个工具的必填/可选参数集、空 `old_string` 拒�
 
 ## 后果
 
-**首版 schema 有意小于 Claude Code 的。** 去掉 PDF pages、多模态 read、丰富的 grep/list flag 和 expected hash 字段使实现保持聚焦，但用户可能很快就会提出这些需求。它们将以独立 RFC 或聚焦的后续工作形式到来，而非对初始 schema 的重载。
+**首版 schema 有意小于 Claude Code 的。** 去掉 PDF pages、多模态 read、丰富的 grep/list flag 和 expected hash 字段使实现保持聚焦，但用户可能很快就会提出这些需求。它们将以独立 Agent Note 或聚焦的后续工作形式到来，而非对初始 schema 的重载。
 
 **v1 中没有显式的面向模型的 stale guard。** schema 不要求模型提供 expected hash/version。这是有意为之：陈旧检查来自后端产生的版本和 `dsh-fs-policy` 插件的观测状态，而非模型复制的脆弱令牌。文件系统安全失败通过 `dsh-fs` 拥有的结构化 `FsError` 代码浮现，而非模型提供的版本字段。
 
-**命名成为公开接口。** 一旦发布，将 `file_path` 改为 `filePath` 或 `old_string` 改为 `oldString` 会搅动提示词、示例和下游客户端。本 RFC 预先选择 snake_case，并将其视为稳定的面向模型的契约。
+**命名成为公开接口。** 一旦发布，将 `file_path` 改为 `filePath` 或 `old_string` 改为 `oldString` 会搅动提示词、示例和下游客户端。本 Agent Note 预先选择 snake_case，并将其视为稳定的面向模型的契约。

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-04-single-source-acp-replay-config.md: 51cbd54d45408df1548c9cc2522b07b5ffaac110
-2026-07-04-single-source-acp-replay-config.zh.md: 2aec0e0e46007be243c0386fc0fca92065ce3c9e
+2026-07-04-single-source-acp-replay-config.md: f270d70feca184217503c472c1cb7c536187a249
+2026-07-04-single-source-acp-replay-config.zh.md: 86eb2d3e15c4939d1de3a78150cd0536d46e10f6

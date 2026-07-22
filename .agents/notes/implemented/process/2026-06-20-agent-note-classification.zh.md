@@ -1,48 +1,48 @@
-# RFC: 通过路径编码的子目录对 RFC 进行分类
+# Agent Note: 通过路径编码的子目录对 Agent Note 进行分类
 
 Status: implemented
 
-[English](2026-06-20-rfc-classification.md) | 中文
+[English](2026-06-20-agent-note-classification.md) | 中文
 
 ## 问题
 
-`docs/rfc/` 过去仅按**生命周期**分组 RFC：`proposed/`／`implemented/`／`rejected/`。没有任何机制记录每个 RFC 属于哪一*类*决策。索引在每个生命周期下只是一个扁平列表，无法按需筛选「所有简化类」或「所有测试策略类」决策。一批简化类 RFC 在同一天落地后，这个缺口变得具体：浏览 `proposed/` 的读者无法在不逐一打开文件的情况下区分新能力、移除和工具策略变更。
+仅按生命周期组织的 Agent Note（agent 决策记录）目录树（`proposed/` / `implemented/` / `rejected/`）无法记录每个文件包含哪一*类*决策。读者浏览某个生命周期时，如果不逐一打开文件，就无法区分新功能、移除项或工具策略变更。
 
 本仓库一贯的倾向是[机械质量门禁优于行文规范](2026-06-11-quality-gates.md)：不被机器检查的约定终将腐烂。因此这里的分类方案必须可强制执行，而非靠自觉的文件头。
 
 ## 决策
 
-增加第二个维度——RFC 的**类别**——并将其编码在路径中：`{lifecycle}/{class}/yyyy-mm-dd-topic.md`。文件夹本身*就是*标签。文件的位置声明其类别，封闭集合是「这些文件夹且仅限这些」，而既有的 [verify-md-links](2026-06-18-markdown-cross-link-lint.md) 门禁已经保护了移动文件所需的路径重写。
+增加第二个维度，即 Agent Note 的**类别**，并将其编码在路径中：`{lifecycle}/{class}/yyyy-mm-dd-topic.md`。文件夹*就是*标签。文件位置声明其类别；封闭集合限定为「这些文件夹且仅限这些」；既有的 [verify-md-links](2026-06-18-markdown-cross-link-lint.md) 门禁已经保护移动文件所需的路径改写。
 
 ### 六个类别的封闭集合
 
 | 类别 | 涵盖范围 |
 |---|---|
-| `feature` | 面向用户或模型的新能力。 |
+| `feature` | 面向用户或模型的新功能。 |
 | `bug-fix` | 修正缺陷或填补事后复盘暴露的空白。 |
-| `simplification` | 移除代码、行为或对外表面积，不引入新能力。 |
+| `simplification` | 移除代码、行为或对外表面积，不引入新功能。 |
 | `architecture` | 关于**交付源码**的结构性决策——包（package）之间的关系、运行时词汇。 |
 | `process` | **围绕**代码的工具、策略或工作流，而非运行时行为。 |
 | `testing` | 测试基础设施与策略。 |
 
-`architecture` 与 `process` 的分界线：**architecture** 关乎我们交付的源码；**process** 关乎围绕源码的工具与工作流。本 RFC 本身是一个 `process` 决策——它改变的是仓库的组织方式和门禁，而非 harness 的运行时行为——因此它位于 `implemented/process/` 下。
+`architecture` 与 `process` 的分界是：**architecture** 关乎我们交付的源码；**process** 关乎源码周边的工具与工作流。本 Agent Note 本身属于 `process` 决策：它改变仓库的组织方式与门禁，而不是 harness 的运行时行为，因此位于 `implemented/process/` 下。
 
 ### 两道门禁
 
 两者都是 `doc-sync`（文档同步门禁）的成员，风格与 `verify-md-wrap` 一致（tsx ESM，只校验不生成，首个违规即以非零退出码退出）：
 
-- **`scripts/verify-rfc-classification.ts`**——封闭集合与索引新鲜度。它断言生命周期文件夹下的每个文件都位于规范集合中的某个类别文件夹内（生命周期根目录下的散落 `.md` 或未知类别文件夹均判定失败），并断言生成的 [INDEX.md](../../INDEX.md) 与从目录树重新渲染的结果逐字节一致（见[生成 RFC 索引表](2026-07-04-generate-rfc-index-tables.md)）。规范类别集合以 `const` 形式定义在 `scripts/rfc-index.ts` 中——这是与生成器共享的机器真源——而 [README](../../README.md) 以行文形式记录它；类别*描述*保持手写，索引由机器生成。
-- **`scripts/verify-doc-refs.ts`**——源码注释中的文档引用。RFC 路径不仅被 Markdown 引用，也被 TypeScript 文档注释引用（以仓库根为起点的路径，如 `docs/rfc/implemented/testing/2026-06-19-acp-snapshot-tests.md`）。`verify-md-links` 从未扫描过这些引用，因此重组可能使它们静默失效。此门禁扫描 `packages/**` 和 `examples/**` 下仓库自有的 `.ts` 文件（排除构建产物 `lib/` 和 `vendor/`），查找 `docs/….md` 形式的 token，将每个以仓库根为起点的路径解析并断言其存在。它要求 `.md` 扩展名，因此无扩展名的行文引用（`docs/postmortem/0001`、`docs/architecture.md § Extending The Harness`）不受影响。
+- **`scripts/verify-agent-note-classification.ts`**：定义封闭的生命周期与类别集合。它断言生命周期文件夹下的每个文件都位于规范集合中的类别文件夹内（生命周期根目录下散落的 `.md` 或未知类别文件夹都会失败），并拒绝集中式 `INDEX.md`。规范集合位于 `scripts/agent-note-tree.ts` 中，[README](../../README.md)则以行文记录每个类别。
+- **`scripts/verify-doc-refs.ts`**：检查引用文档的源码注释。Agent Note 路径不仅出现在 Markdown 中，也出现在 TypeScript 文档注释中（例如以仓库根为起点的 `.agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md`）。`verify-md-links` 看不到这些引用，因此目录重组可能静默留下失效引用。该门禁扫描 `packages/**` 与 `examples/**` 下仓库自有的 `.ts` 文件（排除已构建的 `lib/` 与 `vendor/`），查找 `docs/….md` 和 `.agents/notes/….md` token，解析每个以仓库根为起点的路径并断言其存在。它要求使用 `.md` 扩展名，因此不处理无扩展名的行文。
 
 ## 曾考虑的替代方案
 
 - **在每个文件中添加 `Classification:` 行文行**（紧邻 `Status:`），由门禁解析。可行，但它将路径已能承载的事实重复到文件中，且行内容可能与所在文件夹不一致。路径编码使标签与其存储合二为一，没有需要保持同步的东西。
 - **设立 `refactor` 类别。** 与 `simplification` 几乎完全重叠；唯一有人试图用来区分的标准是「可观察行为是否改变？」，而 `simplification` 已经编码了这一点（它不改变）。一个类别即可，无需两个。
-- **从文件系统自动生成索引。** 此处最初否决，以保持索引手写；后被[生成 RFC 索引表](2026-07-04-generate-rfc-index-tables.md)取代——当堆叠的提案潮使手写表格成为仓库中冲突最频繁的文档区域后，列表改为完全生成的 [INDEX.md](../../INDEX.md)，而 README 行文保持人工维护。
+- **生成或手工维护的语料索引。** 不予采纳：生命周期/类别目录树才是权威结构；集中式清单会制造合并热点，却没有提供目录树导航或仓库搜索无法实现的发现能力。单独的[索引提案](../../rejected/process/2026-07-04-generate-agent-note-index-tables.md)记录了被放弃的生成形状。
 
 ## 后果
 
-- 每个 RFC 现在都位于一个类别文件夹下，索引在每个生命周期内按类别分组。读者只需扫一个标题即可看到所有简化类或所有测试类决策。
+- 每份 Agent Note 都位于一个类别文件夹下。读者浏览单个文件夹，即可查看某个生命周期内的全部简化或测试决策。
 - `doc-sync` 链中多了两个快速 tsx 脚本；无新依赖（mdast/GFM 栈已因 `verify-md-wrap`/`verify-md-links` 而存在）。
-- 新增类别是一个刻意的动作：修改 `scripts/rfc-index.ts` 中的 `const` 和 [Classification 章节](../../README.md#classification)，而非仅仅 `mkdir` 一个文件夹。门禁拒绝未知文件夹，因此临时类别无法悄悄混入。
-- 源码注释中的文档引用现在也受门禁保护——一个被移动或重命名的文档如果被 `.ts` 注释引用，pre-push 钩子就会失败，堵住了 `verify-md-links` 在结构上无法看到的一类漂移。
+- 新增类别必须是显式决策：修改 `scripts/agent-note-tree.ts` 中的 `const` 与 [Classification 章节](../../README.md#classification)，而不是只用 `mkdir` 创建文件夹。门禁会拒绝未知文件夹，因此临时类别无法悄然混入。
+- 源码注释中的文档引用同样受门禁约束：被 `.ts` 注释引用的文档一旦移动或重命名，`doc-sync` 与 CI 中的 `verify-doc-refs` 就会失败，从而堵住 `verify-md-links` 在结构上无法发现的一类漂移。

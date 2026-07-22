@@ -1,4 +1,4 @@
-# RFC: 显式的模型侧工具顺序
+# Agent Note: 显式的模型侧工具顺序
 
 Status: implemented
 
@@ -21,9 +21,9 @@ Status: implemented
 
 `assemble()` 在 `system-prompt/assemble` waterfall（瀑布式事件）之前对提供方工具进行规范化排序，从源头消除注册顺序的差异。waterfall 从这个确定性列表开始；不变的顺序随后流入请求头、冻结的请求和重建检查，无需 loop 特有的排序逻辑。
 
-范围刻意收窄：本 RFC 修复的是注册顺序竞态，而非插件行为。`system-prompt/assemble` 的监听器仍然可以添加、移除或重排工具——正如它可以在 section 排序之后编辑 section——并对自身输出的确定性负责；waterfall 契约已经要求监听器是确定性的（可重建性不变式会捕获在构建与回放之间行为不一致的监听器）。
+范围刻意收窄：本 Agent Note 修复的是注册顺序竞态，而非插件行为。`system-prompt/assemble` 的监听器仍然可以添加、移除或重排工具——正如它可以在 section 排序之后编辑 section——并对自身输出的确定性负责；waterfall 契约已经要求监听器是确定性的（可重建性不变式会捕获在构建与回放之间行为不一致的监听器）。
 
-配置传递沿用 `persona` 的先例，`toolOrder` 与之并列：应用配置（`dsh-stdio-demo`、`dsh-acp-demo`）接受该键，并通过 `dsh-agent-spine-demo`（其 schema 是各所有者 schema 的交集）转发给 `SystemPrompt` 子服务。有一个 schemastery 细节至关重要：schemastery 数组默认为 `[]`，但省略的 `toolOrder` 必须保持 ABSENT（= 字典序），而不是变成一个显式配置的空列表（无效——缺少 rest 条目），因此链路上每个 schema 都将默认值强制为 `undefined`。
+配置传递沿用 `persona` 的先例，`toolOrder` 与之并列：TUI、Headless 和 ACP 应用配置接受该键，并通过 `dsh-agent-spine-demo`（其 schema 是各所有者 schema 的交集）转发给 `SystemPrompt` 子服务。有一个 schemastery 细节至关重要：schemastery 数组默认为 `[]`，但省略的 `toolOrder` 必须保持 ABSENT（= 字典序），而不是变成一个显式配置的空列表（无效——缺少 rest 条目），因此链路上每个 schema 都将默认值强制为 `undefined`。
 
 ## 曾考虑的替代方案
 
@@ -34,13 +34,14 @@ Status: implemented
 - **在 `LlmService` 上加配置 + `orderTools()` 方法，由 loop 在记录 header 前调用**：可行，但仅为在远处应用一个策略就增加了一个公开服务方法和一处 loop 改动；每个未来的请求组合者都必须记得调用。在列表诞生处进行规范化使得无序列表不可表示，且零新增接口。
 - **在 `llm.stream()` 内部规范化**：在 header 事件已记录之后才运行（抖动仍然存在），且需要重建深度冻结的信封，静默地解除了重建不变式。
 - **穷举列表（无 rest 条目）**：每个新加载的工具插件都会导致启动失败；强制的 rest 条目使未列出的工具保持确定性，且其位置是显式的。
-- **启动时校验（由 `dsh-app-boot` 在 `loader.await()` 之后调用 `SystemPrompt.assertToolOrderSatisfied()`）**：能将错误配置变为启动时死亡而非首轮次失败，但代价是一个公开服务方法加上通用启动胶水对单个服务的结构耦合，且无法替代组装时检查（嵌入式调用者从不运行 app boot；注册在 boot 之后仍会变化）。也没有现成事件可以承载该检查：Cordis v4 没有 ready 类事件，`loader/entry-init`/`internal/status` 在加载中途触发（与工具注册存在竞态——正是本 RFC 要消除的熵源），而 agent 生命周期事件不会早于组装。在 `assemble()` 设置单一执行点被判定值得接受较晚的失败时刻。
+- **启动时校验（由 `dsh-app-boot` 在 `loader.await()` 之后调用 `SystemPrompt.assertToolOrderSatisfied()`）**：能将错误配置变为启动时死亡而非首轮次失败，但代价是一个公开服务方法加上通用启动胶水对单个服务的结构耦合，且无法替代组装时检查（嵌入式调用者从不运行 app boot；注册在 boot 之后仍会变化）。也没有现成事件可以承载该检查：Cordis v4 没有 ready 类事件，`loader/entry-init`/`internal/status` 在加载中途触发（与工具注册存在竞态——正是本 Agent Note 要消除的熵源），而 agent 生命周期事件不会早于组装。在 `assemble()` 设置单一执行点被判定值得接受较晚的失败时刻。
 
 ## 后果
 
 - 每个由注册表构建的组装在任何宿主上都以确定性工具顺序开始；在没有专家监听器刻意改变的情况下，每个 `request/header` 事件和模型请求都继承该顺序。CI 与本地之间的注册顺序翻转从结构上被消除，默认为字典序。
 - 初始 `PromptAssembly.tools` 是权威的，因此 waterfall 监听器从模型侧顺序开始；提供方注册顺序在该协作 seam 之前无处可观测。
-- 步骤之间的纯工具重排只能表示为 `request/header` 的 `'fallback'` 快照（按名称索引的 `ToolsDelta` 无法表达它）；在稳定的权威顺序下，这种重排在实践中不再发生，因此 fallback 路径仅作为安全阀存在。
+- 快照套件中唯一固定请求头的 fixture（`text-turn`）携带新的权威工具顺序；按照固定请求头设计，其他 ACP 快照仍将大块 header 清洗为 `{{system}}`/`{{tools}}`。
+- 步骤之间的纯工具重排与其他 header 变更一样记录：一份原因是 `'change'` 的完整 `request/header` 快照。稳定的权威顺序会防止注册时序在普通路径上制造这类变化。
 - `toolOrder` 键沿 app → `agent-core` → `SystemPrompt` 的转发链传递，因此部署时将其放在 app 配置中 `persona` 旁边即可；`dsh-llm` 和 agent loop 无需改动。
 - `toolOrder` 中拼错或未加载的工具名称在 prompt 组装时使轮次失败，而非启动时：loop 在轮次内部组装（`turn/start` 之后、`step/start` 之前），因此拒绝到达轮次的外层 catch——轮次以 `error` 原因平衡关闭并携带错误消息，`agent/error` 镜像该消息，不打开步骤，不记录 `request/header`，不向适配器发出请求，agent 回到空闲状态。每个轮次都以相同方式失败，直到配置被修正；进程本身保持运行（符合仓库规则：显式配置引用不得被静默忽略——执行点是组装，因为不存在更早的通用时刻）。
 - 工具提供方返回保留的 rest 条目名称时，其 prompt 组装失败形态与未知的已列名称相同。这防止哨兵值变成一个歧义的真实工具，并保持「从不丢弃工具」的排序契约。

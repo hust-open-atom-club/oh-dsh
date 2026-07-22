@@ -1,4 +1,4 @@
-# RFC: 将 Node LTS 引擎下限提升至 22.19
+# Agent Note: 将 Node LTS 引擎下限提升至 22.19
 
 Status: implemented
 
@@ -15,7 +15,7 @@ Status: implemented
 两个 Node 特性决定了源码运行时的门槛：
 
 - **`node:sqlite`**：`packages/session-persistence/session-persistence-sqlite` 在顶层执行 `import { DatabaseSync } from 'node:sqlite'`。该模块在 **22.13**（LTS）和 **23.4**（Current）取消了 `--experimental-sqlite` 标志要求；在此之前，导入它会在加载时抛出异常。
-- **原生 TypeScript 类型剥离**：`packages/examples/stdio-demo/tests/built-bin.e2e.ts` 冒烟测试在纯 `node`（不用 tsx）下启动已发布的 `lib/bin.js`，并加载示例的 `.ts` 插件（`mock-llm.ts`、`echo-tool.ts`）。类型剥离从 **22.18**（LTS）和 **23.6**（Current）起成为默认行为；在此之前需要 `--experimental-strip-types`。
+- **原生 TypeScript 类型剥离**——构建模式的 `examples/headless-agent/tests/keyless-smoke.e2e.ts` 冒烟测试使用纯 `node`（无 tsx）启动 `dsh-cli-demo` 已发布的 `lib/bin.js`，并加载示例的 `.ts` 测试适配器（`cli-mock-llm.ts`）。类型剥离从 **22.18**（LTS）和 **23.6**（Current）起成为默认行为；更早版本需要 `--experimental-strip-types`。
 
 这些源码特性在 22.x 线上于 **22.18** 全部就绪，但已安装的 Pi 适配器依赖将宣传的 LTS 下限进一步提高。`@deepseek-ai/dsh-llm-pi-ai` 依赖 `@earendil-works/pi-ai@0.79.3`，后者的 package 声明 `engines.node >=22.19.0`，因此 LTS 下限为 **22.19**。24.x 分支保持 `>=24.0.0`。该不相交范围完全排除了 Node 23：Node 23.0–23.5 至少还有一个源码特性需要标志，而 23 线是非 LTS/已 EOL 的，宣传 `>=23.6` 会增加一条已终止的发布线和一条 CI 分支，而没有任何部署应当使用它。
 
@@ -26,7 +26,7 @@ Status: implemented
 - 宣传的 LTS 分支不再低于 Pi 适配器依赖的下限。
 - CI 通过 Node 22.19 直接验证 Node 22 LTS 下限，Node 24 分支保持 `node: 24`，Node 26 用于下一个偶数线；每条分支都对源码图执行类型检查，并实际启动未构建的工作流 worker。
 - built-bin 冒烟测试无需版本条件标志：在 22.19 上类型剥离已是默认行为，因此测试保持其文档所述的纯 `node lib/bin.js` 路径。
-- 未来如果有依赖或源码 API 提高运行时下限，必须在同一个变更中同步修改 `engines.node`、兼容性矩阵和本 RFC。
+- 未来若依赖或源码 API 提高运行时下限，必须在同一变更中同步调整 `engines.node`、兼容性矩阵和本 Agent Note（agent 决策记录）。
 
 ## 曾考虑的替代方案
 

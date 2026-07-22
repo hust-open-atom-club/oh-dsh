@@ -1,4 +1,4 @@
-# RFC: 为文件系统 seam 添加直接目录列举能力
+# Agent Note: 为文件系统 seam 添加直接目录列举能力
 
 Status: implemented
 

@@ -1,4 +1,4 @@
-# RFC: 文档分层、预算与上限门禁
+# Agent Note: 文档分层、预算与上限门禁
 
 Status: implemented
 
@@ -6,14 +6,14 @@ Status: implemented
 
 ## 问题
 
-尽管已有写作指导，常设文档仍然积累了重复的规则、重述的事故、重复的包（package）映射和陈旧的 RFC 摘要。仅靠评审无法阻止这种膨胀，因此仓库需要在文档分类体系之外增加一道机械化的预算约束。
+尽管已有写作指导，常设文档仍不断累积重复规则、反复讲述的事件、重复的包映射，以及陈旧的 Agent Note（agent 决策记录）摘要。仅靠评审无法阻止这种增长，因此仓库需要在文档分类之外再配一套机械预算。
 
 ## 决策
 
-- **分层分类体系，每条事实只有一个归属地。** [docs/AGENTS.md](../../../AGENTS.md) 是文档标准：它为每个 Markdown 层级指定唯一职责（常设指令、系统地图、类型目录、决策记录、事故叙事、实操手册、逐包契约、生成目录、工作流），禁止在归属层级之外重述事实（应以链接代替），并附带一份在撰写或评审任何文档时使用的冗余检查清单。
-- **窄范围、硬约束的预算门禁。** [scripts/verify-doc-budgets.ts](../../../../scripts/verify-doc-budgets.ts) 加入 `doc-sync`（文档同步门禁）：[scripts/doc-budgets.manifest.json](../../../../scripts/doc-budgets.manifest.json) 中列出的每篇文档都必须低于其字数上限（`wc -w` 语义，整个文件），且受预算约束的文件如果缺失也会导致门禁失败，防止重命名后预算被静默遗留。范围刻意限定为容易膨胀的常设文档：根目录和子树的 `AGENTS.md`、`architecture.md`、`packages/README.md`，以及它们将内容分流到的常设策略文档（`docs/testing.md`、`docs/defensive-patterns.md`）。参考文档、RFC 和 package README 不设预算：当每一行都是事实时，长度是合理的，由评审加冗余检查清单来管控。
+- **每项事实只归属一处的层级分类。**[docs/AGENTS.md](../../../../docs/AGENTS.md) 是文档标准：它为每种 Markdown 层级分配单一职责（常设指令、系统图、类型目录、决策记录、事件故事、操作指南、各包契约、生成式目录、工作流），禁止在事实归属层级之外重复陈述（应改为链接），并包含编写或评审任何文档时使用的赘余检查清单。
+- **范围窄且严格的预算门禁。**[scripts/verify-doc-budgets.ts](../../../../scripts/verify-doc-budgets.ts) 接入 `doc-sync`：[scripts/doc-budgets.manifest.json](../../../../scripts/doc-budgets.manifest.json) 列出的每份文档都必须低于其字数上限（采用 `wc -w` 语义，统计整个文件）；预算内文件缺失也会使门禁失败，使重命名无法悄然遗落其预算。范围刻意只涵盖容易膨胀的常设文档——根目录和子树中的 `AGENTS.md` 文件、`architecture.md`、`packages/README.md`，以及它们将内容移入的常设策略文档（`docs/testing.md`、`docs/defensive-patterns.md`）。参考文档、Agent Note 和包 README 不设预算：只要每一行都是事实，长度在这些位置就是合理的；评审和赘余检查清单负责约束它们。
 - **上限是只进不退的执行红线。** 上限设定为文档当前字数的至少 105%（留出工作余量，使日常措辞调整能通过，而真正的膨胀仍会触发门禁），并随着文档被精简到目标预算而同步下调、保持该余量（根 `AGENTS.md` ≤ 1,500 词；`architecture.md` ≤ 1,800；子树 `AGENTS.md` ≤ 600；`packages/README.md` ≤ 600）。推进机制与[翻译配对的 `required` 清单](2026-07-02-bilingual-docs-and-pairing-gate.md)相同。门禁变红时，修复方式是按分类体系迁移或压缩内容；只有在 PR（Pull Request）描述中给出明确理由时才允许提高上限，manifest（元数据清单）的 diff 本身即为可评审的动作。
-- **轻量工作流 skill（技能），契约在文档中。** [.agents/skills/dsh-doc-standards](../../../../.agents/skills/dsh-doc-standards/SKILL.md) 承载放置/审计/红灯修复工作流，并将文档标准作为真源，与 [dsh-translate-docs](../../../../.agents/skills/dsh-translate-docs/SKILL.md) 对 i18n 契约的分工方式一致。
+- **精简的工作流 skill（技能），契约归文档。**[.agents/skills/dsh-doc-standards](../../../skills/dsh-doc-standards/SKILL.md) 承载放置/审计/红灯门禁工作流，并以文档标准为事实来源，与 [dsh-translate-docs](../../../skills/dsh-translate-docs/SKILL.md) 和 i18n 契约之间的分工相同。
 
 ## 曾考虑的替代方案
 

@@ -1,4 +1,4 @@
-# RFC: Claude Code 与 Codex subagent 后端（向外部编码 agent 的进程外委派）
+# Agent Note: Claude Code 与 Codex subagent 后端（向外部编码 agent 的进程外委派）
 
 Status: proposed
 
@@ -6,23 +6,23 @@ Status: proposed
 
 ## 问题
 
-为 Claude Code 和 Codex 添加隔离的 subagent 提供方。既有的[命名提供方 seam](../../implemented/feature/2026-06-21-subagent-capability-seam.md) 和 [ACP 后端](../../implemented/feature/2026-06-22-acp-subagent-backend.md)已确立了进程边界的形状。harness 的一个轮次应能将一个自包含任务委派给上述任一产品，并接收其最终答案，同时不暴露父进程的密钥，也不继承来自 `~/.claude` 或 `~/.codex` 的宿主配置。
+subagent seam（[seam Agent Note](../../implemented/feature/2026-06-21-subagent-capability-seam.md)）在 `ctx.subagents` 上托管多个命名提供方，ACP 后端（[ACP 后端 Agent Note](../../implemented/feature/2026-06-22-acp-subagent-backend.md)）证明了该 seam 能跨越进程边界泛化；其「未来提供方」一节明确将 Codex app-server 与 Claude Code Agent SDK 列为机械上相似的兄弟。如今真正值得委派的就是这两个引擎：harness 的一个轮次应能把一个自包含任务交给真实的 Claude Code 或真实的 Codex——一个拥有自身模型、工具与沙箱的独立产品——并取回一个最终答案，同时父部署不向子进程泄漏密钥，子进程行为也不静默依赖宿主机上碰巧存在的 `~/.claude` / `~/.codex` 状态。
 
 ## 提案
 
 两个兄弟提供方包（ACP 后端的结构变体），加一次提取：
 
-- `@deepseek-ai/dsh-subagent-claude-code`：通过 `@anthropic-ai/claude-agent-sdk` 的 `query()` 驱动一个 Claude Code 子进程（SDK 在父进程中运行，并将其内置的 `claude` CLI 作为子进程 spawn）。提供方名称为 `claude-code`：子进程是 Claude Code 这个*产品*，而非 Anthropic 模型适配器——"claude" 保留给未来的 `dsh-llm` 适配器。
+- `@deepseek-ai/dsh-subagent-claude-code`：通过 `@anthropic-ai/claude-agent-sdk` 的 `query()` 驱动一个 Claude Code 子进程（SDK 在父进程中运行，并将其内置的 `claude` CLI 作为子进程 spawn）。提供方名称为 `claude-code`：子进程是 Claude Code 这个*产品*，而非 Anthropic 模型适配器——「claude」保留给未来的 `dsh-llm` 适配器。
 - `@deepseek-ai/dsh-subagent-codex`：spawn `codex app-server`，通过其 JSON-RPC-over-stdio 协议驱动一个 thread/turn，使用包内一个手写的换行 JSON 客户端（约 200–300 行）。
-- `@deepseek-ai/dsh-subagent-process`：纯库（沿用 `subagent-inprocess` 的先例），提取 `dsh-subagent-acp` 已有且两个新后端都需要的内容：凭证环境清洗（`SENSITIVE_ENV_PATTERN`/`buildChildEnv`）、EOF → SIGTERM → SIGKILL 的 dispose 阶梯，以及新的隔离配置目录辅助函数（`mkdtemp` 创建、尽力删除）。ACP 后端迁移到该库上；`bash-local` 的兄弟副本保持不动以限制变更范围。
+- `@deepseek-ai/dsh-subagent-process`：纯库（沿用 `subagent-inprocess` 的先例），提取 `dsh-subagent-acp` 已有且两个新后端都需要的内容：凭证环境清洗（`buildChildEnv`）、EOF → SIGTERM → SIGKILL 的 dispose 阶梯，以及新的隔离配置目录辅助函数（`mkdtemp` 创建、尽力删除）。ACP 后端迁移到该库上；`bash-local` 的兄弟副本保持不动以限制变更范围。
 
-两个提供方遵循 ACP 后端契约：每次 `start` 创建一个全新子进程、一次 prompt 往返、不继承父上下文也不声明可选能力、忽略 `request.parent` 和 `request.agentOptions`、使用随机的品牌化 agent id。`result` 从不 reject；子进程失败映射为 stop reason，原始错误送入 logger。每个提供方以不同的工具名挂载 `dsh-tool-subagent`。工具结果是唯一新增的模型可见产物，因此无需新的会话事件；工作区变更仍是 transcript（文本记录）回放之外的环境副作用。
+两个提供方逐字复制 ACP 后端的 seam 姿态：每次 `start` 创建全新子进程、恰好一次 prompt 往返、所有能力均为 `false`、`inheritsParentContext: false`、忽略 `request.parent`/`request.agentOptions`、`id = SessionId(randomUUID())`，且 `result` 从不 reject——子进程级失败扁平化为 stop reason，原始错误则通过 `onError` spec 回调送到 `ctx.logger`。模型暴露无需新代码：每个提供方各加载一次 `dsh-tool-subagent`，使用不同的 `toolName`（`subagent_claude_code`、`subagent_codex`）。无需新的会话事件——唯一的模型可见产物是工具结果，因此可重建性与 ACP 完全相同。明确边界：会话日志重建模型可见的 transcript（文本记录），而不是工作区变更历史——获准写入的子进程将文件作为日志之外的环境副作用进行修改，与 bash 工具和 ACP 后端现有行为完全一致；回放复现请求，而非磁盘。
 
 ## 已验证的接口事实（固定版本）
 
 两个集成面在本提案之前均已针对固定版本进行了验证——阅读类型与打包源码、运行无需密钥的 spike——而非仅依赖厂商文档。固定版本是验证基线，不是运行时契约：后端不执行运行时版本探测（无 `codex --version` 门禁、无 SDK 版本嗅探）。兼容性在开发时强制执行——每次依赖升级都会针对真实加载路径重跑无密钥套件——在运行时则通过大声失败来保障：协议层面的意外通过 `onError` 结算为 `error`，绝不静默异常。
 
-**`@anthropic-ai/claude-agent-sdk` 0.3.202。** `options.env` 会替换子进程环境（不与 `process.env` 合并），恰好满足清洗需求。`settingSources` 默认加载所有文件系统设置——隔离要求显式传入 `[]`。结果子类型为 `success` | `error_during_execution` | `error_max_turns` | `error_max_budget_usd` | `error_max_structured_output_retries`。中止时 SDK 自行升级 CLI 子进程：立即关闭 stdin，约 2 秒后若子进程未退出则发送 SIGTERM（已观察到；无残留进程）——无需自定义 kill 回退。`outputFormat: {type: 'json_schema'}` 和 `agents` 选项已存在，为 seam 的 `outputSchema` 能力和命名 subagent 类型提供了未来着陆点；两者均不在本 RFC 范围内。
+**`@anthropic-ai/claude-agent-sdk` 0.3.202。** `options.env` 会替换子进程环境（不与 `process.env` 合并），恰好满足清洗需求。`settingSources` 默认加载所有文件系统设置——隔离要求显式传入 `[]`。结果子类型为 `success` | `error_during_execution` | `error_max_turns` | `error_max_budget_usd` | `error_max_structured_output_retries`。中止时 SDK 自行升级 CLI 子进程：立即关闭 stdin，约 2 秒后若子进程未退出则发送 SIGTERM（已观察到；无残留进程）——无需自定义 kill 回退。`outputFormat: {type: 'json_schema'}` 和 `agents` 选项已存在，为 seam 的 `outputSchema` 能力和命名 subagent 类型提供了未来着陆点；两者均不在本 Agent Note 范围内。
 
 **codex CLI 0.142.5，`codex app-server`（v2 词汇）。** LF 分隔的 JSON，JSON-RPC 2.0 形状但省略 `"jsonrpc"` 头。
 
@@ -33,11 +33,11 @@ Status: proposed
 
 ## 隔离与凭证
 
-认证方式仅限 API key。每次运行使用一个全新的配置目录（Claude Code 用 `CLAUDE_CONFIG_DIR` 配合 `settingSources: []`，Codex 用 `CODEX_HOME`），dispose 时尽力删除；配置也可以选择一个持久目录。共享的子进程环境辅助函数转发 `PATH`、`HOME`、`TMPDIR`、locale 和代理设置等普通值，移除凭证形态的名称，并叠加显式的 `config.env`。Claude Code 通过该叠加接收 API key，而 Codex 通过 `account/login/start` 接收，而非手写认证文件。
+部署只使用 API key 认证，子进程不得看到宿主用户的 Claude Code / Codex 配置：行为必须只由 `cordis.yml` 决定。每次运行获得一个全新的 `mkdtemp` 配置目录——Claude Code 使用 `CLAUDE_CONFIG_DIR`（并显式设置 `settingSources: []`），Codex 使用 `CODEX_HOME`——dispose 时尽力删除；配置字段也可以固定一个持久目录。子进程环境通过提取逐字复用 ACP 后端的 `buildChildEnv` 语义：转发环境变量，但移除凭证形态的变量（`/KEY|SECRET|TOKEN/i`），再叠加 `config.env`——因此 `PATH`、`HOME`、`TMPDIR`、locale 和代理变量保留，CLI 正常运行；只有环境中的凭证形态变量被清洗（Claude Code 的 `ANTHROPIC_API_KEY` 通过 `config.env` 显式进入），Codex key 则通过 `account/login/start` RPC 进入隔离的 `CODEX_HOME`，而非手写 `auth.json`。
 
 ## 权限与审批策略
 
-每个后端暴露其引擎原生的策略词汇。Claude Code 默认 `permissionMode: default` 配合 `permission: reject`；Codex 默认 `sandboxMode: read-only`、`approvalPolicy: never`，以及相同的拒绝回退。示例可选择启用 `acceptEdits` 或 `workspace-write`。已知的审批、用户输入和 elicitation 请求接收配置的应答；未知方法接收 method-not-found，未知通知被消费。没有 prompt 到达人类，子进程也不会因等待不可用的输入而无限挂起。
+每个后端不压缩为 ACP 单一的 `permission: allow|reject` 旋钮，而把引擎原生词汇作为配置暴露，并采用保守默认值：Claude Code 获得 `permissionMode`（默认 `default`）以及 `permission: allow|reject`（默认 `reject`），后者作为所有漏过请求的 `canUseTool` 自动应答；Codex 获得 `sandboxMode`（默认 `read-only`）和 `approvalPolicy`（默认 `never`），以及同一个 `permission` 后备值，用来应答仍然到达的审批请求。默认值刻意做到不造成损害（开箱即用的子进程无法写文件）；示例演示如何开放权限（`acceptEdits` / `workspace-write`）。机械规则是：每一个服务端发起的请求都由程序迅速结算——枚举出的审批/用户输入/elicitation 请求按配置策略应答，未知请求方法用 JSON-RPC method-not-found 错误响应（绝不保持 pending），未知通知被消费——因此任何子进程请求都不会因等待永远不会到来的应答而卡住轮次。这一版中 prompt 不会到达人类，与 ACP 一致。
 
 ## StopReason 映射
 
@@ -47,11 +47,11 @@ Claude Code：`success` → `completed`；`error_max_turns`、`error_during_exec
 
 ## 测试
 
-每个适用层级都要求覆盖：
+依照根 AGENTS.md 规则在每个层级明确命名，并预先消除风险：
 
-- **无密钥单元/集成测试：** 通过真实 SDK 驱动一个假 Claude CLI，通过真实协议客户端驱动一个脚本化的 Codex app-server。在逐文件 100% 覆盖率下，验证往返、每种 stop 映射、两条取消路径及预中止、权限策略、未知消息、spawn 失败、reload 清理、导出形状、清洗后的环境、临时目录删除，以及 Codex 认证预检失败。
-- **有密钥 e2e 测试：** 每个真实引擎在 `acceptEdits` 或 `workspace-write` 下执行文件操作；跳过时命名缺失的二进制或密钥，并断言无残留子进程。
-- **快照测试：** 标记为 `TODO(claude-code-subagent-replay)` 和 `TODO(codex-subagent-replay)` 推迟，等待 [subagent 回放 RFC](../../implemented/testing/2026-06-22-subagent-snapshot-replay.md) 描述的进程特定回放形状。
+- **无密钥单元/集成测试**：每个后端都镜像 ACP spec 清单（往返和输出累积、每种 stop 映射、两条取消路径、已中止、两种策略下的权限自动应答、未知消息容错、错误命令的 spawn 失败、HMR 提供方清理、导出形状、子进程环境隔离断言和临时目录删除；Codex 另加认证预检失败路径）。Claude Code harness 是通过 `pathToClaudeCodeExecutable` 接入真实 SDK 的脚本化假 `claude` 可执行文件——一个 spike 已在 24ms 内完成端到端无密钥验证（假 CLI 应答一次 `control_request/initialize`，并讲 plain stream-json，约 40 行）。Codex harness 是讲已验证协议格式的脚本化 mock app-server 子进程，沿用 `mock-acp-server.ts` 形状。
+- **有密钥 e2e 测试**：每个后端的真实引擎执行并由磁盘验证真实文件工作，固定使用开放后的配置，以免验收与不造成损害的默认值冲突——Claude Code 使用 `permissionMode: 'acceptEdits'`，Codex 使用 `sandboxMode: 'workspace-write'` + `approvalPolicy: 'never'`；自跳过会准确报告缺失的是二进制还是 key。CI 没有密钥，因此依照有密钥策略在本地运行。
+- **快照测试**：以 `TODO(claude-code-subagent-replay)` / `TODO(codex-subagent-replay)` 推迟——即 ACP 后端也推迟的独立回放形状（[按会话回放 Agent Note](../../implemented/testing/2026-06-22-subagent-snapshot-replay.md)）；在此期间由无密钥套件提供确定性覆盖。
 
 ## 曾考虑的替代方案
 
@@ -61,7 +61,7 @@ dispose 阶梯和环境清洗要求拥有子进程（spawn 参数、env、信号
 
 ### 为什么不用模型可见的 `subagent_type` 参数（单一 Task 风格工具）？
 
-Claude Code 自身的 Task 工具将 subagent 类型放在模型可见的 schema 中，选择一个 prompt + 工具集人格。这里的选择是在执行引擎之间做出的，而只有部署者知道哪些引擎配置了凭证——因此选择留在部署配置层，保持 `dsh-tool-subagent` 文档中的「一个提供方对应一个工具」契约。人格风格的类型选择器应是针对工具的另一个 RFC，而非针对后端。
+Claude Code 自身的 Task 工具将 subagent 类型放在模型可见的 schema 中，选择一个 prompt + 工具集人格。这里的选择是在执行引擎之间做出的，而只有部署者知道哪些引擎配置了凭证——因此选择留在部署配置层，保持 `dsh-tool-subagent` 文档中的「一个提供方对应一个工具」契约。人格风格的类型选择器应是针对工具的另一个 Agent Note，而非针对后端。
 
 ### 为什么不用登录态凭证和用户自身的配置？
 
@@ -73,7 +73,7 @@ Claude Code 自身的 Task 工具将 subagent 类型放在模型可见的 schema
 
 ### 为什么不用 ACP 适配器（如 `claude-code-acp`）复用既有后端？
 
-社区 shim 将两个引擎包装为 ACP，这会使它们在 `dsh-subagent-acp` 上变成「仅配置」。但这在 harness 与引擎之间插入了一个非官方的第三方层，抹去了本 RFC 暴露的原生控制面（permissionMode、sandboxMode/approvalPolicy、配置目录隔离、apiKey RPC），并以 shim 的发布节奏替换了第一方协议的稳定性。第一方接口——Agent SDK 和 app-server——才是受支持的集成点。
+社区 shim 将两个引擎包装为 ACP，这会使它们在 `dsh-subagent-acp` 上变成「仅配置」。但这在 harness 与引擎之间插入了一个非官方的第三方层，抹去了本 Agent Note 暴露的原生控制面（permissionMode、sandboxMode/approvalPolicy、配置目录隔离、apiKey RPC），并以 shim 的发布节奏替换了第一方协议的稳定性。第一方接口——Agent SDK 和 app-server——才是受支持的集成点。
 
 ## 验收标准
 

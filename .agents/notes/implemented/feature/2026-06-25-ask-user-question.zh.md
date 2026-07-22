@@ -1,4 +1,4 @@
-# RFC: ask-user 提问能力
+# Agent Note: ask-user 提问能力
 
 Status: implemented
 
@@ -22,9 +22,9 @@ Provider 返回 `{ answers: [{ id, selected, custom? }] }`。`selected` 始终�
 
 ## UI 映射
 
-`dsh-stdio-demo` 的包内 readline 模块渲染每个问题，在下一行显示每个选项的 `description`，支持以逗号/空格分隔的数字选择 `multi_select`，接受自由格式的自定义答案，并在中止、provider dispose（资源释放）或 stdin EOF 时拒绝待处理的问题。批量请求按顺序询问，作为一个答案对象整体解析。stdio provider 通过内部队列序列化并发请求，确保同一时刻只有一个提示占用 stdin。
+`dsh-tui` 将每个问题渲染为键盘叠层，展示选项描述，支持单选、多选和自由格式自定义答案，并在中止、provider dispose（资源释放）或终端关闭时拒绝待处理的问题。批量请求和并发请求都会排队，确保同一时刻只有一个叠层占用键盘焦点。
 
-`dsh-acp` 为 ACP 会话提供同一 seam。它通过 bridge 的 `agent→sessionId` 反向映射将调用方 `Agent` 的 ask 请求路由出去，并为每个问题调用 ACP `unstable_createElicitation`（附带会话范围的表单）。单选选项变为 `choice` 字符串枚举；`multi_select` 选项变为 `choice` 数组枚举；无选项的问题使用必填的 `custom` 文本字段。如果客户端同时返回 `choice` 和非空 `custom`，以 custom 答案为准。ACP `decline`/`cancel`、缺失答案、缺失会话以及客户端不支持 elicitation，都会转为结构化的 `UserInteractionError`。
+`dsh-acp` 为 ACP 会话提供同一 seam。它通过 `ownedRecord` 解析调用方 `Agent`，要求位于 `agent.session.id` 的正向会话 map 记录拥有该精确 agent 对象，并为每个问题调用 ACP `unstable_createElicitation`（附带会话范围的表单）。单选选项变为 `choice` 字符串枚举；`multi_select` 选项变为 `choice` 数组枚举；无选项的问题使用必填的 `custom` 文本字段。如果客户端同时返回 `choice` 和非空 `custom`，以 custom 答案为准。ACP `decline`/`cancel`、缺失答案、缺失会话以及客户端不支持 elicitation，都会转为结构化的 `UserInteractionError`。
 
 ACP 映射有意使用 elicitation 而非 `session/request_permission`。`request_permission` 仍保留给独立的权限门禁：它是围绕工具执行的 yes/no 或策略式授权协议。`ask_user_question` 是一个通用的信息收集工具，支持可选的自由格式答案，因此 ACP 表单 elicitation 是更贴合的协议。bridge 的会话路由与未来的权限门禁共享，但用户意图不同。
 
@@ -44,8 +44,8 @@ ACP elicitation 目前在 SDK 中标记为 unstable。回退仍然是结构化�
 
 该功能赋予模型一个强大的暂停原语，因此 prompt 引导很重要。工具描述告诉模型：提问要简洁，尽可能使用选项。产品策略后续可以包装 `tools/execute` 来限制工具何时可用，但循环不应对其做特殊处理。
 
-`dsh-user-interaction` 和 `dsh-tool-ask-user` 都位于 `packages/ui`，因为它们共同构成一个面向产品的人机交互能力。`agent-core` 不加载工具或 provider。`stdio-agent` 选择性加载 seam、其 readline provider 和面向模型的工具。`acp-agent` 默认只保留 `userInteraction` seam/provider：ACP elicitation 支持仍取决于客户端，因此 ACP 叶节点必须在其客户端能完成 elicitation 请求后才有意加载面向模型的工具。
+`dsh-user-interaction` 和 `dsh-tool-ask-user` 都位于 `packages/ui`，因为它们共同构成一个面向产品的人机交互能力。`agent-core` 不加载工具或 provider。`dsh-tui-demo` 选择性加载 seam、TUI provider 和面向模型的工具。`acp-agent` 默认只保留 `userInteraction` seam/provider：ACP elicitation 支持仍取决于客户端，因此 ACP 叶节点必须在其客户端能完成 elicitation 请求后才有意加载面向模型的工具。
 
 ## 测试
 
-单元覆盖率固定了以下场景：provider 注册/释放、重复 provider 拒绝、provider 就绪前中止、空问题拒绝、通过 `ctx.tools.execute()` 传出的结构化工具错误、批量答案、多选答案、自定义答案，以及模型 schema（包括移除 `value`、`recommended`、`allow_custom` 和 `desc`）。`dsh-stdio-demo` 测试覆盖选项描述、排队请求、EOF/中止清理、无选项自由格式输入、无效选项重新提示、重复多选编号和批量问题流。ACP bridge 测试驱动一个真实的内存 ACP 连接（使用真实的 `ask_user_question` 工具），验证选中选项、custom 覆盖 choice、多选和无选项自由格式 elicitation 路径能继续 agent loop。
+单元覆盖率固定了以下场景：provider 注册/释放、重复 provider 拒绝、provider 就绪前中止、空问题拒绝、通过 `ctx.tools.execute()` 传出的结构化工具错误、批量答案、多选答案、自定义答案，以及模型 schema（包括移除 `value`、`recommended`、`allow_custom` 和 `desc`）。TUI 测试覆盖选项描述、排队请求、关闭/中止清理、无选项自由格式输入、无效选择、重复多选和批量问题流。ACP bridge 测试驱动一个真实的内存 ACP 连接（使用真实的 `ask_user_question` 工具），验证选中选项、custom 覆盖 choice、多选和无选项自由格式 elicitation 路径能继续 agent loop。

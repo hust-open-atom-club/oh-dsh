@@ -1,4 +1,4 @@
-# RFC: 将 Cordis 以源码形式收录，而非作为 npm 依赖
+# Agent Note: 将 Cordis 以源码形式收录，而非作为 npm 依赖
 
 Status: implemented
 

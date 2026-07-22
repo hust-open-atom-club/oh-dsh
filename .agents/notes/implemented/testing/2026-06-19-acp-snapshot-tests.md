@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-19-acp-snapshot-tests.zh.md)
+
 ## Problem
 
 Unit tests do not exercise the complete ACP subprocess transcript, while real-API tests are nondeterministic and key-gated. Editor-facing `session/update` output can therefore regress despite green unit coverage, as the [default-export postmortem](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md) demonstrated.

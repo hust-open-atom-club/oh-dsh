@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-06-approval-seam.zh.md)
+
 ## Problem
 
 Two callers need to put one question — "may this specific action proceed?" — to a human: `tools/pre-execute`'s `ask` decision (including the Claude-Code hook bridge's `permissionDecision: ask`) and the [sandbox Agent Note](2026-07-06-sandbox.md)'s post-denial one-shot escalation retry. A shared seam keeps them from inventing separate outcome vocabularies, UI routing, cancellation, and audit trails, while guaranteeing that a deployment with no UI can never grant an unanswerable request.

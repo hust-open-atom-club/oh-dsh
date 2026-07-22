@@ -1,4 +1,4 @@
-# RFC: 将 `dsh-fs-policy` 改为事件门控插件，而非方法接口
+# Agent Note: 将 `dsh-fs-policy` 改为事件门控插件，而非方法接口
 
 Status: implemented
 
@@ -6,12 +6,12 @@ Status: implemented
 
 ## 问题
 
-[split-fs-seam RFC](../simplification/2026-06-26-fsspec-style-fs-seam.md) 在面向模型的工具与 `ctx.fs` 提供方之间放置了 `ctx.fileContext`：`dsh-tool-fs` 注入 `fileContext`，并将每次 `read`/`write`/`edit` 路由到它的方法。这使得 `fileContext` **位于关键路径上且不可省略**。工具不经过它就无法访问 `ctx.fs`，策略层掌控着 fs I/O 和读取窗口，而一个不需要观测状态策略的部署也无法简单地移除该包——`dsh-tool-fs` 会因无法解析 `ctx.fileContext` 而失败。
+[split-fs-seam Agent Note](../simplification/2026-06-26-fsspec-style-fs-seam.md) 在面向模型的工具与 `ctx.fs` 提供方之间放置了 `ctx.fileContext`：`dsh-tool-fs` 注入 `fileContext`，并将每次 `read`/`write`/`edit` 路由到它的方法。这使得 `fileContext` **位于关键路径上且不可省略**。工具不经过它就无法访问 `ctx.fs`，策略层掌控着 fs I/O 和读取窗口，而一个不需要观测状态策略的部署也无法简单地移除该包——`dsh-tool-fs` 会因无法解析 `ctx.fileContext` 而失败。
 
 这把三件本应可分离的事情耦合在了一起：
 
 1. **工具做什么**——解析路径、读取窗口、写入/编辑文件。这是工具的职责，只需要 `ctx.fs`。
-2. **新鲜度/观测策略**——"编辑前必须先读"、"写入/编辑必须基于你读到的版本"。这是 `dsh-fs-policy` 插件的职责。
+2. **新鲜度/观测策略**——「编辑前必须先读」、「写入/编辑必须基于你读到的版本」。这是 `dsh-fs-policy` 插件的职责。
 3. **观测状态的记录**——一个副作用，永远不应阻止工具正常运行。
 
 由于工具调用的是 `fileContext` 方法，移除策略层就是一个破坏性变更，而非优雅地失去一个*附加*能力。策略层对工具的运行是承重性的，而非可选的收紧。
@@ -37,12 +37,12 @@ provider      dsh-fs-local      local implementation of ctx.fs
 
 ## 策略由提供方 CAS 强制执行，而非 `dsh-fs-policy` 的 stat
 
-`dsh-fs-policy` 强制执行"你必须基于你读到的版本来写入/编辑"，**自身从不调用 `stat` 或比较版本**。它将观测到的版本作为 CAS 基准提供，让提供方的 mutation 临界区检测陈旧性：
+`dsh-fs-policy` 强制执行「你必须基于你读到的版本来写入/编辑」，**自身从不调用 `stat` 或比较版本**。它将观测到的版本作为 CAS 基准提供，让提供方的 mutation 临界区检测陈旧性：
 
-- "你读过这个文件吗？"是 `dsh-fs-policy` 在本地决定的唯一事项——一次 `WeakMap` 查找，无 I/O。无记录 ⇒ `FS_NOT_OBSERVED`。
-- "你读到的版本是否仍为最新？"由 **`ctx.fs.editText`/`writeText` 内部**决定，在执行 read-match-rename 的同一个原子锁中完成。`dsh-fs-policy` 将 `vObserved` 作为期望值传入；如果文件已变更，提供方抛出 `FS_STALE_VERSION`。
+- 「你读过这个文件吗？」是 `dsh-fs-policy` 在本地决定的唯一事项——一次 `WeakMap` 查找，无 I/O。无记录 ⇒ `FS_NOT_OBSERVED`。
+- 「你读到的版本是否仍为最新？」由 **`ctx.fs.editText`/`writeText` 内部**决定，在执行 read-match-rename 的同一个原子锁中完成。`dsh-fs-policy` 将 `vObserved` 作为期望值传入；如果文件已变更，提供方抛出 `FS_STALE_VERSION`。
 
-这是有意为之的。如果 `dsh-fs-policy` 在其 waterfall（瀑布式事件）处理器中 stat 并比较版本，该检查与工具实际写入之间会存在 TOCTOU 间隙——文件可能在此期间变化，因此该检查只是一个虚假保证，提供方的锁无论如何都要兜底。将版本检查放在提供方的临界区中既无竞态又无额外 `stat`。所以 `dsh-fs-policy` **不做**任何文件系统 I/O；"必须基于最近一次读取"的保证由 CAS *实现*，`dsh-fs-policy` 只负责选择基准（`vObserved`）并对先前观测进行门控。
+这是有意为之的。如果 `dsh-fs-policy` 在其 waterfall（瀑布式事件）处理器中 stat 并比较版本，该检查与工具实际写入之间会存在 TOCTOU 间隙——文件可能在此期间变化，因此该检查只是一个虚假保证，提供方的锁无论如何都要兜底。将版本检查放在提供方的临界区中既无竞态又无额外 `stat`。所以 `dsh-fs-policy` **不做**任何文件系统 I/O；「必须基于最近一次读取」的保证由 CAS *实现*，`dsh-fs-policy` 只负责选择基准（`vObserved`）并对先前观测进行门控。
 
 ## 提供方契约变更：版本守卫变为可选
 
@@ -62,7 +62,7 @@ editText(target: FsTarget, edit: FsEditRequest, expected?: { version: FsVersion 
 //   { version }  → edit only at that version, else FS_STALE_VERSION (the current behavior)
 ```
 
-`FsWriteIntent` 联合类型本身不变——第三种"无条件"状态通过*省略* `expected` 来表达，因此两个 mutation 共享同一种对称形状（`expected?`：省略 = 无守卫，传入 = 有守卫）。这对 `dsh-fs-policy` 使用的有守卫路径保持完全向后兼容；只有之前不可能出现的"无守卫"情况是新增的，且它是裸提供方的默认行为。无论哪种情况，mutation 仍在后端的 per-target 锁内运行，因此无条件写入/编辑仍是原子的（不会产生撕裂文件）；"无条件"去掉的是*版本*前置条件，而非原子性。`editText` 在有守卫和无守卫路径上都将缺失目标报告为 `FS_STALE_VERSION`，保持一个统一的编辑失败码表示"此刻无法编辑该目标"。
+`FsWriteIntent` 联合类型本身不变——第三种「无条件」状态通过*省略* `expected` 来表达，因此两个 mutation 共享同一种对称形状（`expected?`：省略 = 无守卫，传入 = 有守卫）。这对 `dsh-fs-policy` 使用的有守卫路径保持完全向后兼容；只有之前不可能出现的「无守卫」情况是新增的，且它是裸提供方的默认行为。无论哪种情况，mutation 仍在后端的 per-target 锁内运行，因此无条件写入/编辑仍是原子的（不会产生撕裂文件）；「无条件」去掉的是*版本*前置条件，而非原子性。`editText` 在有守卫和无守卫路径上都将缺失目标报告为 `FS_STALE_VERSION`，保持一个统一的编辑失败码表示「此刻无法编辑该目标」。
 
 ## 事件词汇（由 `dsh-fs` 拥有）
 
@@ -110,7 +110,7 @@ interface Events {
 
 ## 工具契约（`dsh-tool-fs`）
 
-工具保留其面向模型的 schema（`read`/`write`/`edit`，逐字节不变）和 prompt 段落。prompt 引导仍以策略优先，因为加载 fs 工具的部署预期也会加载 `dsh-fs-policy`：模型仍被告知在覆写或编辑前先读取，任何声称"后端"要求如此的措辞应修正为 fs-policy 插件要求如此。裸提供方回退不改变 prompt 立场。
+工具保留其面向模型的 schema（`read`/`write`/`edit`，逐字节不变）和 prompt 段落。prompt 引导仍以策略优先，因为加载 fs 工具的部署预期也会加载 `dsh-fs-policy`：模型仍被告知在覆写或编辑前先读取，任何声称「后端」要求如此的措辞应修正为 fs-policy 插件要求如此。裸提供方回退不改变 prompt 立场。
 
 `dsh-tool-fs` 获得从旧 `fileContext` 方法服务迁移来的执行器职责，包括**读取渲染**（`read-render.ts`：`buildWindow` + `formatReadOutput`、`READ_MAX_BYTES`、`READ_MAX_LINE_LENGTH`、`FileReadOutcome`/`FileTextLine`，以及 `read.ts` 中的 `STREAM_MIN_SIZE`），这些现在是工具的渲染细节，因为读取已由工具拥有。这些读取渲染类型和辅助函数移入 `dsh-tool-fs`；策略插件不得继续作为工具的类型依赖。
 
@@ -134,7 +134,7 @@ interface Events {
 - `fs/edit-intent` 监听器：`prior = getObserved(owner, key)`；如果无 `owner` 或无 `prior`，抛出 `FS_NOT_OBSERVED`；否则返回 `{ version: prior.version }`。同样不调用 `next()`。
 - `fs/observed` 监听器：`record(owner, key, version)`。
 
-一条观测状态条目是**先前观测记录**：成功的 `read`、`write` 或 `edit` 都会 emit `fs/observed` 并记录 `{ version }`，因此条目的存在意味着"此 owner 在此版本观测过此目标"，而非狭义的"已读取过"。这使得 create-then-edit 或 edit-then-edit 序列无需中间重新读取即可工作：mutation 将记录的版本刷新为自身的结果，因此下一次编辑的基准就是它刚产出的版本。`FS_NOT_OBSERVED` 只拒绝完全没有任何先前观测的编辑。owner 从 `{ agent?: { session? } }` 结构化推导；dispose 时丢弃所有状态（HMR 安全）。
+一条观测状态条目是**先前观测记录**：成功的 `read`、`write` 或 `edit` 都会 emit `fs/observed` 并记录 `{ version }`，因此条目的存在意味着「此 owner 在此版本观测过此目标」，而非狭义的「已读取过」。这使得 create-then-edit 或 edit-then-edit 序列无需中间重新读取即可工作：mutation 将记录的版本刷新为自身的结果，因此下一次编辑的基准就是它刚产出的版本。`FS_NOT_OBSERVED` 只拒绝完全没有任何先前观测的编辑。owner 从 `{ agent?: { session? } }` 结构化推导；dispose 时丢弃所有状态（HMR 安全）。
 
 `dsh-fs-policy` 现在是一个纯策略/记录插件，没有服务面——它只通过事件 seam 影响外界。这正是移除 `dsh-tool-fs` 方法耦合的关键。
 
@@ -144,13 +144,13 @@ interface Events {
 
 - **read** 行为不变（它从不需要策略；只是 emit 了一个现在无人监听的 `fs/observed`）。
 - **write** 无条件 create-or-overwrite：`expected` 为 `undefined`，因此 `writeText` 无论文件是否存在、无论当前版本如何都直接写入。无先读要求，无版本检查。
-- **edit** 无条件替换文件当前内容中的字面文本：`expected` 为 `undefined`，因此 `editText` 无版本守卫、无先读要求地匹配并重写（`FS_EDIT_NOT_FOUND`/`FS_AMBIGUOUS_EDIT` 仍适用——它们关乎字面匹配，而非新鲜度）。缺失目标仍报告 `FS_STALE_VERSION`，与有守卫编辑路径的"此刻无法编辑该目标"错误码一致。
+- **edit** 无条件替换文件当前内容中的字面文本：`expected` 为 `undefined`，因此 `editText` 无版本守卫、无先读要求地匹配并重写（`FS_EDIT_NOT_FOUND`/`FS_AMBIGUOUS_EDIT` 仍适用——它们关乎字面匹配，而非新鲜度）。缺失目标仍报告 `FS_STALE_VERSION`，与有守卫编辑路径的「此刻无法编辑该目标」错误码一致。
 
 两个 mutation 仍是原子的（后端的 per-target 锁是无条件的）。仅仅是*不存在*（而非丢失）的是 `dsh-fs-policy` 本会叠加的策略：观测状态、先读后编辑和版本守卫的写入/编辑。加载 `dsh-fs-policy` 后，其监听器返回有守卫的 `expected` 值而非 `undefined`，从而叠加这些约束；裸提供方本身无需任何变更。
 
 ## 取代关系
 
-本 RFC 修正——而非推翻——[split-fs-seam RFC](../simplification/2026-06-26-fsspec-style-fs-seam.md)。四层拆分、提供方契约和新鲜度*策略*均保留。变更的是**工具与策略层之间的耦合方式**：强制性方法服务变为插件拥有的事件门控，fs I/O + 读取窗口从 `fileContext` 上移至 `dsh-tool-fs`。split-fs-seam RFC 中关于 `dsh-tool-fs` 注入 `fileContext` 以及 `fileContext` 拥有 `read`/`write`/`edit` 的描述已在同一变更中更新。
+本 Agent Note 修正——而非推翻——[split-fs-seam Agent Note](../simplification/2026-06-26-fsspec-style-fs-seam.md)。四层拆分、提供方契约和新鲜度*策略*均保留。变更的是**工具与策略层之间的耦合方式**：强制性方法服务变为插件拥有的事件门控，fs I/O + 读取窗口从 `fileContext` 上移至 `dsh-tool-fs`。split-fs-seam Agent Note 中关于 `dsh-tool-fs` 注入 `fileContext` 以及 `fileContext` 拥有 `read`/`write`/`edit` 的描述已在同一变更中更新。
 
 ## 验证
 
@@ -158,14 +158,14 @@ interface Events {
 
 ## 曾考虑的替代方案
 
-- **保留 `ctx.fileContext` 作为关键路径上的方法服务**——[split-fs-seam RFC](../simplification/2026-06-26-fsspec-style-fs-seam.md) 最初落地的形态；否决，因为工具无法在没有策略层的情况下运行，使策略对基本操作是承重性的，而非可选的收紧。
+- **保留 `ctx.fileContext` 作为关键路径上的方法服务**——[split-fs-seam Agent Note](../simplification/2026-06-26-fsspec-style-fs-seam.md) 最初落地的形态；否决，因为工具无法在没有策略层的情况下运行，使策略对基本操作是承重性的，而非可选的收紧。
 - **策略侧版本检查**（`dsh-fs-policy` 在其 waterfall 处理器中 stat 并比较版本）——否决，因为该检查与工具实际写入之间存在 TOCTOU 间隙；提供方的 mutation 临界区是唯一无竞态的位置，因此策略只选择 CAS 基准并对先前观测进行门控。
 - **每工具 `/read`/`/write`/`/edit` 子路径插件**——实现时放弃：没有消费方需要单工具部署，且子路径发布迫使引入兄弟工具包都不需要的定制 `tsdown`/`tsconfig`/`files`/workspace-constraint 处理；每工具的注册辅助函数仍作为根插件组合的内部模块保留。
 
 ## 后果
 
 - **事件间接层取代方法调用。** 一次 waterfall + emit 不如 `await ctx.fileContext.edit(...)` 直接。收益是移除了工具到策略的方法依赖，同时保留默认策略插件；代价是多一套事件词汇需要学习。通过保持三个事件的窄小范围并在每个事件上记录 default-thunk 语义来缓解。
-- **策略事件位于存储 seam 中。** `dsh-fs` 增加了两个版本决策事件和一个记录事件，尽管它"只是存储"。这是解耦的代价（发射方不能依赖策略插件）。这些事件只携带 `dsh-fs` 词汇加一个不透明的 `object` actor，不携带面向模型的概念，因此 seam 不沾染行窗口/观测策略类型，也不沾染 agent/session owner 结构。
-- **单一策略占位者，按约定先到先得。** `fs/write-intent`/`fs/edit-intent` 槽位恰好容纳一个决策者；先注册（或 `prepend`）的监听器获胜，其余被短路。`dsh-fs-policy` 占据该槽位是部署约定，而非事件系统强制的不变式——一个先注册的第二决策者会绕过它。这是可接受的，因为第二个 fs 版本策略决策者是配置错误，而非功能。如果未来出现*分层* fs 版本策略的需求，那是一个新 RFC（可组合的值传递 seam），而非在这些事件上静默添加第二个监听器。分层的权限/审计/沙箱拦截已有其归属：`tools/execute`。
+- **策略事件位于存储 seam 中。** `dsh-fs` 增加了两个版本决策事件和一个记录事件，尽管它「只是存储」。这是解耦的代价（发射方不能依赖策略插件）。这些事件只携带 `dsh-fs` 词汇加一个不透明的 `object` actor，不携带面向模型的概念，因此 seam 不沾染行窗口/观测策略类型，也不沾染 agent/session owner 结构。
+- **单一策略占位者，按约定先到先得。** `fs/write-intent`/`fs/edit-intent` 槽位恰好容纳一个决策者；先注册（或 `prepend`）的监听器获胜，其余被短路。`dsh-fs-policy` 占据该槽位是部署约定，而非事件系统强制的不变式——一个先注册的第二决策者会绕过它。这是可接受的，因为第二个 fs 版本策略决策者是配置错误，而非功能。如果未来出现*分层* fs 版本策略的需求，那是一个新 Agent Note（可组合的值传递 seam），而非在这些事件上静默添加第二个监听器。分层的权限/审计/沙箱拦截已有其归属：`tools/execute`。
 - **移除读后确认 stat** 使后续*有守卫*的编辑在 read/write 竞争下偶尔快速失败（`FS_STALE_VERSION` → 重新读取）。这是丢失的 UX 便利，绝非正确性漏洞；提供方锁仍阻止基于错误版本的写入。
 - **裸提供方不做先读后写/编辑，也不做版本检查。** 没有 `dsh-fs-policy` 的部署允许模型无条件覆写或编辑任何已有文件。这正是保持工具独立于策略服务的有意含义：安全纪律存在于 `dsh-fs-policy` 插件中。省略它的部署是有意选择无约束的文件系统；对于发布 fs 工具的配置而言，这不是预期的姿态。

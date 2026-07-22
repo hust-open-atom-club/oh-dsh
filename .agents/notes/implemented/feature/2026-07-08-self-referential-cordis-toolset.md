@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-08-self-referential-cordis-toolset.zh.md)
+
 ## Problem
 
 Everything in this harness is a cordis plugin, but the agent running inside that plugin runtime cannot see or touch it: it cannot enumerate the services and events around it, cannot extend itself with a new tool mid-session, and cannot compose capabilities it invents. Handing the model that power is worth exploring — a self-referential agent that inspects and modifies its own runtime — but it raises three correctness problems at once, and the design is about answering them rather than the raw "let the model run code" mechanic.
@@ -30,9 +32,9 @@ Mount code runs as an async-function body in a fresh vm realm. Its documented su
 
 Sandbox globals are deliberately small: a tagged write-through `console` (`[cordis:<id>] …` on the host stdout/stderr, so a listener that fires long after the mount call still lands somewhere the user sees), the `harness.defineTool` / `harness.registerTool` registration pair, the encoding primitives fresh vm contexts lack (`btoa`/`atob` as host closures over `Buffer` — a sanctioned exception, `Buffer` itself is never exposed — plus `TextEncoder`/`TextDecoder`), and callable traps over the withheld Node APIs (`require`, `setTimeout`/`setInterval`/`setImmediate`/`clearTimeout`/`clearInterval`, `fetch`) that throw a redirect naming the cordis alternative. Only function-shaped globals are trapped; `process` and `Buffer` stay `undefined` so a `typeof` feature probe stays inert rather than detonating a throwing accessor.
 
-Mount code crosses the vm boundary through three controls. Dual-realm `instanceof` recognizes both host and vm objects. `harness.defineTool` rebuilds the output schema/projectors in the host realm, snapshots the body value as host-owned JSON, and lets the registry enforce the [canonical tool-output contract](../architecture/2026-07-20-canonical-tool-output-contract.md) before observation. The mounted plugin receives a whitelist context façade, not a raw or pass-through `Context`; framework plumbing and context-valued returns are rejected. Service reads require a declared `inject`, preserving Cordis activation and unload semantics. `ctx.tools.get` exposes only the schema view, so mounted code cannot bypass `ToolRegistry.execute` by calling a definition directly.
+Mount code crosses the vm boundary through three controls. Dual-realm `instanceof` recognizes both host and vm objects. `harness.defineTool` normalizes results into host-realm JSON and validates the `ToolExecuteReturn` shape before logging. The mounted plugin receives a whitelist context façade, not a raw or pass-through `Context`; framework plumbing and context-valued returns are rejected. Service reads require a declared `inject`, preserving Cordis activation and unload semantics. `ctx.tools.get` exposes only the schema view, so mounted code cannot bypass `ToolRegistry.execute` by calling a definition directly.
 
-The boundary normalizes unambiguous JSON-Schema forms into `ParameterSchemaSpec`, preserving `integer`, raw object openness, and required arrays. Direct DSL object nodes must declare `additionalProperties`; invalid vocabulary fails with the accepted alternatives. Parse, TypeScript, missing-return, Node-API, and duplicate-tool errors include the relevant source line or corrective contract without narrating implementation internals.
+The boundary normalizes unambiguous JSON-Schema forms into `SchemaSpec`, including object wrappers, `integer`, and optional fields. Invalid vocabulary fails with the accepted alternatives. Parse, TypeScript, missing-return, Node-API, and duplicate-tool errors include the relevant source line or corrective contract without narrating implementation internals.
 
 ### The dynamic group and mount lifecycle
 
@@ -60,7 +62,7 @@ Model-visible ⟺ logged holds with no new session event type: a mount or unmoun
 
 | Dimension | Structured per-capability tools | Single `cordis_mount` |
 |---|---|---|
-| Schema correctness | `parameters` is still model-written JSON needing unified-schema validation, merely one step earlier | The same validation runs at the sandbox boundary, with the same instructive errors |
+| Schema correctness | `parameters` is still a model-written JSON object needing SchemaSpec validation, merely one step earlier | The same validation runs at the sandbox boundary, with the same instructive errors |
 | The code field | An `execute` body is still model-written JS in a vm; the realm and service-call correctness problems are unchanged | One sandbox, one normalization path, one guarded registration |
 | Capability coverage | Tools only; listeners, services, `inject` relations each need another structured tool — a surface that grows without bound | One vocabulary (a cordis plugin) covers every effect, present and future |
 | Cross-mount composition | Not expressible in a tool-registration payload | Native `provide`/`inject`, ordinary cordis semantics |

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-11-immutable-public-surfaces.md: c807b036bb57bd5e64290fd59bf422c4732e9080
-2026-06-11-immutable-public-surfaces.zh.md: 9ff40436915e194848ba163ed80fefe84a1b3da4
+2026-06-11-immutable-public-surfaces.md: c9009ad923720efaecb25e2017ceab6e3eb0dbf4
+2026-06-11-immutable-public-surfaces.zh.md: 2516450c61eab399b2cb64862af164289eb87fbe

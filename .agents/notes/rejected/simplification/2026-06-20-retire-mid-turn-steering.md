@@ -2,6 +2,8 @@
 
 Status: rejected — mid-turn steering is an intentional agent capability for between-step user/plugin input and future goal/loop workflows. It is complexity with a product direction, not an accidental duplicate of `send()`.
 
+English | [中文](2026-06-20-retire-mid-turn-steering.zh.md)
+
 ## Problem
 
 The agent exposes two user-message paths that look close but have different lifecycle semantics: `send()` queues a normal user turn, while `steer()` injects a message between steps of the currently running turn and falls back to `send()` when idle. That distinction leaks through the whole stack: `Agent.steer()` is public API, the session log has a durable `steering/message` event, the agent event taxonomy has `agent/steering`, the loop maintains a steering FIFO beside the queued-message FIFO, cancellation clears both queues, and `deriveMessages()` has to render steering as a tagged synthetic user message rather than a normal prompt.

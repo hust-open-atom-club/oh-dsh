@@ -1,8 +1,10 @@
-# RFC: 将 stdio UI 辅助模块折入 stdio 应用
+# Agent Note: 将 stdio UI 辅助模块折入 stdio 应用
 
 Status: implemented
 
 [English](2026-07-04-fold-stdio-ui-helper.md) | 中文
+
+后来的[冗余 agent（智能体）移除](2026-07-20-remove-stdio-and-echo-agents.md)取代了这项包放置决策，并完整移除合并后的包、应用和面向行的表面。
 
 ## 问题
 
@@ -12,15 +14,15 @@ readline UI 曾是一个完整的包（`packages/support/` 下的 `@deepseek-ai/
 
 ## 决策
 
-该辅助模块作为终端通道插件存放在 `@deepseek-ai/dsh-stdio` 中（`packages/ui/stdio/src/index.ts`）：`createStdioChat`、其 `StdioRuntime` 测试 seam 及单元测试（`packages/ui/stdio/tests/stdio.spec.ts`、`readline.spec.ts`）一并迁入，因此 EOF 处理、渲染、dispose（资源释放）以及管道/TTY 行为在按文件覆盖率门禁下仍有单元测试覆盖，且无需劫持进程全局对象。该模块保留具名的 `name`/`inject`/`Config`/`apply` 导出形状——即应用的 `ctx.plugin(uiStdio, …)` 挂载所消费的契约——而 `examples/echo-agent` 与 `examples/coding-agent` 中的 keyless Loader 路径冒烟测试继续证明组合树能通过真实 Loader 启动（stdio 包的插件形状单元测试套件固定了显式的 `unwrapExports` 断言，因为缺少 `inject` 的 bundle 会跳过一个意外的 default 导出而不是崩溃）。
+当时，该辅助函数移入 `@deepseek-ai/dsh-stdio`，成为终端通道插件。`createStdioChat`、其 `StdioRuntime` 测试接缝和单元测试随之一同迁移，使 EOF 处理、渲染、释放以及管道/TTY 行为继续受逐文件覆盖率门禁约束，而不会劫持进程全局量。该模块保留应用挂载所消费的具名 `name`/`inject`/`Config`/`apply` 导出形状；当时的 Echo 和 REPL Loader 冒烟证明组合树，插件形状套件则固定显式 `unwrapExports` 行为。上方取代本文的移除记录负责当前包和示例状态。
 
-`packages/support/ui-stdio` 包已移除：manifest、tsconfig 引用、module-graph 行与 README 行均已删除；曾命名该包的文档注释（示例 e2e 模块文档、`packages/README.md`、support 与 todo README、[ui 组 README](../../../../packages/ui/README.md)）现在描述的是包内模块。
+早期的支持辅助包已移除：其清单、tsconfig 引用、模块图行和 README 行均已消失，其余文档改为描述包内模块。
 
 ## 曾考虑的替代方案
 
 ### 为什么不将其提升到 `ui/` 而是折入？
 
-提升可以解决 support 与 product 之间的错位，同时保留边界——只有在 readline UI 是一个可独立替换的集成或有第二个组合方时才是正确选择，而消费方普查表明两者皆非。结构化的 ACP 桥接保留为独立包，因为它是具有自身契约和快照层级的产品协议表面；readline 辅助模块只是一个应用前门的脚手架。在发布前重新拆分成本很低：如果将来有第二个产品应用需要 readline UI，届时再拆出来，由那个消费方来塑造包契约。
+提升可以解决 support 与 product 之间的错位，同时保留边界——只有在 readline UI 是一个可独立替换的集成或有第二个组合方时才是正确选择，而消费方普查表明两者皆非。结构化的 ACP（Agent Client Protocol）桥接保留为独立包，因为它是具有自身契约和快照层级的产品协议表面；readline 辅助模块只是一个应用前门的脚手架。在发布前重新拆分成本很低：如果将来有第二个产品应用需要 readline UI，届时再拆出来，由那个消费方来塑造包契约。
 
 ## 后果
 

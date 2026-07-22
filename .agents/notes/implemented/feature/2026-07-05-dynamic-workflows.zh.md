@@ -1,4 +1,4 @@
-# RFC: 动态工作流——脚本驱动的多 agent 编排 seam
+# Agent Note: 动态工作流——脚本驱动的多 agent 编排 seam
 
 Status: implemented
 
@@ -20,7 +20,7 @@ harness 可以将一个任务委派给一个子 agent（`dsh-tool-subagent`）�
 
 ### seam（dsh-workflow）
 
-`ctx.workflows` 是 bash 形态的抽象 `WorkflowService`——每个上下文一个引擎，无命名提供方注册表（引擎是部署级替换，不是共存者）。`start(request)` 对无法启动的脚本同步抛出；返回的 `WorkflowRun` 的 `result` 永不 reject（失败解析为 `stopReason: 'error' | 'cancelled'`）。`workflow/*` 事件是仅观察的 emit，携带数据快照（id + meta；`workflow/end` 省略 result 值），按监听器隔离，与 `subagent/start`/`subagent/end` 对称——控制权留在 run 的持有者手中。词汇详情见 [core-data-structures/workflow.md](../../../core-data-structures/workflow.md)。
+`ctx.workflows` 是 bash 形态的抽象 `WorkflowService`——每个上下文一个引擎，无命名提供方注册表（引擎是部署级替换，不是共存者）。`start(request)` 对无法启动的脚本同步抛出；返回的 `WorkflowRun` 的 `result` 永不 reject（失败解析为 `stopReason: 'error' | 'cancelled'`）。`workflow/*` 事件是仅观察的 emit，携带数据快照（id + meta；`workflow/end` 省略 result 值），按监听器隔离，与 `subagent/start`/`subagent/end` 对称——控制权留在 run 的持有者手中。词汇详情见 [core-data-structures/workflow.md](../../../../docs/core-data-structures/workflow.md)。
 
 ### 引擎（dsh-workflow-workerthread）：每次运行一个 worker 线程
 
@@ -28,7 +28,7 @@ harness 可以将一个任务委派给一个子 agent（`dsh-tool-subagent`）�
 
 **为何选择 `node:worker_threads`**：每次运行获得一个非池化的 worker。vm 上下文限制了文档化的脚本表面，而 message-port RPC 将 `agent()` 桥接到宿主侧的子循环。worker 防止脚本的同步工作阻塞宿主，提供序列化边界，并允许取消后强制终止。`isolated-vm` 因其维护状态和部署要求被否决。
 
-宿主在发布前校验元数据并解析正文。私有枚举键 payload 映射定义协议格式；待启动记录、已发布子记录、单一取消信号、worker 死亡回收、结果优先级与 dispose 静默，在此协议上保持 subagent run 契约。这些竞态算法归 [agent-scope runtime-design RFC](../architecture/2026-07-12-agent-scope-runtime-design.md#workflow-children-are-pending-starts-or-published-records) 所有。
+宿主在发布前校验元数据并解析正文。私有枚举键 payload 映射定义协议格式；待启动记录、已发布子记录、单一取消信号、worker 死亡回收、结果优先级与 dispose 静默，在此协议上保持 subagent run 契约。这些竞态算法归 [agent-scope runtime-design Agent Note](../architecture/2026-07-12-agent-scope-runtime-design.md#workflow-children-are-pending-starts-or-published-records) 所有。
 
 引擎暴露一条进程内 `MessageChannel` 测试路径，因为主进程 V8 覆盖率无法观测 worker 执行。
 
@@ -46,7 +46,7 @@ harness 可以将一个任务委派给一个子 agent（`dsh-tool-subagent`）�
 
 输出 schema 使一次 schema 有效的已提交捕获成为子 agent 成功完成的必要条件。作用域运行时呈现捕获工具和指令，仅提交成功的最终结果（包括 SDK 调用时外层 `run_code` 的结果），在捕获变为 pending 后拒绝后续副作用，并在提交后不再进行模型步骤即停止子 agent。校验失败仍是可重试的工具错误；没有已提交捕获的正常完成以错误结算。
 
-`StructuredOutputSchema` 是 `dsh-tools` 中可强制执行的原始 JSON-Schema 子集（单字符串 `type`、`properties`/`required`/`additionalProperties`、`items`、标量 `enum`/`const`），不支持的关键字会大声失败，因为该协议数据会逐字成为捕获工具的 parameters。组装、提交、守卫和终止停止的正确性算法归 [agent-scope runtime-design RFC](../architecture/2026-07-12-agent-scope-runtime-design.md#structured-output-commits-only-authoritative-outcomes) 所有。
+`StructuredOutputSchema` 是 `dsh-tools` 中可强制执行的原始 JSON-Schema 子集（单字符串 `type`、`properties`/`required`/`additionalProperties`、`items`、标量 `enum`/`const`），不支持的关键字会大声失败，因为该协议数据会逐字成为捕获工具的 parameters。组装、提交、守卫和终止停止的正确性算法归 [agent-scope runtime-design Agent Note](../architecture/2026-07-12-agent-scope-runtime-design.md#structured-output-commits-only-authoritative-outcomes) 所有。
 
 ## 测试
 

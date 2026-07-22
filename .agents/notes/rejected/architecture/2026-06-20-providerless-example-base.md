@@ -2,6 +2,8 @@
 
 Status: rejected — superseded by [Extract example apps into packages](../../implemented/architecture/2026-06-20-extract-example-app-packages.md), which moves the spine into a `dsh-agent-spine-demo` bundle and deletes the `base*.yml` files, so there is no shared base YAML left to rename.
 
+English | [中文](2026-06-20-providerless-example-base.zh.md)
+
 ## Problem
 
 The examples had two shared base files: `examples/base-core.yml` was providerless, while `examples/base.yml` included that core plus the real `llm-deepseek` adapter. Snapshot replay needs the providerless core with `llm-replay`, because loading the real adapter without a key throws. The normal demos need the real adapter. The result was a naming inversion: the file named `base.yml` was not the reusable base for all examples, while the true base was `base-core.yml`.

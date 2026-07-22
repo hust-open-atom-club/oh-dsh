@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-12-prune-unused-skill-registry-surface.md: 5b90deca8681373b2cc2befa3ab341084f924a3d
-2026-07-12-prune-unused-skill-registry-surface.zh.md: 7b0e24f49688ed61f2ac4bff93b4c3f85117a170
+2026-07-12-prune-unused-skill-registry-surface.md: 5a13effa04a6cd9954741a0a33ebc6fc3512fab8
+2026-07-12-prune-unused-skill-registry-surface.zh.md: 4b25c03d740f4fda1696629d56b88057a055f0af

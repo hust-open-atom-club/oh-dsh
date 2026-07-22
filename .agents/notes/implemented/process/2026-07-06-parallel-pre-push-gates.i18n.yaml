@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-06-parallel-pre-push-gates.md: cf032f8dfedd88a7d6be87999fd9786a9efbb2e8
-2026-07-06-parallel-pre-push-gates.zh.md: 776faf1f46c6490f1935727612225414dd258aa3
+2026-07-06-parallel-pre-push-gates.md: f2e8f0054e595be20a320ec7095f0fe674eb93c6
+2026-07-06-parallel-pre-push-gates.zh.md: 06cd2fc41ca9a2cc2546fe85de82c8198f9573c3

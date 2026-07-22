@@ -1,4 +1,4 @@
-# RFC: 使用 tsdown 替代 dumble 进行 JS 打包
+# Agent Note: 使用 tsdown 替代 dumble 进行 JS 打包
 
 Status: implemented
 
@@ -15,7 +15,7 @@ Status: implemented
 用 **tsdown**（基于 rolldown，每周约 250 万次下载，VoidZero 支持，活跃发布）替代 dumble：
 
 - 根目录 `tsdown.config.ts`，配置 `workspace: ['vendor/*', 'packages/*/*']`（显式 glob 将打包范围限定在 vendor 的 Cordis 与 TypeScript 包目录树内；`workspace: true` 还会发现示例 manifest 和不需要打包的 workspace 成员）。
-- 共享形态：入口 `lib/types/index.js`，`outDir: 'lib'`，ESM，`platform: node`，`target: es2024`，`fixedExtension: false`（为 `"type": "module"` 的包保持 `.js` 扩展名），`dts: false`（声明文件由 tsc -b 负责），`clean: false`（lib/ 同时存放 TSC 的 `lib/types` 中间产物树）。入口最初是 `src/index.ts`；[TSC 优先构建 RFC](2026-06-17-ts-build-config.md) 后来将 tsdown 改为打包 TSC 输出的 JS，使 TypeScript 转换行为统一来自一个编译器。
+- 共享形状：入口为 `lib/types/index.js`，`outDir: 'lib'`，ESM，`platform: node`，`target: es2024`，`fixedExtension: false`（为 `"type": "module"` 包保留 `.js`），`dts: false`（声明归 tsc -b 所有），`clean: false`（lib/ 还保存 TSC 的 `lib/types` 中间树）。入口最初是 `src/index.ts`；[TSC 优先构建 Agent Note（agent 决策记录）](2026-06-17-ts-build-config.md)随后将 tsdown 改为打包 TSC 输出的 JS，使 TypeScript 转换行为统一由一个编译器提供。
 - vendor/ 中有两个按包覆盖的配置（属于我们自己的修改，与重新生成的 tsconfig 类似；记录在 vendor/README.md 中）：schemastery（通过 `outExtensions` 输出双格式 `.mjs`/`.cjs`）、logger-console（两次单入口 pass，使共享基类被内联到每个入口而非生成哈希命名的 chunk，与上游发布形态一致）。
 - `scripts/build.ts` 删除；`pnpm run build` = `tsc -b tsconfig.build.json && tsdown`。
 
@@ -27,4 +27,4 @@ Status: implemented
 
 ## 后果
 
-运行时打包产物仍遵循 dumble 时代的公开入口形态（`lib/index.js`，以及按包特定的变体，如 `schemastery` 的 `lib/index.mjs`/`lib/index.cjs` 和 `logger-console` 的 `lib/browser.js`）；声明文件现在位于 `lib/types` 下，见 [TSC 优先构建 RFC](2026-06-17-ts-build-config.md)。外部依赖仍来自各包的 dependencies/peerDependencies。我们放弃了 dumble 的 exports 字段推断功能：新增的非默认形态的包需要编写按包的 `tsdown.config.ts`，而不能仅靠 package.json 字段。未来可选方向：如果 `tsc -b` 成为瓶颈，tsdown 还可以接管声明文件打包（isolatedDeclarations）；那将是一个新的 RFC。
+运行时 bundle 输出仍沿用 dumble 时代的公开入口形状（`lib/index.js`，以及包特有的变体，例如 `schemastery` 的 `lib/index.mjs`/`lib/index.cjs` 与 `logger-console` 的 `lib/browser.js`）；根据 [TSC 优先构建 Agent Note](2026-06-17-ts-build-config.md)，声明现位于 `lib/types` 下。External 仍来自各包的 dependencies/peerDependencies。我们放弃了 dumble 的 exports 字段推断：采用非默认形状的新包需要逐包提供 `tsdown.config.ts`，不能只依赖 package.json 字段。未来如果 `tsc -b` 成为瓶颈，tsdown 也可以接管声明打包（isolatedDeclarations）；这需要另写一份 Agent Note。

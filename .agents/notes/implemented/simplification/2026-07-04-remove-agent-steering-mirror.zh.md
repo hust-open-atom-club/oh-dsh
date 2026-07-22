@@ -1,4 +1,4 @@
-# RFC: 移除 `agent/steering` 镜像 emit
+# Agent Note: 移除 `agent/steering` 镜像 emit
 
 Status: implemented
 
@@ -10,23 +10,23 @@ Status: implemented
 
 `agent/steering` 以相同的 payload 重复了紧接其前的持久事件 `steering/message`。`agent/queued` 仍保留为纯瞬态信号，因为它在持久化之前触发，覆盖了可能在进入日志前被取消的工作。
 
-steering 承载着真实的生产流量：hook bridge 的轮次续行决策通过 `inbox.steer()` 注入理由，落地为持久的 `steering/message` 事件，hook-matrix 的 golden 文件对此进行固定——所有这些消费方观察的都是持久事件。没有任何消费方观察镜像事件。
+Steering 承载真实生产流量——hook bridge 的 turn 延续决策通过 `inbox.steer()` 注入其理由，最终成为由 hook 矩阵预期输出固定的持久 `steering/message` 事件——而这些消费者无一例外都观察持久事件。没有任何内容观察镜像。
 
 ## 决策
 
-`agent/steering` 从 agent 事件分类体系中移除：`packages/core/agent/src/types.ts` 中的声明（及其在 live-events JSDoc 列表中的提及）、`drainSteering` 中的 emit（随之移除的还有当时已无用的 `ctx` 参数）、`packages/core/agent/README.md` 中的对应行，以及 loop 伪代码块中的 emit 行（`packages/core/agent-loop/src/loop.ts` 模块文档与 [architecture.md](../../../architecture.md)）；Cordis catalog 重新生成后不再包含它。唯一的回归测试改为在持久事件 `steering/message` 上固定 source 保持性——它所固定的事实存在于日志中。
+`agent/steering` 已从 agent 事件分类中移除：包括 `packages/core/agent/src/types.ts` 中的声明（以及其中实时事件 JSDoc 列表对它的提及）、`drainSteering` 中的 emit（当时已无用的 `ctx` 参数也随之移除）、`packages/core/agent/README.md` 中的表格行，以及循环伪代码块（`packages/core/agent-loop/src/loop.ts` 模块文档和 [architecture.md](../../../../docs/architecture.md)）中的 emit 行；Cordis 目录重新生成后不再包含它。唯一的回归测试改为在持久 `steering/message` 事件上固定来源保留行为——所固定的事实存在于日志上。
 
-三份已实施的 RFC 曾声明保留该事件，每份均按 [implemented/AGENTS.md](../AGENTS.md) 的要求修订，指向本 RFC 作为移除记录：[boundary RFC](2026-06-20-remove-agent-boundary-mirror-events.md) 的保留列表条目、[stream-chunk RFC](2026-07-02-remove-stream-chunk-mirror.md) 的范围条款，以及 [event-domain-semantics RFC](../architecture/2026-06-30-event-domain-semantics.md) 的瞬态 emit 枚举。
+三份已实现 Agent Note（agent 决策记录）曾说明保留该事件；按照 [implemented/AGENTS.md](../AGENTS.md)，每份记录都已修改并指向本文作为移除记录：包括[边界 Agent Note](2026-06-20-remove-agent-boundary-mirror-events.md) 的保留列表条目、[stream chunk Agent Note](2026-07-02-remove-stream-chunk-mirror.md) 的范围条款，以及[事件域语义 Agent Note](../architecture/2026-06-30-event-domain-semantics.md) 的瞬态 emit 枚举。
 
 ## 曾考虑的替代方案
 
 ### 为什么不保留？
 
-"它是控制信号，不是边界事件"——但分类体系的操作性区分是「镜像 vs. 纯瞬态」，而非「控制 vs. 边界」，而这个事件属于镜像。需要入队时通知的消费方有 `agent/queued`（带 steering flag）；需要 drain 时通知的消费方，本质上是在请求 `steering/message` 被追加的那一刻，而 `session/event` 以相同 payload 加上持久性提供了这一通知。被否决的 [retire-mid-turn-steering RFC](../../rejected/simplification/2026-06-20-retire-mid-turn-steering.md) 捍卫的是 steering *能力*——`steer()`、持久事件、续行强制——本次移除对这些全部保持不变。
+“它是控制信号，不是边界”——但该分类的实际区分是镜像/仅实时，而非控制/边界，并且该事件确实是镜像。希望在入队时收到通知的消费者可以使用 `agent/queued`（及其 steering 标记）；希望在排空时收到通知的消费者，本质上是在要求获知 `steering/message` 被追加的时刻，而 `session/event` 会交付相同 payload 并附带持久性。遭拒绝的[退役 turn 中途 steering Agent Note](../../rejected/simplification/2026-06-20-retire-mid-turn-steering.md)所捍卫的是 steering *功能*——`steer()`、持久事件、强制延续——本次移除不会触及其中任何一项。
 
 ## 验证
 
-`agent/steering` 这一拼写仅存于 RFC 行文中（本 RFC、上述三份修订的 RFC，以及冻结的[被否决的 steering 能力 RFC](../../rejected/simplification/2026-06-20-retire-mid-turn-steering.md)，其文本记录了它所拒绝的提案）；catalog 已重新生成；重定向后的测试在 `steering/message` 上固定 source 保持性。
+`agent/steering` 拼写只存在于 Agent Note 正文中（本 Agent Note、上方三份已修改 Agent Note，以及已冻结的[遭拒绝 steering 功能 Agent Note](../../rejected/simplification/2026-06-20-retire-mid-turn-steering.md)，其正文记录了它所否决的提案）；目录已重新生成；重新定向的测试在 `steering/message` 上固定来源保留行为。
 
 ## 后果
 

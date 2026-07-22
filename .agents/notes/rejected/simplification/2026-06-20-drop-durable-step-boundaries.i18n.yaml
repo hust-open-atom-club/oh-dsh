@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-20-drop-durable-step-boundaries.md: 16fdf17c3bc8907745df17e8a105d7978eafb274
-2026-06-20-drop-durable-step-boundaries.zh.md: 5613a84d5f1b5cf87109a2e04a4cb350ffd650a8
+2026-06-20-drop-durable-step-boundaries.md: c5c4f269a378e334c4dc509d1288146d77d9a520
+2026-06-20-drop-durable-step-boundaries.zh.md: 7724a8f6c2c51650eb9ea0a6675ece7c24a211d8

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-06-parallel-github-ci-gates.zh.md)
+
 ## Problem
 
 The keyless GitHub CI gates are mostly orthogonal: typecheck, lint, documentation freshness, coverage, snapshot replay, build, package-publication hygiene, demo smoke, and built-bin smoke fail for different reasons and do not need each other's runtime state. Running them as one ordered command chain makes the workflow wall clock equal the sum of those gates, while splitting every short leaf into its own GitHub job repeats checkout, Node setup, pnpm restore, and install work until orchestration overhead becomes the bottleneck.

@@ -1,4 +1,4 @@
-# RFC: 移除轮次中途引导
+# Agent Note: 移除轮次中途引导
 
 Status: rejected — mid-turn steering is an intentional agent capability for between-step user/plugin input and future goal/loop workflows. It is complexity with a product direction, not an accidental duplicate of `send()`.
 
@@ -14,7 +14,7 @@ agent（智能体）暴露了两条用户消息路径，外观相近但生命周
 
 暂时删除轮次中途的用户 steering。`Agent.send()` 成为提交用户内容的唯一公开方式；当 agent 正在运行时，内容等待下一个轮次。循环仅因工具调用而在轮次内继续，不因用户在某个步骤运行期间输入内容而继续。调用方若要中断当前轮次，使用 `cancel()` 后再 `send()`。
 
-移除 `Agent.steer()`、steering FIFO、`steering/message`、`agent/steering`、由 steering 驱动的续行逻辑，以及取消操作中区分排队消息与 steering 消息的逻辑。除非实现 PR 发现了生产级监听器，否则在同一变更中一并移除 `agent/turn-continuation`；没有 steering 后，当前仓库不再有具体的续行消费方。如果将来真正的预算或目标插件需要强制续行，应以该插件为具体消费方重新引入一个更窄的 seam。
+移除 `Agent.steer()`、steering FIFO、`steering/message`、`agent/steering`、由 steering 驱动的续行逻辑，以及取消操作中区分排队消息与 steering 消息的逻辑。除非实现 PR（Pull Request）发现了生产级监听器，否则在同一变更中一并移除 `agent/turn-continuation`；没有 steering 后，当前仓库不再有具体的续行消费方。如果将来真正的预算或目标插件需要强制续行，应以该插件为具体消费方重新引入一个更窄的 seam。
 
 ## 验收标准
 
@@ -34,4 +34,4 @@ agent（智能体）暴露了两条用户消息路径，外观相近但生命周
 
 本提案与[移除持久化步骤边界](2026-06-20-drop-durable-step-boundaries.md)天然配对，因为移除同轮次 steering 和 `agent/turn-continuation` 后，工具调用成为一个轮次包含多个模型步骤的唯一原因。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

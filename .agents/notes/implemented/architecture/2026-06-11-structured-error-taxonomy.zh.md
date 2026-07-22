@@ -1,4 +1,4 @@
-# RFC: 结构化错误分类体系
+# Agent Note: 结构化错误分类体系
 
 Status: implemented
 
@@ -12,7 +12,7 @@ Status: implemented
 
 在 `dsh-llm`（叶子包，所有其他包都已依赖它，不引入新的依赖边）中引入一个 `HarnessError extends Error` 基类：稳定的 `code`（与 `message` 分离）、通过 `ErrorOptions` 进行 `cause` 链接、`name` 默认为子类名。`isHarnessError` 在 seam 处做类型收窄。
 
-- `LlmError`、`ToolArgsError`（dsh-tools）和 `InvariantError`（dsh-invariants）现在继承该基类，保留各自既有的 code。
+- `LlmError` 和 `ToolArgsError`（dsh-tools）继承该基类，保留各自既有的 code。
 - `ToolExecutionResult` 新增可选字段 `error: { name, code }`，在注册表的 catch 中当抛出值为 `HarnessError` 时填充。agent loop 将其转发到 `tool/result` 会话事件（该事件也新增了同一可选字段），使结构化的失败信息存活到日志中，供重试/沙箱插件和回放使用。面向模型的文本块保持不变。
 - agent loop 的 `toError` 将非 Error 的 throw 包装为 `HarnessError`（`code: 'UNKNOWN'`，原始值作为 `cause` 链接），而非裸 `Error`；这样即使是不规范的 throw 也能携带可路由的 code 进入会话的 `error` 事件（该事件此前已暴露 `code`）。
 
@@ -21,6 +21,6 @@ Status: implemented
 - 错误端到端可机器路由：插件可以基于 `error.code` 分支，而无需对 message 做子串匹配。
 - 一个基类被广泛导入，但它位于所有包已经依赖的包中，代价仅是一条 import 语句，而非新的依赖边。
 - `deriveMessages` 不会将 `error` 暴露到模型历史中——模型仍然看到文本块；结构化字段服务于代码和回放。
-- 参数校验与开发不变式保留各自既有的 code 和行为；共享基类增加了跨 seam 的路由元数据，不改变面向模型的文本。
+- 参数校验保留其既有的 code 和行为；包自有的诊断不变式独立携带稳定 code，使不变式注册表无需导入产品包。共享基类增加了跨 seam 的路由元数据，不改变面向模型的文本。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

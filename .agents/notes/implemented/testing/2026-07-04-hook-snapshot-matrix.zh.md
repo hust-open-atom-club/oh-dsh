@@ -1,4 +1,4 @@
-# RFC: Hook 快照矩阵——覆盖两种 bridge 的端到端 golden 测试
+# Agent Note: Hook 快照矩阵——覆盖两种 bridge 的端到端 预期输出 测试
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-hook bridge——[`dsh-hooks-claude`](../../../../packages/hooks/hooks-claude)（7 个 Claude Code hook 点）和 [`dsh-hooks-codex`](../../../../packages/hooks/hooks-codex)（5 个 Codex 点）——将外部 hook 命令映射到 harness 的拦截 seam 上。它们拥有深度的单元测试和 coverage-spec 覆盖率（每个决策分支、每种 payload 方言，均对 mock 的 seam 驱动），外加一个需要密钥的 e2e 测试（`hooks.e2e.ts`，一次真实的 `PreToolUse` 拦截）。但完整 transcript（文本记录）快照层：那张真正启动 `acp-agent` 子进程、无密钥回放录制会话、并将规范化的 ACP stdout 与重新持久化的日志与已提交 golden 做 diff 的网，只覆盖了一个 hook：Claude 的 `UserPromptSubmit` 拦截（`hook-cc-promptsubmit-block`）。
+hook bridge——[`dsh-hooks-claude`](../../../../packages/hooks/hooks-claude)（7 个 Claude Code hook 点）和 [`dsh-hooks-codex`](../../../../packages/hooks/hooks-codex)（5 个 Codex 点）——把外部 hook 命令映射到 harness 拦截接缝。它们有深入的单元与覆盖率规格覆盖（每个决策分支、每种 payload dialect，针对 mock 接缝驱动），外加一个受密钥门控的 e2e（`hooks.e2e.ts`，实时 `PreToolUse` 阻止）。但完整 transcript（文本记录）快照层——会启动真实 `acp-agent` 子进程、无需密钥重放已记录 session，并将规范化 ACP（Agent Client Protocol）stdout + 重新持久化日志与已提交预期输出进行 diff 的那张网——只覆盖了一个 hook：Claude `UserPromptSubmit` 阻止（`hook-cc-promptsubmit-block`）。
 
 这正是 mock 单元测试在结构上无法替代的层级：它验证的是真实 bridge 将真实 hook 进程的结果翻译到真实 seam 决策，再到真实 agent loop（智能体循环）的反应，渲染结果与编辑器看到的完全一致。一个 bridge 翻译或 loop 结构的回归，即使让所有单元测试保持绿色，也会在除那一个 hook 点之外的所有点上逃逸；而对于 Codex bridge，ACP 示例甚至没有加载它，因此没有任何 Codex hook 能端到端触发。
 
@@ -31,20 +31,22 @@ hook bridge——[`dsh-hooks-claude`](../../../../packages/hooks/hooks-claude)�
 
 每个 hook 命令只输出固定字面量字符串（无时间戳/pid/`$RANDOM`/cwd 回显）；快照规范化器擦除 `hook/result` 携带的唯一不稳定字段（`durationMs`）。`Stop` 场景通过标记文件（`.stop_fired`）自限，使 force-continue 不会循环——`stop_hook_active` 循环守卫仍是 bridge 的一个 `TODO`，因此无条件的 Stop hook 会在每一步都 force-continue。
 
+`PostToolUse` 阻止场景会在其证明的机制处自行限制。Claude hook 在首次拒绝后持久化一个 workspace 标记，因此允许一次恢复调用；Codex prompt 发起一次调用并报告注入结果。每份预期输出固定一次遭阻止调用，不会重复阻止/重试循环。
+
 ### 三个 hook 点被有意排除在快照之外
 
 在构建矩阵过程中发现，记录于此是因为这些遗漏是决策而非疏忽：
 
-- **`SessionStart` 与 `SubagentStart`** 通过一个分离的、尽力而为的 `void runPoint(...).then(agent.inject())` 注入上下文，没有轮次绑定。由此产生的 `context/message` 与它所先于的工作（首次模型请求/子 agent 的首轮）存在竞争，落在日志中的位置不确定。录制的 golden 甚至无法在自身回放中复现——10 次回放稳定性检查对两者均 10/10 失败。它们留在 bridge 的单元覆盖率中，单元测试直接驱动 seam 而无时序竞争。（如果注入将来变为轮次绑定且确定性的——`TODO(session-start-gating)` 所指的方向——它们就可以纳入快照。）
-- **`SubagentStop`** 是纯观察性的：其 `subagent/end` 处理器不传递轮次（因此无 `hook/*` 日志事件）、不做注入。它对 transcript 不写入任何内容，因此 golden 与无 hook 运行逐字节一致，永远无法被证明失败——一道永远不会触发的守卫。它留在单元覆盖率中（`bridge.spec.ts` 已断言了纯观察调用）。
+- **`SessionStart` 和 `SubagentStart`** 通过脱离且尽力而为的 `void runPoint(...).then(agent.inject())` 注入上下文，没有 turn 绑定。由此产生的 `context/message` 会与它应先于的工作（首次模型请求 / 子项的第一个 turn）竞速，并落在不确定的日志位置。记录的预期输出甚至无法在自己的重放中复现——对两者执行 10 次重放稳定性检查，结果均为 10/10 次失败。它们继续留在 bridge 的单元覆盖率中，那里会直接驱动接缝而不存在时序竞速。（如果注入未来改为绑定 turn 且具备确定性——`TODO(session-start-gating)` 所指方向——它们就能接受快照测试。）
+- **`SubagentStop`** 只观察：其 `subagent/end` handler 不传递 turn（因此没有 `hook/*` 日志事件），也不执行注入。它不会向 transcript 写入任何内容，因此预期输出会与无 hook 运行逐字节相同，永远无法证明失败——一道咬不住问题的守卫。它继续由单元覆盖率负责（`bridge.spec.ts` 已断言仅观察调用）。
 
 因此，该矩阵覆盖了所有具有确定性、可观测 transcript 足迹的 hook 点，涵盖两种方言。
 
 ## 后果
 
-- 每个具有可观测 transcript 的 bridge seam 映射现在都在完整 transcript 层级、在真实应用中、对两种方言受到守护——包括此前完全没有端到端覆盖率的 Codex bridge。录制的 golden 捕获了模型对 deny/block/force-continue 轮次的真实反应，这是手工编写的 transcript 只能猜测的。
-- block 场景无需密钥（无模型轮次）；其余场景从录制的 fixture（测试前置数据）无密钥回放。`pnpm run test:snapshot:record` 从真实 API 重新生成录制的 fixture，无密钥时自动跳过，与所有录制场景一致。
-- prove-red 纪律成立：篡改 hook 配置的输出（例如修改 deny 原因）会使其场景在回放时变红——hook 进程在回放期间真实运行（只有模型被回放），因此 golden 守护的是实际的 hook→seam→loop 路径，而非它的 mock。
+- 现在，两种 dialect 中每个具有可观察 transcript 的 bridge 接缝映射，都在真实应用的完整 transcript 层受到守护——包括此前完全没有端到端覆盖的 Codex bridge。记录的预期输出捕获模型对遭拒绝/遭阻止/强制继续 turn 的真实反应，而手工编写的 transcript 只能猜测这种反应。
+- `UserPromptSubmit` 阻止场景无需密钥即可编写（没有模型 turn）；其余场景从已记录 fixture（测试前置数据）无需密钥重放。`pnpm run test:snapshot:record` 从实时 API 重新生成记录式 fixture，并像所有记录场景一样在缺少密钥时自行跳过。
+- 证明会变红的准则仍成立：篡改 hook 配置输出（例如改变拒绝理由）会让相应场景在重放时变红——hook 进程在重放期间真实运行（只有模型被重放），因此预期输出守护的是实际 hook→接缝→循环路径，而非其 mock。
 - `acp-agent` 演示现在加载了一个通常会无操作的 Codex bridge（典型项目中没有 `codex-hooks.json`），这正是预期的柔性失败行为，而非代价。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

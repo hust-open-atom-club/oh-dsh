@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-05-uniform-rfc-format.md: 9688ad6566e88372508bbfd8d032ab6d02568716
-2026-07-05-uniform-rfc-format.zh.md: eab2505e64b813f698b4356bc52a796cbd66b948
+2026-07-05-uniform-agent-note-format.md: 06082251c1b96c90ed470d84224662e00e29791b
+2026-07-05-uniform-agent-note-format.zh.md: 61ade75f179d64fa73390dc85bcd47c30deb112a

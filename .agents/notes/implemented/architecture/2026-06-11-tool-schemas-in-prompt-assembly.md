@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-11-tool-schemas-in-prompt-assembly.zh.md)
+
 ## Problem
 
 On the wire, tool schemas travel in a dedicated `tools` field of the model request, not in prompt text. Architecturally, though, "what the model is told it can do" is one coherent concern: prompt sections and the tool list are assembled from the same plugin contributions and consumed at the same moment.

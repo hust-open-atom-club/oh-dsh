@@ -1,4 +1,4 @@
-# RFC: 每个会话事件都封闭在一个轮次内
+# Agent Note: 每个会话事件都封闭在一个轮次内
 
 Status: implemented
 
@@ -20,10 +20,10 @@ Status: implemented
 **每个会话事件都位于一个轮次内部**：在 `turn/start` 与其匹配的 `turn/end` 之间。具体而言：
 
 - agent loop 在 `turn/start` **之后**（轮次内部）追加排队的 `user/message` 事件，而非之前。因此，一旦这些消息被记录，就欠下一个 `turn/end`，既有的 finalizer 保证它被写入。
-- agent **运行中**调用 `agent.inject()` 时，`context/message` 追加到已打开的轮次中（行为不变）。
+- agent **运行中**调用 `agent.inject()` 时，它会加入已打开的轮次。当前步骤执行 assistant 工具调用期间，已接受的上下文按到达顺序等待该批次结算，随后在每个已记录结果之后追加；即使执行中断，也会在轮次关闭前写入。
 - agent **空闲时**调用 `agent.inject()`，则将 `context/message` 包裹在一个一次性轮次中：`turn/start{trigger:{kind:'injection'}}` → `context/message` → `turn/end{completed}`。一个新的 `injection` 变体加入可合并扩展的 `TurnTriggerMap`。
 - agent loop 每次迭代从日志推导下一个轮次编号（`lastTurnNumber(session) + 1`），而不是维护一个私有计数器，这样空闲注入的一次性轮次不会与下一个真实轮次的编号冲突。
-- `dsh-invariants` 插件在开发环境中**强制执行**该不变式：在没有打开轮次的情况下追加 `user/message` / `context/message` / `steering/message` 会抛出 `InvariantError`。
+- `dsh-session/invariant` companion 将该检查注册到 `ctx.invariants`：选中后，在没有打开轮次的情况下追加 `user/message` / `context/message` / `steering/message` 会抛出归因于 `@deepseek-ai/dsh-session` 的 `InvariantError`。
 
 可序列化性不变式在同一源码边界处强制执行（`Session.append` 对不可 JSON 序列化的数据抛出异常），因此「什么可以进入日志」现在由一个位置统一管控，而非由下游碰巧在监听的某个后端各自发现。
 

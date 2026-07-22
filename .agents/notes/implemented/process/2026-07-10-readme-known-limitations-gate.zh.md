@@ -1,4 +1,4 @@
-# RFC: 在每个 package README 中设置受门禁保护的 Known Limitations 章节
+# Agent Note: 在每个 package README 中设置受门禁保护的 Known Limitations 章节
 
 Status: implemented
 
@@ -6,15 +6,15 @@ Status: implemented
 
 ## 问题
 
-[文档标准](../../../AGENTS.md)将限制事项指定在 package README 中记录。如果没有统一的格式，缺失的章节无法区分「经审计确认无此内容」与「忘了写文档」，而标题写法不一致也会妨碍全仓库搜索。
+[文档标准](../../../../docs/AGENTS.md)规定限制项归属包 README。没有共享形状时，缺少章节无法区分“经审计确认没有限制”与“忘记编写文档”，不同的标题还会妨碍全仓库搜索。
 
 ## 决策
 
-`packages/<group>/<pkg>/package.json` 下的每个包（package）manifest（元数据清单）都有一个同目录的 README，其中包含规范的 `## Known Limitations and Deferred Work` 章节。该章节的条目记录该包拥有的持久性消费方缺口与非显而易见的维护者约束；常规清理工作仍留在源码 TODO 或所属 RFC 中。[`verify-package-readme-limitations` 门禁](../../../../scripts/verify-package-readme-limitations.ts)从 manifest 推导包集合，拒绝缺少 README 的情况，并要求恰好有一个规范的 h2 标题且至少包含一个顶级条目。近似标题（如 "Limitations"、"Deferred"、"What is NOT here" 或 "Non-goals"）会导致失败。
+`packages/<group>/<pkg>/package.json` 下的每份包清单都有一个同级 README，其中包含规范的 `## Known Limitations and Deferred Work` 章节。其项目符号记录由该包拥有的持久消费者缺口和不明显的维护者约束；普通清理仍留在源码 TODO 或所属 Agent Note（agent 决策记录）中。[`verify-package-readme-limitations` 门禁](../../../../scripts/verify-package-readme-limitations.ts)从清单推导包集合，拒绝缺失 README，并要求恰好一个规范 h2 且至少包含一个顶层项目符号。“Limitations”“Deferred”“What is NOT here”或“Non-goals”等近似标题都会失败。
 
 如果一个包确实没有需要声明的限制事项，则将其列入 `NO_LIMITATIONS` 并省略该章节。新增限制事项时须移除该条目；重命名或移除条目会失败，因为每个条目都必须对应一个被扫描的包。
 
-门禁检查的是存在性、格式与白名单。覆盖面和准确性由文档标准与 [prose 标准](../../../../.agents/skills/dsh-prose-standard/SKILL.md)下的评审负责。常设规则见 [packages/AGENTS.md](../../../../packages/AGENTS.md)。
+门禁检查存在性、形状和允许列表。按照文档与[正文](../../../skills/dsh-prose-standard/SKILL.md)标准进行的评审负责覆盖面和准确性。常设规则位于 [packages/AGENTS.md](../../../../packages/AGENTS.md)。
 
 ## 曾考虑的替代方案
 

@@ -1,4 +1,4 @@
-# RFC: 移除未被消费的 LLM 组装便捷接口
+# Agent Note: 移除未被消费的 LLM 组装便捷接口
 
 Status: implemented
 
@@ -14,7 +14,7 @@ Status: implemented
 
 LLM（大语言模型）服务唯一的生产消费方是 agent loop（智能体循环），它只使用 `stream()`：将原始分片送入自己的 `BlockAssembler`，以便在并行组装的同时记录分片，保证回放保真度（[packages/core/agent-loop/src/loop.ts](../../../../packages/core/agent-loop/src/loop.ts)，`ctx.llm.stream(req)` 步骤）。在 `packages/*/src` 和 `examples/*/src` 中 grep `streamBlocks` 与 `ctx.llm.generate`，找不到任何生产调用方。仅有的引用来自服务方法定义、文档和测试；适配器测试用 `generate()` 作为便捷驱动，但它们完全可以通过同一个 assembler 辅助函数手动消费 `stream()`，无需为此保留一个公开的生产 API。
 
-这与 [drop-mutable-session-summary](../../implemented/simplification/2026-06-19-drop-mutable-session-summary.md) 是同一模式：拥有经过测试的契约的组装视图 API，消费方却只有测试而非生产代码。它们是为「不关心 token 级增量」的消费方预设的，但唯一的真实消费方恰恰需要增量，以便持久化高保真回放数据。
+这属于[删除可变 session summary](2026-06-19-drop-mutable-session-summary.md) 的同类模式：带有受测契约的组装视图 API，由测试而非生产代码消费。它们是为不关心 token 级增量的消费者推测性构建的，但唯一的真实消费者恰恰关心增量，以便持久化高保真重放数据。
 
 `streamBlocks()` 拖带了 `BlockAssembler` 的一块专用逻辑：`flushReady()` 与 `flushRemaining()`（[packages/llm/llm/src/assembler.ts:138-168](../../../../packages/llm/llm/src/assembler.ts)）以及 `flushed` 游标字段，仅为支持按序增量产出而存在。`generate()` 拖带了 `GenerateResult`、`BlockAssembler.result()` 以及 `llm/generate` waterfall——在同一底层流之上的第二个拦截面。agent loop 对 assembler 的使用仅限于 `push()` / `message()` / `usage` / `finish`，不涉及流式 flush 或一次性服务组装。
 
@@ -28,7 +28,7 @@ LLM（大语言模型）服务唯一的生产消费方是 agent loop（智能体
 
 ## 验证
 
-`streamBlocks`、`generate`、`llm/generate` 及其独占的 assembler 辅助方法已移除，无新增死导出；两个真实适配器通过 `stream()` 和共享 assembler 得到验证；agent loop 行为不变（ACP 快照 golden 文件无变化）；README、架构文档与模块文档中不再提及已移除的接口。
+`streamBlocks`、`generate`、`llm/generate` 及仅供它们使用的 assembler 辅助函数均已移除，且未产生新的无用导出；两个真实 adapter 都通过 `stream()` 和共享 assembler 接受测试；循环行为保持一致（ACP（Agent Client Protocol）快照预期输出未变）；README、架构文档和模块文档也不再提及已删除表面。
 
 ## 后果
 

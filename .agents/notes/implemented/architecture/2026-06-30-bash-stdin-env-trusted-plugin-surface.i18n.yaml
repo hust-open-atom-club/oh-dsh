@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-30-bash-stdin-env-trusted-plugin-surface.md: 712c17532bc1e6b95479aec5b544bc7e296952ec
-2026-06-30-bash-stdin-env-trusted-plugin-surface.zh.md: db50f08dae30aa0c43e741a4f27f948f712954e0
+2026-06-30-bash-stdin-env-trusted-plugin-surface.md: 284cd45a66294dbc9e8207a1e00e9642d32d4e58
+2026-06-30-bash-stdin-env-trusted-plugin-surface.zh.md: 9486f8c35c5060150b072fb673acca5d4167ec1a

@@ -1,4 +1,4 @@
-# RFC: 持久化 seed 边界以确保 fork 子会话回放正确路由
+# Agent Note: 持久化 seed 边界以确保 fork 子会话回放正确路由
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[逐会话快照回放 RFC](2026-06-22-subagent-snapshot-replay.md) 让快照层表达了嵌套 agent（智能体）的形状：一个父会话加上每个进程内 subagent 各一份已录制的日志，各自作为独立脚本回放、以调用方会话为键。该 RFC 指出（§ Scope 末尾条目）fork 快照是「一个平凡的后续补充，不是键控方案的缺口」。这对 fork 子会话而言是错的——问题不在键控，而在*脚本推导*。
+[逐 session 快照重放 Agent Note（agent 决策记录）](2026-06-22-subagent-snapshot-replay.md)使快照层能够表达嵌套 agent 形状：一个父项加上每个进程内 subagent 的一份记录日志，每份日志都按调用 session 作为键，以独立脚本重放。它曾指出（§ 范围，最后一个项目符号），fork 快照“只是未来很容易添加的一项，并非键控缺口”。这一判断对 fork 子项而言是错误的——问题不在键控，而在*脚本派生*。
 
 subagent 脚本由 [`deriveReplayScript`](../../../../packages/support/llm-replay) 从已录制的会话日志推导：它按 `(turn, step)` 对日志中的 `assistant/chunk` 事件分组，每次 `stream()` 调用对应一条回放条目。对 **spawn** 子会话而言这是正确的，因为其日志只包含自身的模型调用。
 

@@ -1,4 +1,4 @@
-# RFC: 裁剪 web seam 中未使用的字段
+# Agent Note: 裁剪 web seam 中未使用的字段
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-web 能力携带的 request/result/status 值，虽然每个已交付的实现都会填充，但没有任何生产环境的消费方读取它们。`WebSearchResult.providerId`、`query`与 `WebFetchResult.providerId` 是结果回显；`tool-web` 只格式化 content/sources/truncation 或最终 URL/status/body/truncation，没有其他运行时读取这些字段。搜索提供方返回 `WebProviderStatus.reason`，但可用性检查只看 `available`，并有意输出一条通用的不可用诊断信息。
+web 能力携带的 request/result/status 值，虽然每个已交付的实现都会填充，但没有任何生产环境的消费方读取它们。`WebSearchResult.providerId`、`query` 与 `WebFetchResult.providerId` 是结果回显；`tool-web` 只格式化 content/sources/truncation 或最终 URL/status/body/truncation，没有其他运行时读取这些字段。搜索提供方返回 `WebProviderStatus.reason`，但可用性检查只看 `available`，并有意输出一条通用的不可用诊断信息。
 
 `WebFetchRequest.timeoutMs` 同样从未被生产调用方设置。`tool-web` 只提供 URL，使用工具定义的 timeout 加 `exec.signal` 作为调用方截止时间，并依赖本地提供方的配置默认值作为兜底。这个未使用的逐请求覆盖迫使 `web-fetch-local` 暴露 `maxTimeoutMs`、对两个 timeout 来源做 clamp，并为没有任何产品路径能选中的优先级规则编写文档和测试。`WebExecContext` 则是另一个单字段包装层：每个调用方分配 `{ signal }`，每个提供方立即解包 `exec?.signal`；不存在第二个执行控制字段。
 

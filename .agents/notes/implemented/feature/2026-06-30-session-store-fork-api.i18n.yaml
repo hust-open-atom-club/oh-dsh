@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-30-session-store-fork-api.md: c5359a30124aabf0f9f809ffe899c6ad5fca8051
-2026-06-30-session-store-fork-api.zh.md: 62f399df41488143a66069fdd5a36ddb3e62421f
+2026-06-30-session-store-fork-api.md: 4e4ea7f1d3aa3290bdb21999a292dbdfd016302e
+2026-06-30-session-store-fork-api.zh.md: d21a2a233d60bd788b79eb39f0f358b8e5b90cae

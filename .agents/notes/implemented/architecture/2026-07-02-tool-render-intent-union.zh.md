@@ -1,4 +1,4 @@
-# RFC: 用于工具调用展示的带标签 render-intent 联合类型
+# Agent Note: 用于工具调用展示的带标签 render-intent 联合类型
 
 Status: implemented
 
@@ -12,7 +12,7 @@ Status: implemented
 - 哪些组合是*合法的*没有文档说明：一个设置了 `content` 的 `terminal` 调用意味着「卡片上方的描述」；一个设置了 `terminal` 的 generic 调用毫无意义但类型上可表达。类型允许无意义的状态存在。
 - 无法表达编辑器最需要的文件工具能力：**diff 卡片**（`{path, oldText, newText}`，Zed 将其渲染为内联 diff / 新文件预览）。`ToolCallPresentation.content` 使用的是 *LLM（大语言模型）* 的 `ContentBlock[]` 词汇（text/image），工具根本无法请求 diff 展示。
 
-`packages/core/tools/src/index.ts` 中已有的 `FIXME(tool-presentation)` 指出了修复方向：「重新设计类型，让工具一次性声明其渲染意图（例如按卡片种类的带标签联合类型），而非一堆由 bridge 拼接的可选字段。」被否决的 RFC [Collapse tool-owned UI presentation](../../rejected/simplification/2026-06-20-generic-tool-rendering.md) 明确推迟了此事：富渲染「应当在至少有两个真实工具和两个真实消费方验证词汇之后，以带标签 render-intent 联合类型的形式回归。」该条件现已满足：两个生产者族（`dsh-tool-bash`、`dsh-tool-fs`）和两个消费方（ACP bridge 实时路径 + snapshot-golden 回放路径）。
+`packages/core/tools/src/index.ts` 中已有的 `FIXME(tool-presentation)` 指出了修复方向：「重新设计类型，让工具一次性声明其渲染意图（例如按卡片种类的带标签联合类型），而非一堆由 bridge 拼接的可选字段。」被否决的 Agent Note [Collapse tool-owned UI presentation](../../rejected/simplification/2026-06-20-generic-tool-rendering.md) 明确推迟了此事：富渲染「应当在至少有两个真实工具和两个真实消费方验证词汇之后，以带标签 render-intent 联合类型的形式回归。」该条件现已满足：两个生产者族（`dsh-tool-bash`、`dsh-tool-fs`）和两个消费方（ACP bridge 实时路径 + snapshot 回放路径）。
 
 ## 决策
 
@@ -45,7 +45,7 @@ interface TerminalResultView { card: 'terminal'; title?: string; output?: string
 ### 生产者映射
 
 - `dsh-tool-fs` read → `generic`（`kind:'read'`，附带一个 follow-along `location`）；write → `diff`（`oldText:null`）；edit → `diff`（`oldText:old_string || null`，`newText:new_string ?? ''`）。这与 `claude-agent-acp` 的 `toolInfoFromToolUse` 中 Read/Write/Edit 各分支逐字段对应。
-- `dsh-tool-bash` foreground → `terminal` 调用 + `terminal` 结果；`run_in_background` 和 `bash_output`/`bash_kill` → `generic`。
+- `dsh-tool-bash` foreground → `terminal` 调用 + `terminal` 结果；`run_in_background` → `generic`。通用 `task_*` 控制工具拥有各自的 generic 卡片。
 - `dsh-tool-todo` → `generic`。
 
 ### 终端回退的归属
@@ -72,11 +72,11 @@ interface TerminalResultView { card: 'terminal'; title?: string; output?: string
 
 ## 非目标
 
-- **实时增量 `terminal_output_delta` 流式输出**与**命令分类**：终端渲染 RFC 自身推迟的后续工作，本 RFC 不涉及。
+- **实时增量 `terminal_output_delta` 流式输出**与**命令分类**：终端渲染 Agent Note 自身推迟的后续工作，本 Agent Note 不涉及。
 
 ## 相关
 
-- 取代 [Collapse tool-owned UI presentation](../../rejected/simplification/2026-06-20-generic-tool-rendering.md)（已否决——「等两个真实工具和两个真实消费方，然后做带标签 render-intent 联合类型」）中的推迟决定。该条件现已满足；本 RFC 即为那个联合类型。
+- 取代 [Collapse tool-owned UI presentation](../../rejected/simplification/2026-06-20-generic-tool-rendering.md)（已否决——「等两个真实工具和两个真实消费方，然后做带标签 render-intent 联合类型」）中的推迟决定。该条件现已满足；本 Agent Note 即为那个联合类型。
 - 被 [Result-time applied-hunk diffs](2026-07-02-result-time-applied-hunk-diffs.md) 扩展：后者添加了一个持久化的 `meta` 通道，使 write/edit 在结果时输出 `DiffResultView`（应用后的变更：带上下文行的 contextual hunk / 每个 `replace_all` 位点一个，或创建时的整文件 diff），叠加在本联合类型的调用时 diff 卡片之上。
 - 将 `ToolTerminal` 折入 [ACP terminal and tool-call rendering](../feature/2026-06-18-acp-terminal-and-tool-rendering.md) 所描述的 `terminal` view（`_meta` terminal 卡片约定和能力门控不变；仅 harness 侧的展示类型改变）。
 - ACP SDK 的 `Diff` / `ToolCallContent` 类型支撑新的 `diff` 卡片。

@@ -1,4 +1,4 @@
-# RFC: 生成式插件配置目录
+# Agent Note: 生成式插件配置目录
 
 Status: implemented
 
@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`scripts/gen-config-catalog.ts` 从每个插件声明的配置类型与 JSDoc 生成 [docs/config-catalog.md](../../../config-catalog.md)，包含注入要求、引用类型链接和源码指针。包内局部类型被传递性地包含；workspace 和外部类型以链接或名称形式引用。确定性的 `--write` 和 `--check` 模式使提交到仓库的页面成为一个生成产物。
+`scripts/gen-config-catalog.ts` 根据各插件声明的 config 类型和 JSDoc 生成 [docs/config-catalog.md](../../../../docs/config-catalog.md)，并包含注入要求、被引用类型的链接和源码位置。包内类型会以传递方式纳入；workspace 类型和外部类型则会链接或点名。确定性的 `--write` 和 `--check` 模式使提交页面成为生成产物。
 
 此处采用纯 AST 生成是正确的，原因与 events/services catalog 相同，而与 tool catalog 不同：配置类型是静态声明，仓库中每个 schemastery schema 都是静态的 `z.object`/`z.intersect` 字面量，因此源码即全部真相——配置表面没有任何部分是运行时组合的。
 
@@ -34,7 +34,7 @@ Status: implemented
 
 ## 后果
 
-- catalog 不会漂移：源码变更而提交的文件未反映时，`verify-config-catalog` 在 pre-push 和 CI 中报错。未文档化的配置字段、无法解析的引用类型名、或 schema 键在配置类型中缺失，都会直接导致生成器报错。
+- 目录不会发生漂移：提交文件未反映的源码变化会使 `doc-sync` 和 CI 中的 `verify-config-catalog` 失败。config 字段未记录、被引用类型名无法解析，或 schema 键未出现在 config 类型中，都会直接使生成器失败。
 - 配置行文现在有了声明处的强制函数：编写新配置字段意味着编写其 JSDoc，而该 JSDoc 将逐字成为 catalog 条目。
 - 生成器对无法静态遍历的形状直接报错——别名化的包内配置导入、非 `object`/`intersect` 组合构建的 schema、未列入的全局类型名。引入此类形状时必须同时教会生成器（否则该形状不能进入仓库），这正是设计意图：catalog 始终是全部真相。
 - `gen-cordis-catalog.ts` 导出其 JSDoc/指针辅助函数与 `LINK_MAP` 供复用，因此两个 catalog 以相同方式交叉链接类型，新增一条 link-map 条目同时服务于两者。

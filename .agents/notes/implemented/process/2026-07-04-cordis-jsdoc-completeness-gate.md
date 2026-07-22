@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-cordis-jsdoc-completeness-gate.zh.md)
+
 ## Problem
 
 The generated Cordis catalog enforced event dispatch modes but not complete service and event contracts. Methods could lack descriptions, and parameters or returns could be undocumented on the cross-plugin API surface where IDE guidance matters most.

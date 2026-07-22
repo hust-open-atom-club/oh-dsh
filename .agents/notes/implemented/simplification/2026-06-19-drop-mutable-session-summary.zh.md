@@ -1,4 +1,4 @@
-# RFC: 移除可变的会话摘要
+# Agent Note: 移除可变的会话摘要
 
 Status: implemented
 
@@ -12,7 +12,7 @@ Status: implemented
 
 - `SessionPersistence.update()` **零个生产调用方**（所有 `.update(` 匹配都是 `createHash().update()` 或测试代码）。
 - `firstPrompt` 在生产代码中**从未被读取**。
-- `title` *确实*在 ACP 桥接层被读取过，但读的是工具调用的 **presenter**（`present.title`），从未读取存储的会话元数据。
+- `title` *确实*在 ACP（Agent Client Protocol）桥接层被读取过，但读的是工具调用的 **presenter**（`present.title`），从未读取存储的会话元数据。
 - `updatedAt` **没有消费方**：`list()` 唯一的生产调用方读取的是 `meta.cwd`（`SessionHeader` 字段），用于在 `session/load` 时校验工作区；恢复会话读取的是 `createdAt`/`cwd`/`parentSession`——全是 header 字段。
 - 决定性的一点：活跃的 `Session.header` 类型本来就是 `SessionHeader` 而非 `SessionMeta`——摘要从未存在于活跃会话对象上；它只存在于持久化层，除了自身的契约测试外无人写入、无人读取。
 
@@ -22,7 +22,7 @@ Status: implemented
 
 摘要原本要提供的一切，在消费方真正需要时都**可从仅追加日志中派生**（`firstPrompt` = 第一条 `user/message`；近期度 = 最后一个事件的 `time` 或文件 mtime），或者已经存在于不可变 header 中（`createdAt`、`cwd`）。唯一*不可*派生的是用户*手动编辑*的标题，但它从未实现，纯属 YAGNI；如果未来真有功能需要，它可以作为独立的日志事件或 header 字段回归。
 
-将此记录为决策，原因有三：**持久性**（它收窄了一个公开服务契约和跨两个后端的磁盘格式）、**争议性**（摘要是有意的前瞻性设计，而非意外产物）、**意外性**（未来读者看到 `SessionHeader` 而原始 RFC 描述的是 `SessionMeta`，否则会疑惑摘要为何消失）。它还为 [shared persistence write coordinator](../architecture/2026-06-18-shared-persistence-write-coordinator.md) 扫清了障碍：没有可变摘要后，协调器的钩子接口无需 `updateSummary` 钩子，JSONL 伴随文件与 SQLite 列之间的持久性分歧也随之消失，两个后端的写入路径得以统一。
+这被记录为一项决策，因为它具有**持久性**（它同时收窄两个后端的公共服务契约和磁盘格式）、**争议性**（summary 是有意为未来设计的结果，而非意外），也具有**意外性**（未来读者在原 Agent Note（agent 决策记录）描述 `SessionMeta` 的位置发现 `SessionHeader`，否则会追问 summary 为何消失）。它还为[共享持久化写入协调器](../architecture/2026-06-18-shared-persistence-write-coordinator.md)扫清障碍：不再有可变 summary 后，协调器的 hook 接口不需要 `updateSummary` hook，JSONL sidecar 与 SQLite 列之间的持久性分歧也随之消失，使两个后端的写入路径趋于一致。
 
 ## 无需迁移
 
@@ -32,4 +32,4 @@ Status: implemented
 
 未来的会话选择器现在必须从日志派生预览/排序信息（或重新引入一个类型化字段），而不能直接读取现成的摘要行。这是正确的代价：为一个尚不存在的功能维护缓存，是每个后端都要付出维护成本、每个契约测试都要付出断言成本的死重。这一原则——**通过的测试固定的是当前行为，不一定是正确行为；行为可能是过去妥协的产物**——现已作为独立约定记录在[根 AGENTS.md](../../../../AGENTS.md) 中，本次变更即为其实例。
 
-<!-- rfc-format: alternatives-not-recorded (pre-format RFC) -->
+<!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

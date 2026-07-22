@@ -1,4 +1,4 @@
-# RFC: 移除无消费方的 skill 提供方事件
+# Agent Note: 移除无消费方的 skill 提供方事件
 
 Status: implemented
 
@@ -16,7 +16,7 @@ skill 发现按需读取当前的提供方映射表，提供方注册时同步�
 
 skill 注册表不再声明和 emit 提供方成员变更事件。提供方的注册与 dispose（资源释放）仍为 effect 所有的直接状态变更，同步使已完成的 catalog 失效；查找与发现按需读取当前提供方映射表。测试通过提供方查找和收集到的输出来观察清理行为，而非依赖生命周期通知。
 
-生成的事件 catalog、API catalog 与生产者/消费方矩阵不再包含已删除的通知。skill 系统 RFC 与包文档通过 effect 所有的直接状态及缓存失效契约来描述注册行为。
+生成式事件目录、API 目录和生产者/消费者矩阵均不再包含已删除通知。skill system Agent Note（agent 决策记录）和包文档改为通过其由 effect 直接拥有的状态与 cache 失效契约描述注册。
 
 ## 曾考虑的替代方案
 

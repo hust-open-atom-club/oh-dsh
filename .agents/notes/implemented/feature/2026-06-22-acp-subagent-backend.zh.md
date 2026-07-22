@@ -1,4 +1,4 @@
-# RFC: ACP subagent 后端（进程外委派）
+# Agent Note: ACP subagent 后端（进程外委派）
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-subagent seam（[seam RFC](2026-06-21-subagent-capability-seam.md)）的设计使多个后端可以按名称共存于 `ctx.subagents`。进程内后端（`-spawn`/`-fork`）将子 agent（智能体）作为第二个 `Agent` 运行在同一个 Cordis 上下文上：开销低，但子 agent 与父 agent 共享进程、模型客户端和工具。seam 的核心意义在于同时支持通过协议到达的进程外子 agent，以证明该抽象能跨越进程边界泛化。本 RFC 添加第一个此类后端：一个 ACP（Agent Client Protocol）客户端。
+subagent seam（[seam Agent Note](2026-06-21-subagent-capability-seam.md)）的设计使多个后端可以按名称共存于 `ctx.subagents`。进程内后端（`-spawn`/`-fork`）将子 agent（智能体）作为第二个 `Agent` 运行在同一个 Cordis 上下文上：开销低，但子 agent 与父 agent 共享进程、模型客户端和工具。seam 的核心意义在于同时支持通过协议到达的进程外子 agent，以证明该抽象能跨越进程边界泛化。本 Agent Note 添加第一个此类后端：一个 ACP（Agent Client Protocol）客户端。
 
 ## 决策
 
@@ -18,11 +18,15 @@ subagent seam（[seam RFC](2026-06-21-subagent-capability-seam.md)）的设计�
 
 ### 最小化客户端桩
 
-客户端不声明任何可选能力（无 `fs`、无 `terminal`）：子 agent 在自己的进程中自行处理文件/终端访问。`session/update` 通知被消费：后端将 `agent_message_chunk` 文本累积为结果输出，在本阶段忽略其余内容（思考、工具调用卡片），仅暴露子 agent 的最终回答。`session/request_permission` 由配置的策略自动应答（`reject` 拒绝所有提示，`allow` 通过第一个允许形态的选项批准）——本阶段不向人类暴露任何权限提示。将 `fs`/`terminal` 代理回父进程（共享工作区模式）仍为后续工作，如 seam RFC 所述。
+客户端不声明任何可选能力（无 `fs`、无 `terminal`）：子 agent 在自己的进程中自行处理文件/终端访问。`session/update` 通知被消费：后端将 `agent_message_chunk` 文本累积为结果输出，在本阶段忽略其余内容（思考、工具调用卡片），仅暴露子 agent 的最终回答。`session/request_permission` 由配置的策略自动应答（`reject` 拒绝所有提示，`allow` 通过第一个允许形态的选项批准）——本阶段不向人类暴露任何权限提示。将 `fs`/`terminal` 代理回父进程（共享工作区模式）仍为后续工作，如 seam Agent Note 所述。
 
 ### 无启动时能力
 
-提供方的 `capabilities` 全部为 `false`。进程外子 agent 无法遵守父 agent 的 `maxDepth`（它无权访问 `parent.options.subagentDepth`）或 `toolFilter`（它拥有自己的工具注册表），本阶段也未实现 `outputSchema`。如果请求需要其中任何一项，服务在 `start` 运行前即拒绝。后端仅注入 `subagents`（而非 `ctx.agents`），并忽略 `request.parent`。
+提供方的 `capabilities` 全部为 `false`。进程外子 agent 无法遵守父 agent 的 `maxDepth`（它无权访问 `parent.options.subagentDepth`）或 `toolFilter`（它拥有自己的工具注册表），本阶段也未实现 `outputSchema`。如果请求需要其中任何一项，服务在 `start` 运行前即拒绝。后端仅注入 `subagents`（而非 `ctx.agents`）；它从 `request.parent` 读取的唯一内容是会话 header 的 cwd（见下方工作区解析）——对话上下文、深度和工具状态都不会跨越进程边界。
+
+### 工作区 cwd 解析
+
+子进程工作目录来自显式解析，绝不使用 harness 进程的 cwd：若已配置部署 `cwd` 覆盖，则相对于启动目录将其转为绝对路径并在加载时验证；否则使用父会话 header 的 cwd 并在启动时验证；如果两者都不存在，则在生成任何进程前大声拒绝。一个 ACP 服务端进程会服务来自多个工作区的会话，因此 `process.cwd()` 不能代替会话工作区——旧的隐式回退会让子进程在服务端启动目录中运行。候选路径必须是 harness 可以进入的绝对目录（要求 `X_OK`；仅 `statSync().isDirectory()` 会接受 mode-600 的目录，而 spawn 会因 EACCES 失败）；解析出的同一路径同时用作子进程 cwd 与 ACP `session/new` 工作区。
 
 ### StopReason 映射
 
@@ -35,6 +39,7 @@ ACP `StopReason` → harness `SubagentStopReason`：`end_turn`→`completed`、`
 ## 测试
 
 - **无需密钥的单元/集成测试：** 一个脚本化的 ACP 子进程通过真实 stdio 测试 prompt/output 流、所有 stop-reason 映射、信号与 dispose 取消（包括 pre-abort、pre-session 竞态和管道断裂场景）、两种权限策略、被忽略的非消息更新、命令缺失时的清理、提供方重载以及命名空间导出。
+- **无需密钥的 Loader 组合测试：** 仅用于测试的 cordis.yml 通过真实 Loader 启动 stdio 应用，并省略后端的 `cwd`；脚本化模型委派一次，脚本化子进程则证明它在父会话工作区中运行，且 ACP 也对外公布了该工作区，从而端到端覆盖 cwd 继承分支。
 - **需要密钥的 e2e 测试：** 后端 spawn 真实的 ACP 示例；其模型回答 `PONG`，写入 `proof.txt`，父进程验证该文件。
 - **快照缺口：** 每个 ACP 子 agent 是独立进程，拥有自己的回放会话，不同于进程内的按会话回放。确定性 mock 服务器覆盖率已具备；`TODO(acp-subagent-replay)` 跟踪父进程对回放中子 agent 的回放支持。
 
@@ -54,4 +59,4 @@ ACP `StopReason` → harness `SubagentStopReason`：`end_turn`→`completed`、`
 
 ## 后续提供方
 
-同样的进程外 spawn/prompt/stream/cancel 形态可泛化到 seam RFC 中列出的其他传输方式——A2A、Codex app-server 和 Claude Code Agent SDK——每个都是按名称注册的兄弟提供方。ACP 后端证明了 seam 支持跨进程边界；其余在机制上类似。
+同样的进程外 spawn/prompt/stream/cancel 形态可泛化到 seam Agent Note 中列出的其他传输方式——A2A、Codex app-server 和 Claude Code Agent SDK——每个都是按名称注册的兄弟提供方。ACP 后端证明了 seam 支持跨进程边界；其余在机制上类似。

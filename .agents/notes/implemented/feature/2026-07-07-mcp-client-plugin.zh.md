@@ -1,4 +1,4 @@
-# RFC: MCP 客户端插件——连接外部 MCP 服务器并桥接其工具
+# Agent Note: MCP 客户端插件——连接外部 MCP 服务器并桥接其工具
 
 Status: implemented
 
@@ -8,13 +8,13 @@ Status: implemented
 
 harness 此前无法消费 MCP（Model Context Protocol）生态中的工具。MCP 是工具服务器的新兴标准——GitHub、文件系统、数据库、代码搜索以及数百个社区服务器都通过 MCP 暴露工具。用户希望将 harness 指向一个或多个 MCP 服务器，让其工具以原生的模型可见工具形式出现，而无需为每个服务器编写胶水代码。
 
-`ToolRegistry` 已经接受原始 JSON Schema 工具定义（`dsh-tools` README 中有记录："Raw JSON-Schema tool definitions (from MCP servers) are still accepted by `ToolRegistry.register()` directly"），扩展实操手册（cookbook）也勾勒了预期模式（"MCP | one plugin per server: discover tools → `ctx.tools.register()`"）。基础设施已就绪，缺的是桥接插件。
+`ToolRegistry` 已经接受原始 JSON Schema 工具定义（`dsh-tools` README 中有记录：「Raw JSON-Schema tool definitions (from MCP servers) are still accepted by `ToolRegistry.register()` directly」），扩展实操手册（cookbook）也勾勒了预期模式（「MCP | one plugin per server: discover tools → `ctx.tools.register()`」）。基础设施已就绪，缺的是桥接插件。
 
 ## 决策
 
 ### 包
 
-单个包（package） `@deepseek-ai/dsh-mcp-client`，位于 `packages/mcp/mcp-client/`。不做能力 seam 的三包拆分——可预见范围内不会有第二种 MCP 客户端实现，且约定是"不要预防性拆分"（[能力 seam RFC](../../implemented/architecture/2026-06-13-capability-seams.md)）。
+单个包（package） `@deepseek-ai/dsh-mcp-client`，位于 `packages/mcp/mcp-client/`。不做能力 seam 的三包拆分——可预见范围内不会有第二种 MCP 客户端实现，且约定是「不要预防性拆分」（[能力 seam Agent Note](../architecture/2026-06-13-capability-seams.md)）。
 
 ### SDK
 
@@ -22,7 +22,7 @@ harness 此前无法消费 MCP（Model Context Protocol）生态中的工具。M
 
 ### 范围
 
-仅 MCP Client（不含 server 端——ACP 已承担"将 harness 暴露为 agent"的角色）。仅桥接 **Tools**——Resources 和 Prompts 延后处理（它们需要 harness 侧尚不存在的消费机制，且设计空间较大）。
+仅 MCP Client（不含 server 端——ACP 已承担「将 harness 暴露为 agent」的角色）。仅桥接 **Tools**——Resources 和 Prompts 延后处理（它们需要 harness 侧尚不存在的消费机制，且设计空间较大）。
 
 ### 插件形态
 
@@ -100,7 +100,7 @@ type Config = StdioConfig | StreamableHttpConfig
 2. 监听 `notifications/tools/list_changed` → 重新执行同步（dispose 上一代、注册新一代）。确定性命名意味着未变化的工具在重新同步后保持原名。
 3. 执行器闭包持有 `rawName`；公开名称永远不发送给服务器，也永远不被解析以还原原始名称。
 4. 无 `presentCall`/`presentResult`——ACP 桥接的通用卡片兜底负责渲染。
-5. 工具在系统提示词中是透明的——除名称本身外不附加 "[via MCP]" 标注。
+5. 工具在系统提示词中是透明的——除名称本身外不附加「[via MCP]」标注。
 
 ### 公开名称规范化
 
@@ -143,7 +143,7 @@ MCP 仅保证工具名在[单个服务器内](https://modelcontextprotocol.io/sp
 1. 解析 `rawName`（执行器闭包持有它），以配置的超时时间调用 `client.callTool({ name: rawName, arguments }, { signal: exec.signal })`——公开名称永远不发送给服务器。
 2. 映射结果：
    - 多个 `text` 内容块 → 以 `'\n'` 连接为单个 `TextBlock`（必要原因：`flattenText` 使用 `join('')` 无分隔符，多块会丢失块间边界）。
-   - `image` 内容块 → 丢弃并 `ctx.logger.warn`（harness 没有图片内容块类型；[drop-image RFC](../../implemented/simplification/2026-07-04-drop-image-content-block.md)）。
+   - `image` 内容块 → 丢弃并 `ctx.logger.warn`（harness 没有图片内容块类型；[drop-image Agent Note](../simplification/2026-07-04-drop-image-content-block.md)）。
    - `isError: true` → 映射到 harness 的 `isError` 结果路径（`{ content: [...], isError: true }`）。
 3. 取消：`exec.signal`（来自 agent loop（智能体循环）的取消）透传给 MCP SDK 的 `callTool`，后者向服务器发送 `$/cancelRequest`。
 
@@ -159,7 +159,7 @@ MCP 仅保证工具名在[单个服务器内](https://modelcontextprotocol.io/sp
 2. 后续模型对这些工具的调用 → `ToolNotFoundError` → `isError: true`。
 3. 恢复：用户编辑 `cordis.yml`（触发 HMR 重载）或重启 harness。
 
-这与 ACP subagent 模式一致："崩溃即终态，报告错误，清理资源，不重试。"
+这与 ACP subagent 模式一致：「崩溃即终态，报告错误，清理资源，不重试。」
 
 ## 曾考虑的替代方案
 
@@ -169,7 +169,7 @@ MCP 仅保证工具名在[单个服务器内](https://modelcontextprotocol.io/sp
 
 ### 能力 seam 三包拆分（interface / impl / consumer）
 
-否决。可预见范围内不会有替代的 MCP 客户端实现——MCP 只有一个协议、一个 SDK。约定是"不要预防性拆分"，直到出现第二种实现。
+否决。可预见范围内不会有替代的 MCP 客户端实现——MCP 只有一个协议、一个 SDK。约定是「不要预防性拆分」，直到出现第二种实现。
 
 ### 指数退避自动重连
 
@@ -177,11 +177,11 @@ v1 否决。引入复杂性（工具已注册但暂时不可用的部分可用�
 
 ### 桥接 Resources 和 Prompts
 
-延后。Resources 需要 harness 侧的机制来决定何时注入内容（系统提示词？按需？模型触发？）。Prompts 需要 harness 尚不具备的"提示词模板"概念。两者都需要独立设计；Tools 是高价值、低风险的起点。
+延后。Resources 需要 harness 侧的机制来决定何时注入内容（系统提示词？按需？模型触发？）。Prompts 需要 harness 尚不具备的「提示词模板」概念。两者都需要独立设计；Tools 是高价值、低风险的起点。
 
 ### 原始模型可见工具名加可选 `toolPrefix`
 
-否决。这是最初的提案，基于"大多数 MCP 服务器已在工具名中使用语义前缀（如 `github_create_issue`）"这一前提。该前提不成立：官方 GitHub 服务器发布的是 `create_issue`，参考文件系统服务器发布 `read_file`，Sentry 发布 `search_issues`——且上述微软调查表明冲突在生态规模下很常见。冲突时再加前缀（或 warn-and-skip）还会使可用工具集取决于插件加载顺序，且添加不相关服务器时工具可能被静默重命名——在对话中途使会话历史和权限规则失效。所有被调研的多服务器 agent 产品都不使用裸名。
+否决。这是最初的提案，基于「大多数 MCP 服务器已在工具名中使用语义前缀（如 `github_create_issue`）」这一前提。该前提不成立：官方 GitHub 服务器发布的是 `create_issue`，参考文件系统服务器发布 `read_file`，Sentry 发布 `search_issues`——且上述微软调查表明冲突在生态规模下很常见。冲突时再加前缀（或 warn-and-skip）还会使可用工具集取决于插件加载顺序，且添加不相关服务器时工具可能被静默重命名——在对话中途使会话历史和权限规则失效。所有被调研的多服务器 agent 产品都不使用裸名。
 
 ### 仅服务器命名空间（`github__create_issue`，无 `mcp__` 前缀）
 
@@ -201,7 +201,7 @@ v1 否决。它能防止跨服务器冲突，但无法将 MCP 注册与原生 ha
 
 - **单元测试**（`tests/mcp-client.spec.ts`、`tests/apply.spec.ts`，mock MCP SDK）：`publicToolName` 算法（干净名称、规范化、截断加 hash、确定性、不同标识的分离）、raw 与 public 的协议纪律、跨服务器与原生工具共存、重复 `serverName` 加载失败与预留释放、无效工具列表拒绝、代切换/回滚、重新同步失败时的保留、结果映射、取消、配置 schema 校验。100% 逐文件覆盖率门禁约束该包。
 - **E2E**（`tests/mcp-client.e2e.ts`，无需密钥）：使用真实 MCP 协议对接仓库内的 fixture（测试前置数据）服务器、`@modelcontextprotocol/server-everything` 和 `@modelcontextprotocol/server-filesystem`（stdio 传输），以及进程内 `StreamableHTTPServerTransport` 服务器（Streamable HTTP 传输）——命名空间下的发现、带点号名称的端到端规范化、执行往返、重复 `serverName` 拒绝、dispose。
-- **快照**：刻意不做。MCP 工具不引入新的 transcript（文本记录）呈现面——它们以原始 `ToolDefinition` 注册，通过 ACP 桥接的通用卡片兜底渲染，该兜底已由桥接的单元测试套件固定（`packages/ui/acp/tests/stream-update.spec.ts`）。将 MCP 服务器添加到快照示例的 `cordis.yml` 会改变已固定的 `text-turn` 系统提示词 fixture（迫使每条录制的 golden 都需要带密钥重新录制），且使每次回放依赖于 spawn 外部 MCP 服务器进程——而新增渲染行为为零。如果后续变更为 MCP 工具引入专属渲染意图，该变更届时自行声明快照覆盖。
+- **快照**：刻意不做。MCP 工具不引入新的 transcript（文本记录）呈现面——它们以原始 `ToolDefinition` 注册，通过 ACP 桥接的通用卡片兜底渲染，该兜底已由桥接的单元测试套件固定（`packages/ui/acp/tests/stream-update.spec.ts`）。将 MCP 服务器添加到快照示例的 `cordis.yml` 会改变已固定的 `text-turn` 系统提示词 fixture（迫使每条录制的预期输出都需要带密钥重新录制），且使每次回放依赖于 spawn 外部 MCP 服务器进程——而新增渲染行为为零。如果后续变更为 MCP 工具引入专属渲染意图，该变更届时自行声明快照覆盖。
 
 ## 后果
 

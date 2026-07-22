@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-04-remove-agent-steering-mirror.md: fbd13b3d43b0052bcdeffd7f94caa341e1f636c5
-2026-07-04-remove-agent-steering-mirror.zh.md: 185cc5601a7406e0d801afd877e9d97eaaa12a0c
+2026-07-04-remove-agent-steering-mirror.md: 9f7cd5abe968ff216cbd7012163ea1c04dc00599
+2026-07-04-remove-agent-steering-mirror.zh.md: b498f473941b69eb5eab66e2e3034976da75e62c

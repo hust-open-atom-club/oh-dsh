@@ -1,8 +1,10 @@
-# RFC: 将包重组为模块化层级结构
+# Agent Note: 将包重组为模块化层级结构
 
 Status: implemented
 
 [English](2026-06-20-package-hierarchy.md) | 中文
+
+后续的 [fold-stdio-helper](../simplification/2026-07-04-fold-stdio-ui-helper.md) 决策取代了最初的 `support/ui-stdio` 放置方式，[冗余 agent 移除](../simplification/2026-07-20-remove-stdio-and-echo-agents.md) 随后又彻底移除了该接口。这里拥有的决策仍是统一的二层目录深度。
 
 ## 问题
 

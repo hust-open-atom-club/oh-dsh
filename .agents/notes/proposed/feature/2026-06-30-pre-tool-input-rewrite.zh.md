@@ -1,4 +1,4 @@
-# RFC: 工具执行前输入重写——一致性设计
+# Agent Note: 工具执行前输入重写——一致性设计
 
 Status: proposed
 
@@ -6,7 +6,7 @@ Status: proposed
 
 ## 问题
 
-[拦截 seam RFC](../../implemented/feature/2026-06-30-interception-seams.md) 将 `tools/pre-execute` 定义为一道针对执行的允许/拒绝/询问门禁，此时执行的身份标识已受保护、参数已被深度冻结。Claude Code 的 `PreToolUse` 钩子还提供了 `updatedInput`，因此忠实的桥接需要一个显式的重写机制。重写不能是对现有执行对象的可变逃逸口：它必须保持持久化历史、审计记录、展示层与实际执行值之间的一致性。
+[拦截 seam Agent Note](../../implemented/feature/2026-06-30-interception-seams.md) 将 `tools/pre-execute` 定义为一道针对执行的允许/拒绝/询问门禁，此时执行的身份标识已受保护、参数已被深度冻结。Claude Code 的 `PreToolUse` 钩子还提供了 `updatedInput`，因此忠实的桥接需要一个显式的重写机制。重写不能是对现有执行对象的可变逃逸口：它必须保持持久化历史、审计记录、展示层与实际执行值之间的一致性。
 
 ## 问题本质：执行前参数的三个读取方
 

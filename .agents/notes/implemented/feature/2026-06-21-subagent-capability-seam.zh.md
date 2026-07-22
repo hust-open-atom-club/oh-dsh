@@ -1,18 +1,18 @@
-# RFC: Subagent 能力 seam
+# Agent Note: Subagent 能力 seam
 
 Status: implemented
 
 [English](2026-06-21-subagent-capability-seam.md) | 中文
 
-> 完整 seam 已交付：`dsh-subagent` 接口、`dsh-subagent-mock` 测试后端与 `dsh-tool-subagent` 消费方；两个进程内后端（`dsh-subagent-spawn`、`dsh-subagent-fork`）；嵌套 agent 快照基础设施（[逐会话快照回放](../testing/2026-06-22-subagent-snapshot-replay.md)）；以及进程外后端 `dsh-subagent-acp`（[其 RFC](2026-06-22-acp-subagent-backend.md)）。
+> 完整 seam 已交付：`dsh-subagent` 接口与 `dsh-tool-subagent` 消费方；两个进程内后端（`dsh-subagent-spawn`、`dsh-subagent-fork`）；嵌套 agent 快照基础设施（[逐会话快照回放](../testing/2026-06-22-subagent-snapshot-replay.md)）；以及进程外后端 `dsh-subagent-acp`（[其 Agent Note](2026-06-22-acp-subagent-backend.md)）。
 
 ## 问题
 
-harness 有一个长期搁置的 seam 用于 **subagent**：一个 agent（智能体）将工作委派给另一个 agent。这一意图在 `Agent`/`AgentLoop` 接口中已有草案（[packages/core/agent/src/types.ts](../../../../packages/core/agent/src/types.ts)、[packages/core/agent-loop/src/index.ts](../../../../packages/core/agent-loop/src/index.ts)）：一个创建选项引用父 agent（fork = 用父会话的事件日志初始化子会话；spawn = 全新会话），子 agent 以 `Agent` 句柄返回，使 steering（中途引导）和事件订阅可以统一工作。本 RFC 实现了这个 seam；上方横幅列出了已交付的内容。
+harness 有一个长期搁置的 seam 用于 **subagent**：一个 agent（智能体）将工作委派给另一个 agent。这一意图在 `Agent`/`AgentLoop` 接口中已有草案（[packages/core/agent/src/types.ts](../../../../packages/core/agent/src/types.ts)、[packages/core/agent-loop/src/index.ts](../../../../packages/core/agent-loop/src/index.ts)）：一个创建选项引用父 agent（fork = 用父会话的事件日志初始化子会话；spawn = 全新会话），子 agent 以 `Agent` 句柄返回，使 steering（中途引导）和事件订阅可以统一工作。本 Agent Note 实现了这个 seam；上方横幅列出了已交付的内容。
 
 决定整体设计走向的核心需求是：**多种 subagent 实现必须在运行时共存**。一个父 agent 可能在同一个会话中既需要一个廉价的进程内子 agent 处理有限范围的子任务，又需要一个隔离的进程外子 agent（通过 ACP（Agent Client Protocol））。我们预见的传输方式：
 
-- **进程内**：在同一个 `Context` 上创建子 `ReactLoopAgent`（最廉价，且鉴于现有 agent 工厂几乎零成本）；
+- **进程内**：在同一个 `Context` 上创建一个具体的子 `Agent`（最廉价，且鉴于现有 agent 工厂几乎零成本）；
 - **ACP**：作为 ACP *客户端*驱动另一个 agent 进程（可以是自身的另一个实例）；
 - 后续：**A2A**、**Codex app-server** 与 **Claude Code Agent SDK**——每种都与 ACP 后端相同的进程外形状：「启动子 agent、发送提示词、流式接收更新、取消」。
 
@@ -20,7 +20,7 @@ harness 有一个长期搁置的 seam 用于 **subagent**：一个 agent（智�
 
 ### 为何不采用 bash seam 的形状
 
-bash seam（[能力 seam](../../implemented/architecture/2026-06-13-capability-seams.md)）在每个 context 中只注册恰好一个 `BashExecutor`；加载第二个会抛异常。这对 bash 是正确的（一台机器、一种执行命令的方式），但对这里是错误的：共存才是需求。因此 subagent 服务是一个**命名提供方注册表**——每个实现以唯一名称注册，调用方按名称选择——镜像 **LLM（大语言模型）适配器注册表**（`LlmService.registerAdapter`），而非单服务的 bash 执行器。seam 仍然是由三个包构成的结构（接口 / 实现 / 消费方）；只是「一个 vs. 多个实现」这个维度不同。
+bash seam（[能力 seam](../architecture/2026-06-13-capability-seams.md)）在每个 context 中只注册恰好一个 `BashExecutor`；加载第二个会抛异常。这对 bash 是正确的（一台机器、一种执行命令的方式），但对这里是错误的：共存才是需求。因此 subagent 服务是一个**命名提供方注册表**——每个实现以唯一名称注册，调用方按名称选择——镜像 **LLM（大语言模型）适配器注册表**（`LlmService.registerAdapter`），而非单服务的 bash 执行器。seam 仍然是由三个包构成的结构（接口 / 实现 / 消费方）；只是「一个 vs. 多个实现」这个维度不同。
 
 ## 决策
 
@@ -34,7 +34,6 @@ bash seam（[能力 seam](../../implemented/architecture/2026-06-13-capability-s
 | `@deepseek-ai/dsh-subagent-spawn` | 实现：通过 `ctx.agents.create` 创建全新的进程内子 agent |
 | `@deepseek-ai/dsh-subagent-fork` | 实现：用父 agent 日志快照初始化的进程内子 agent |
 | `@deepseek-ai/dsh-subagent-acp` | 实现：作为 ACP 客户端驱动已配置的子进程 |
-| `@deepseek-ai/dsh-subagent-mock` | 辅助：用于通过真实加载路径测试 seam 的脚本化提供方 |
 | `@deepseek-ai/dsh-tool-subagent` | 消费方：基于 `ctx.subagents` 的面向模型的 `subagent` 工具 |
 
 ### 原语：异步 `start → SubagentRun`
@@ -64,11 +63,11 @@ bash seam（[能力 seam](../../implemented/architecture/2026-06-13-capability-s
 
 ## 测试
 
-seam 通过真实的 Cordis Loader/export 路径测试，这能捕获[事后分析 0001](../../../postmortem/0001-acp-default-export-drops-inject.md) 中描述的 export 形状错误。注册表测试覆盖重载安全性、重名和启动时能力拒绝；嵌套 agent 场景通过[逐会话快照回放](../testing/2026-06-22-subagent-snapshot-replay.md)进行无密钥回放；进程内后端还有真实循环的单元测试和带密钥的 e2e 测试。
+注册表与工具测试仅用包内脚本化提供方替换非确定性的子进程边界，同时运行真实的 `SubagentService`、生命周期、任务集成和面向模型的工具。提供方与消费方的 export 形状仍保留 Loader 回归覆盖，以防止[事后分析 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md) 中描述的失败。注册表测试覆盖重载安全性、重名和启动时能力拒绝；嵌套 agent 场景通过[逐会话快照回放](../testing/2026-06-22-subagent-snapshot-replay.md)进行无密钥回放；进程内后端还有真实循环的单元测试和带密钥的 e2e 测试。
 
 ## 后果
 
-- **递归。** 如果不设限制，进程内子 agent 能看到委派工具并递归调用。进程内后端实现了可选的绝对深度限制和有作用域的实时全局 `toolFilter`；ACP 声明这两项能力为关闭状态，并拒绝此类请求。[subagent 组合控制 RFC](2026-07-12-subagent-persona-tool-filter-and-depth.md) 负责定义它们的确切语义和安全边界。
-- **阻塞父轮次。** 同步收集在子 agent 的整个持续时间内保持父 agent 的 `runStep` 打开。这对首版是可接受的；**后台 / 轮询 / 溢出语义推迟到未来的重新设计，该设计将统一 subagent 和 bash 的长时间运行工具处理**（一个 subagent 和一个长时间运行的 `bash` 后台任务面临相同的问题——「模型启动了一个慢操作，之后如何收集结果」——应共享一套机制，而非各自发明）。
+- **递归。** 如果不设限制，进程内子 agent 能看到委派工具并递归调用。进程内后端实现了可选的绝对深度限制和有作用域的实时全局 `toolFilter`；ACP 声明这两项能力为关闭状态，并拒绝此类请求。[subagent 组合控制 Agent Note](2026-07-12-subagent-persona-tool-filter-and-depth.md) 负责定义它们的确切语义和安全边界。
+- **阻塞父轮次。** 前台收集在子 agent 的整个持续时间内保持父 agent 的步骤打开。后台委派使用共享的 `ctx.tasks` 运行时与通用 `task_*` 工具，与后台 bash 共用同一套收集机制；subagent seam 本身仍不感知任务。
 - **实时进度。** 本版仅暴露生命周期事件与最终结果；逐分片的子→父更新流推迟到后台重新设计时一并处理。
 - **ACP 客户端接口。** 将 ACP 子 agent 的 `fs`/`terminal` 代理回父 agent（共享工作区模式）是后续工作；首版不声明这两项能力，子 agent 在自己的进程中自行服务。

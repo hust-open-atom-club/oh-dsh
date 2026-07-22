@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-20-retire-mid-turn-steering.md: 2c4d686942d2bfa8016bb60d55624dc59a933c1a
-2026-06-20-retire-mid-turn-steering.zh.md: 2196d7d1d1f1bff39e8e0f03cf9910ab41434d2a
+2026-06-20-retire-mid-turn-steering.md: a8812b3222739244d77f4d4dab60cf7c0cd6907d
+2026-06-20-retire-mid-turn-steering.zh.md: 6beb00a646fd16b7bd9d987fb28429771145d6fc

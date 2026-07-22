@@ -1,4 +1,4 @@
-# RFC: 自引用 cordis 工具集
+# Agent Note: 自引用 cordis 工具集
 
 Status: implemented
 
@@ -20,11 +20,11 @@ vm 隔离了意外的全局污染，上下文门面隐藏了框架内部细节�
 
 | 工具 | 契约 |
 |---|---|
-| `cordis_inspect` | 对活跃运行时的只读报告，每个 `what` 值对应一个 Markdown 段落（省略 `what` 则输出全部段落）。从不产生变更。 |
+| `cordis_inspect` | 对活跃运行时的只读报告，每个 `what` 值对应一个 Markdown 段落（省略 `what` 则输出全部段落）。精确的 `name` 搭配 `what: "api"` 或 `what: "events"` 可收窄到一个带源码文档的目标。从不产生变更。 |
 | `cordis_mount` | 在 `node:vm` 沙箱中执行 `code`（一个异步 JavaScript 函数的函数体）；代码必须 `return` 一个 cordis 插件，该插件作为 `cordis-dynamic` 分组 fiber 的子节点挂载，并以一个新 id（`dyn-1`、`dyn-2`……）跟踪。 |
 | `cordis_unmount` | 按 id 释放一个动态挂载，并等到释放达到静止状态后才返回——该插件所做的每一项注册都被撤销，而不仅仅是请求停止。 |
 
-`cordis_inspect` 的段落：`services`（每个已提供的 ctx 服务及其所属 fiber，非活跃的所有者会被标记）、`plugins`（来自 `ctx.registry` 的所有已加载插件的扁平列表及其生命周期状态——展示加载了哪些能力，刻意不展示树形结构）、`tools`（模型可调用的工具）、`dynamic`（挂载表：id、名称、状态、提供的服务、等待的服务）、`api`（来自生成目录的活跃服务签名及其引用的类型形状）和 `events`（harness 事件及其分发模式和签名）。面向模型的工具描述携带了模型在调用时所需的操作规则；[生成的工具目录](../../../tool-catalog.md)是其完整呈现。
+`cordis_inspect` 的段落：`services`（每个已提供的 ctx 服务及其所属 fiber，非活跃的所有者会被标记）、`plugins`（来自 `ctx.registry` 的所有已加载插件的扁平列表及其生命周期状态——展示加载了哪些能力，刻意不展示树形结构）、`tools`（模型可调用的工具）、`dynamic`（挂载表：id、名称、状态、提供的服务、等待的服务）、`api`（来自生成目录的活跃服务签名及其引用的类型形状）和 `events`（harness 事件及其分发模式和签名）。宽泛的 `api` 和 `events` 报告省略完整 JSDoc 以保持紧凑；精确 `name` 会返回一个服务或事件，以及其原始方法/声明 JSDoc。其他段落不能搭配 name，未知目标会失败，而 API 目标必须处于活跃状态。面向模型的工具描述携带了模型在调用时所需的操作规则；[生成的工具目录](../../../../docs/tool-catalog.md)是其完整呈现。
 
 ### 沙箱语义
 
@@ -46,15 +46,15 @@ vm 隔离了意外的全局污染，上下文门面隐藏了框架内部细节�
 
 ### 生成的 API 目录
 
-`cordis_inspect` 从生成的目录提供 API 和事件数据，而非维护一份重复的表格。生成器复用 Cordis 目录的 AST 扫描，输出服务摘要、签名、事件模式、引用的类型声明以及继承的 context 接口面。有歧义的类型名被省略，过大的声明被标记为截断。
+`cordis_inspect` 从生成的目录提供 API 和事件数据，而非维护一份重复的表格。生成器复用 Cordis 目录的 AST 扫描，输出服务摘要、签名、原始服务方法与事件 JSDoc、事件模式、引用的类型声明以及继承的 context 接口面。有歧义的类型名被省略，过大的声明被标记为截断。
 
-新鲜度像所有生成产物一样受门禁约束：`pnpm run verify-cordis-api`（在 `doc-sync` 中）在内存中重新生成并在有任何 diff 时失败，因此修改了公开签名的 JSDoc 变更如果不重新生成模型读取的目录就无法合入。运行时 inspect 工具将目录与活跃运行时取交集而非直接转储：有目录条目的活跃服务渲染摘要 + 签名，没有目录条目的活跃服务（挂载提供的）渲染名称 + 所属 fiber，有目录条目但无活跃提供方的服务简要列出，引用的类型形状随后附上。
+新鲜度像所有生成产物一样受门禁约束：`pnpm run verify-cordis-api`（在 `doc-sync` 中）在内存中重新生成并在有任何 diff 时失败，因此 JSDoc 或公开签名变更如果不重新生成模型读取的目录就无法合入。运行时 inspect 工具将目录与活跃运行时取交集而非直接转储：宽泛报告把有目录条目的活跃服务渲染为摘要 + 签名，把没有目录条目的活跃服务（挂载提供的）渲染为名称 + 所属 fiber，简要列出有目录条目但无活跃提供方的服务，再附上引用的类型形状。精确名称报告渲染一个活跃服务或事件，并把原始 JSDoc 紧靠在每个签名之前；让该细节按需出现，避免探索性列表承担其 token 成本。
 
 ### 配置、渲染与可观测性
 
-该插件暴露一个配置字段，由 schemastery 校验并记录在[配置目录](../../../config-catalog.md)中：`vmTimeoutMs`（默认 5000），挂载代码同步执行部分的毫秒上限。工具名、`cordis-dynamic` 分组名和 `dyn-` id 前缀是结构性词汇，保持固定。三个工具均按[工具实操手册](../../../cookbook/adding-a-tool.md)渲染为 `generic` 卡片（`cordis_inspect` 为 `read`，`cordis_mount` 为 `execute` 并将代码作为 `rawInput` 携带，`cordis_unmount` 为 `delete`），不覆盖 `presentResult`。
+该插件暴露一个配置字段，由 schemastery 校验并记录在[配置目录](../../../../docs/config-catalog.md)中：`vmTimeoutMs`（默认 5000），挂载代码同步执行部分的毫秒上限。工具名、`cordis-dynamic` 分组名和 `dyn-` id 前缀是结构性词汇，保持固定。三个工具均按[工具实操手册](../../../../docs/cookbook/adding-a-tool.md)渲染为 `generic` 卡片（`cordis_inspect` 为 `read`，`cordis_mount` 为 `execute` 并将代码作为 `rawInput` 携带，`cordis_unmount` 为 `delete`），不覆盖 `presentResult`。
 
-「模型可见 ⟺ 已记录」成立，且无需新的会话事件类型：挂载或卸载仅通过其自身的 `tool/call` / `tool/result` 对可见（循环会记录它们），而挂载引起的工具集变化由循环在 schema 在步骤间发生变化时已有的 request-header delta 记录。刻意不设 `cordis/mount` 溯源事件——它只会重复工具调用对已记录的内容。动态挂载是进程生命周期的，不是会话状态：恢复一个持久化的会话会重建对话，但不会重新挂载插件。
+「模型可见 ⟺ 已记录」成立，且无需新的会话事件类型：挂载或卸载仅通过其自身的 `tool/call` / `tool/result` 对可见（循环会记录它们），而挂载引起的工具集变化由循环在 schema 在步骤间发生变化时发出的完整变更 request header 记录。刻意不设 `cordis/mount` 溯源事件——它只会重复工具调用对已记录的内容。动态挂载是进程生命周期的，不是会话状态：恢复一个持久化的会话会重建对话，但不会重新挂载插件。
 
 ## 曾考虑的替代方案
 
@@ -73,10 +73,10 @@ vm 隔离了意外的全局污染，上下文门面隐藏了框架内部细节�
 
 **在工具中手工维护服务/事件参考。** inspect 工具的第一版携带了一份手写的服务方法签名表。它被生成的 `api-catalog.ts` 取代，因为手写表在签名变化的瞬间就会与 JSDoc 脱节且没有门禁约束这种漂移，而生成产物的新鲜度由文档使用的同一套 AST 检查。
 
-**新增 `cordis/mount` 会话事件。** 一个持久的溯源事件记录每次挂载（源码、名称）有明确先例（`hook/invoked`、`compact/start`）。v1 中予以否决：挂载和卸载已经作为 `tool/call` / `tool/result` 对可见，工具集变化已经作为 request-header delta 被记录，因此专用事件只会重复记录。如果审计用例需要将挂载溯源从工具调用中分离出来，日后仍可添加。
+**新增 `cordis/mount` 会话事件。** 一个持久的溯源事件记录每次挂载（源码、名称）有明确先例（`hook/invoked`、`compact/start`）。v1 中予以否决：挂载和卸载已经作为 `tool/call` / `tool/result` 对可见，工具集变化已经作为完整的变更 request header 被记录，因此专用事件只会重复记录。如果审计用例需要将挂载溯源从工具调用中分离出来，日后仍可添加。
 
 **加固的/能力受限的沙箱。** 对 Node 内置模块设陷阱并向挂载代码提供白名单门面而非原始 context，可能暗示意图是为安全而沙箱化。这里明确不是：陷阱和门面收窄的是挂载代码所见的*接口面*——将其引导至 cordis 服务、远离易泄漏的 Node 内置模块和框架内部——目的是正确性和封堵未受保护的 context 逃逸，但门面暴露的能力（`ctx.bash`、`ctx.fs`、`ctx.web`）触及真实运行时，因此它不是安全边界。真正的安全边界（独立进程、权限提示）超出了一个开发/显式启用工具集的范围，且会与其核心目的——将活跃运行时交给模型——相冲突。
 
 ## 后果
 
-该工具集是刻意的显式启用设计，具有完全特权的 `ctx`，因此部署方采用它的意识程度应与 bash 工具相当。以下几个事实由工具描述直接告知模型：一个 waterfall（瀑布式事件）监听器（如 `tools/pre-execute`）如果不调用 `next()` 就返回，会否决整条链，因此一个挂载的监听器可以瘫痪 agent 自身的工具分发（[waterfall 语义](../../../cordis-primer.md#cordis-waterfall-semantics)）；挂载代码在当前轮次的工具调用内运行，因此 await 任何只在该轮次结束后才 resolve 的东西会导致死锁；`vmTimeoutMs` 仅约束同步执行；挂载不会在会话恢复后存活。
+该工具集是刻意的显式启用设计，具有完全特权的 `ctx`，因此部署方采用它的意识程度应与 bash 工具相当。以下几个事实由工具描述直接告知模型：一个 waterfall（瀑布式事件）监听器（如 `tools/pre-execute`）如果不调用 `next()` 就返回，会否决整条链，因此一个挂载的监听器可以瘫痪 agent 自身的工具分发（[waterfall 语义](../../../../docs/cordis-primer.md#cordis-waterfall-semantics)）；挂载代码在当前轮次的工具调用内运行，因此 await 任何只在该轮次结束后才 resolve 的东西会导致死锁；`vmTimeoutMs` 仅约束同步执行；挂载不会在会话恢复后存活。

@@ -1,4 +1,4 @@
-# RFC: 将仅用于追踪的会话事实折叠进承载性事件
+# Agent Note: 将仅用于追踪的会话事实折叠进承载性事件
 
 Status: implemented
 
@@ -35,7 +35,7 @@ Status: implemented
 
 ## 实现说明
 
-按提案交付，有一处范围细化（遵循 AGENTS.md「RFC 是提案，不是金科玉律」）：
+按提案落地，但有一处范围细化（遵循 AGENTS.md 所述“Agent Note（agent 决策记录）是提案，而非绝对真理”）：
 
 - **空内容 `assistant/message` 承载 usage，无数据丢失。** 提案要求的证明（不会有已持久化的 usage 分片无处安放）落在 max-tokens 路径上：一个被截断的步骤有 usage 但内容为空（例如只有一个被丢弃的工具调用），以前会发出独立的 `usage`。现在它记录一个空内容的 `assistant/message { content: [], usage }`。为防止这向 provider transcript 注入一个无内容的虚假 assistant 轮次，`deriveMessages()` 跳过空内容的 `assistant/message` 事件。回归测试断言 usage 仍被表示，且派生历史未被破坏。
 

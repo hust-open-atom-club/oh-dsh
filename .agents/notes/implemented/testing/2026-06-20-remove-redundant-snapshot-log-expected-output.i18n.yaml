@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-06-20-remove-redundant-snapshot-log-goldens.md: 18d0a4491eb10a3b4dc56d3d63285c219ba6a00a
-2026-06-20-remove-redundant-snapshot-log-goldens.zh.md: 5675c69862b6052ed3f3e4710461cc1478b9fa7d
+2026-06-20-remove-redundant-snapshot-log-expected-output.md: c2452f971d3cb76dceb766072dbc0a5c81465e78
+2026-06-20-remove-redundant-snapshot-log-expected-output.zh.md: b584bfa0154c71c1bbb683c3041dc7baf7a3548e

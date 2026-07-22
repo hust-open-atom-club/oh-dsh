@@ -1,4 +1,4 @@
-# RFC: 移除 `image` 内容块，直到有路径能真正处理它
+# Agent Note: 移除 `image` 内容块，直到有路径能真正处理它
 
 Status: implemented
 
@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-`ImageBlock`（`packages/llm/llm/src/types.ts`）没有任何生产环境的生产者，而每条路径上的每个消费方都将其丢弃：deepseek 适配器的序列化器跳过 image 块（这是文档中注明的 MVP 限制）；pi-ai 转换器因无法表示而跳过；ACP 编解码器既不宣告 image prompt 能力、也不向外转发 image 块，并且会拒绝入站的 image prompt 内容；压缩（compaction）估算器对其收取一个固定 token 常量并渲染为 `[image]`。此时构造的 `ImageBlock` 会在协议格式（wire format）上静默消失——词汇宣告了一种没有任何路径兑现的能力，这正是 AGENTS.md 防御性模式所警告的静默数据丢失形态。唯一的构造调用出现在测试中，用于覆盖 skip/drop/estimate 分支。
+`ImageBlock`（`packages/llm/llm/src/types.ts`）没有任何生产环境的生产者，而每条路径上的每个消费方都将其丢弃：deepseek 适配器的序列化器跳过 image 块（这是文档中注明的 MVP 限制）；pi-ai 转换器因无法表示而跳过；ACP（Agent Client Protocol）编解码器既不宣告 image prompt 能力、也不向外转发 image 块，并且会拒绝入站的 image prompt 内容；压缩（compaction）估算器对其收取一个固定 token 常量并渲染为 `[image]`。此时构造的 `ImageBlock` 会在协议格式（wire format）上静默消失——词汇宣告了一种没有任何路径兑现的能力，这正是 AGENTS.md 防御性模式所警告的静默数据丢失形态。唯一的构造调用出现在测试中，用于覆盖 skip/drop/estimate 分支。
 
 ## 决策
 
@@ -22,7 +22,7 @@ Status: implemented
 
 ## 验证
 
-RFC 记录之外没有任何地方构造 harness 的 `ImageBlock`。ACP 独立的入站 image 拒绝仍有测试覆盖，适配器、编解码器和压缩的默认分支则通过插件定义的块类型来覆盖。
+除 Agent Note（agent 决策记录）之外，没有任何地方构造 harness `ImageBlock`。ACP 独立的入站图像拒绝路径仍有测试；adapter、codec 和压缩的默认分支则使用插件定义的块类型覆盖。
 
 ## 后果
 

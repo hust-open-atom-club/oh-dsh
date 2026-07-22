@@ -1,4 +1,4 @@
-# RFC: 并行 GitHub CI 门禁
+# Agent Note: 并行 GitHub CI 门禁
 
 Status: implemented
 
@@ -6,36 +6,45 @@ Status: implemented
 
 ## 问题
 
-keyless GitHub CI 门禁大多相互正交：类型检查、lint、文档新鲜度、覆盖率、快照回放、构建、包发布卫生检查、demo 冒烟测试与 built-bin 冒烟测试各自因不同原因失败，彼此不需要对方的运行时状态。将它们串成一条有序命令链，工作流的挂钟时间等于所有门禁之和；而把每个叶子门禁拆成独立的 GitHub job，则会重复 checkout、Node 设置、pnpm restore 和 install 工作，直到编排开销本身成为瓶颈。
+无密钥 GitHub CI 门禁大多相互正交：类型检查、lint、文档新鲜度、覆盖率、快照重放、构建、包发布卫生、demo 冒烟和已构建二进制冒烟会因不同原因失败，也不需要彼此的运行时状态。将它们作为一条有序命令链运行，会使工作流墙钟时间等于所有门禁耗时之和；而把每个短小叶子拆成独立 GitHub job，又会反复执行 checkout、Node 设置、pnpm 恢复和安装，直到编排开销成为瓶颈。
 
-难点在于产物边界。`publint`、`verify-node-next-types` 和 built-bin 冒烟测试需要构建出的 `lib/` 输出，而大多数门禁只需要源码和依赖。盲目扇出要么让这些产物消费方在 `pnpm run build` 输出声明文件和 bundle 之前就开始竞跑，要么在每个依赖产物的 job 中重复构建。
+随着 workspace 增长，原有的宽车道拆分不再满足这一平衡。PR（Pull Request）#404 合并时，Linux 的静态、覆盖率、快照和产物 job 分别耗时 148、195、94 和 230 秒；Windows 的静态和产物 job 分别耗时 251 和 482 秒。每个包都调用一次包管理器打包，主导了两个产物验证器的耗时；覆盖率在仅运行源码的套件前无谓地重建输出；CPU 密集型门禁则在静态与覆盖率车道内争用资源。
+
+产物边界仍然承载关键约束。`publint`、`verify-node-next-types`、已编译不变量加载和已构建二进制冒烟测试都需要生成的 `lib/` 输出。分片不能让这些消费者抢在构建前运行，也不能用源码执行取代它们对已发布产物的信号。
 
 ## 决策
 
-[CI](../../../../.github/workflows/ci.yml) 将 keyless 检查分组为若干宽粒度的主运行时 lane，外加一个兼容性矩阵。工作流文件拥有当前 lane 和运行时清单的定义权。
+下述生产拓扑已经成为历史，并由[基于证据采用更大的托管 runner](2026-07-22-evidence-based-larger-hosted-runners.md) 取代。更大 runner 的决策移除了其分片选择器和工作流 job；本文保留早期拓扑为何被实现的记录。
 
-每个 lane 委托给 [scripts/run-gates.ts](../../../../scripts/run-gates.ts)，该脚本以有界并发调度独立门禁，并为每个门禁打印一个可归因的结果块。产物消费方依赖其所在 lane 内的一次 build，而兼容性 job 将类型检查与一次真实的未构建 worker 启动结合，以覆盖运行时特定的 loader 行为。
+[CI](../../../../.github/workflows/ci.yml) 将非 Windows job 的一分钟和 Windows job 的三分钟视为观测所得的性能目标，而非取消截止时间。托管 runner 的波动应留下完整计时证据和有用的失败日志，而不是取消本来正确的门禁。[串行跨平台 CI 参考](2026-07-21-serial-cross-platform-ci-reference.md)会在 Linux、macOS 和 Windows 上独立运行完整、未分片的主 Node 聚合，使优化后的车道清单不会成为自身完整性的唯一判据。
 
-生成的 `.sessions/` 日志和 `.doc-typecheck-*` 临时目录被 lint 忽略。聚合的本地 CI 模式仍在 lint 之后运行 demo 冒烟测试，而拆分后的 GitHub static lane 可以直接运行 demo 冒烟测试，因为 lint 已隔离在自己的 lane 中。
+在该拓扑中，[scripts/run-gates.ts](../../../../scripts/run-gates.ts) 是通用的有界调度器，GitHub 则为昂贵的门禁族提供显式分片名称。`scripts/static-shards.ts` 将静态门禁划分为基础、文档类型、API 契约、目录、正文、文档投影和文档构建等归属，并拒绝缺失或重复的门禁分配。Linux lint 使用互不重叠的 A-C、D-M、N-S、T-Z 包源码和包测试车道，Windows 则使用完整的包源码与包测试车道；两者都包含从 `.` 开始的仓库补集，使新增顶层目标无法消失在分片之间，并负责唯一一次跨文件重复检查。`scripts/coverage-shards.ts` 把每个 workspace 包恰好分配给一个源码覆盖率车道。目录过滤器保留尾部分隔符，因为 Vitest 位置过滤器按子字符串匹配，否则会纳入具有同名前缀的相邻项。每个覆盖率车道只包含其拥有的源码文件，重复运行穷尽式伴随拓扑测试，并且不先执行构建，因为从删除了所有生成式 `lib/` 的树开始，完整覆盖率套件仍可通过。
 
-构建输出在 Node 24 的产物 lane 中只生成一次。产物消费方（`publint`、`verify-node-next-types` 和 built-bin 冒烟测试）声明对 `build` 的依赖，因此没有 upload/download 交接，消费方也不可能在声明文件或 bundle 就绪之前抢跑。CI 覆盖率报告仅输出文本，本地覆盖率则保留 HTML 报告。
+快照重放使用两个显式多文件车道，以及大型 ACP（Agent Client Protocol）文件的八个场景分区。`scripts/snapshot-shards.ts` 拥有该清单，其测试会发现快照配置允许的每个文件。每个快照 job 在其 Linux runner 准备 Bubblewrap 的同时安装依赖，随后构建已发布运行时，并且只运行分配给它的重放表面。该套件保留五个子进程的有界并发，因为重放的大部分时间都在等待子进程协议 I/O。fixture（测试前置数据）守卫仍会在每个分区中检查完整 ACP 场景表。
 
-两个工作流都缓存 pnpm store。真实 API 工作流使用共享的有界 Vitest 文件池，而非为每组测试单独开一个 job。
+冷启动的独立文档类型检查会重建完整的项目引用图，因此专用文档类型车道只构建一次，再用这些声明检查 Markdown 块。Linux 文档车道使用 VitePress 的 MPA 构建，在观测所得的非 Windows 目标内保留页面渲染与死链接验证；单独的阻塞式 Windows 构建和生产站点车道保留已生成包与已发布站点检查，同时避免把两条关键路径放进同一个 job。
+
+产物使用两个车道：一个元数据车道负责 `publint`、NodeNext 声明和已编译不变量加载，另一个负责已构建二进制冒烟。每个车道都会在其消费者之前自行构建。重复短时构建会消耗 runner 分钟数，但避免了上传/下载依赖，并使每个 job 的关键路径保持有界。
+
+[scripts/publint-all.ts](../../../../scripts/publint-all.ts) 在进程内针对内存发布视图调用 publint 支持的 API；该视图由每份清单声明的文件和 npm 强制元数据文件构成。这样无需生成 103 次包管理器打包命令，也能保留 workspace 文件与已发布文件之间的区别。[scripts/verify-built-package-invariants.mjs](../../../../scripts/verify-built-package-invariants.mjs) 在真实包下暂存这些经过结构验证、由清单声明的 `lib/` 文件，再通过纯 Node 和 Cordis Loader 规范化导入已编译的自引用。若伴随项触及未声明的运行时 chunk，仍会失败。
+
+兼容性车道会在每条声明支持的 Node 版本线上运行源码 worker 和 Zstandard 运行时冒烟。TypeScript 在专用的主 Node 24 车道中只检查一次源码图；在运行时兼容性 job 中重复同一编译器分析只会增加耗时，不会提供运行时特有信号。
+
+工作流缓存 pnpm store，将每个不可变 ESLint 缓存的键绑定到其所属 lint 分片，为 Windows 测量保留原生 PowerShell，并保留一个聚合的 `all checks passed` 状态用于分支保护。Windows 复用三个穷尽式 lint 分区，并在共享 runner 设置后组合基础/目录/正文门禁与文档类型/API 契约门禁；只有调度方式与 Linux 分区不同。Windows 构建和生产站点验证继续阻塞，而更广泛的 Windows 静态、lint 和产物矩阵仍为观察性检查。
 
 ## 曾考虑的替代方案
 
-- **在 Node 矩阵中保留完整串行链**：最容易推理，但会重复执行不产生 Node 版本特定信号的仓库级门禁，且让每个 PR 等待所有门禁的总和。
-- **每个门禁作为独立 GitHub job 运行**：最大化 GitHub 可见的扇出，但产生过多 check，且对运行时间短于 runner 准备时间的门禁而言，重复的 setup/install 开销得不偿失。
-- **将构建产物上传给依赖产物的 job**：在多 job 间保持正确性，但增加了 artifact upload/download 时间，且当产物消费方可以在主 job 内通过本地依赖排序运行时，工作流仍然过宽。
-- **并发运行 `typecheck` 与 `build`**：向调度器暴露更多工作，但两个命令都调用 `tsc -b`；在它们之间共享增量构建状态是一场不必要的竞争，换来的挂钟收益很小。
-- **使用无界的真实 API e2e 并行度**：否决。该套件包含大量真实模型/工具场景；worker 池需要一个显式的 `DSH_E2E_MAX_WORKERS` 上限，使 CI 和本地运行都能扇出，同时不会把配额或资源问题隐藏在不稳定的限流失败背后。
+- **保留宽车道**：最大限度减少工作流 YAML，但会保留观测到的数分钟反馈周期。
+- **让每个叶子门禁分别成为 GitHub job**：最大化扇出，但短小的生成器和正文检查准备 runner 的时间会超过检查仓库的时间。
+- **向产物消费者上传一次构建**：避免重复编译，但上传/下载和依赖调度会延长墙钟时间；干净构建足够短，可以在有界车道内重复。
+- **在两个发布门禁中保留包管理器打包**：把清单选择委托给 pnpm，但会重复启动 200 多个包管理器进程。清单结构门禁加发布视图 fixture 使优化后的清单契约显式化，并会在存在磁盘上有但未发布的依赖时失败。
+- **在覆盖率前保留构建**：提供源码套件已不再消费的生成输出；干净树覆盖率证明表明这只是纯粹的延迟。
+- **在每个 Node 版本上执行类型检查**：重复编译器工作，而兼容性冒烟已经验证实际的 Node 特有加载与压缩行为。
 
 ## 后果
 
-PR 反馈以少量 GitHub check 的形式呈现，每个宽粒度 job 内部包含结构化的逐门禁日志块。这将 runner 设置开销控制在有限范围内，并保持 Actions UI 紧凑，代价是失去了每个叶子门禁独立的状态标记。
+上述分片清单和矩阵 job 不属于当前仓库契约。取而代之的更大 runner 决策在单个进程中保留完整主清单，并以串行套件作为独立完整性判据。
 
-宽 lane 拆分比单一主 job 更频繁地重复 checkout、setup 和 install。这一设置开销是有意为之的：在 GitHub 托管 runner 上，将 lint、覆盖率和快照回放放在同一个进程池中运行会严重超额占用 CPU，以至于单 job 的关键路径比重复设置还要长。
+优化后的发布验证器依赖由 `verify-package-invariants` 强制执行的清单 `files` 契约。如果发布规则超出该契约，结构门禁和两个暂存视图必须一起变化。
 
-这种拆分引入了一项维护义务：当 `package.json` 新增或移除一个应纳入 CI 的门禁时，[scripts/run-gates.ts](../../../../scripts/run-gates.ts) 需要添加或删除对应的叶子。这一义务是有意为之的，因为该 runner 是同一套门禁词汇的并行执行计划，而非独立的质量策略。
-
-兼容性信号比主 Node 24 信号更窄。它证明源码图在每个声明支持的运行时上都能通过类型检查，且真实的未构建 workflow-worker 启动路径能够执行，而不必重复文档、覆盖率、发布、快照回放以及那些不因 Node 版本而异的无关冒烟测试。
+兼容性 job 不再声称 TypeScript 本身已在每个 Node 运行时下执行。它们证明 Node 22、24 和 26 上对运行时敏感的源码加载，而主运行时负责唯一一次源码图类型检查。

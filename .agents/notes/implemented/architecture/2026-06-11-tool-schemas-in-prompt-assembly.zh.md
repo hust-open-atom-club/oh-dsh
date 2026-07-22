@@ -1,4 +1,4 @@
-# RFC: 工具 schema 是系统提示词组装的一部分
+# Agent Note: 工具 schema 是系统提示词组装的一部分
 
 Status: implemented
 
