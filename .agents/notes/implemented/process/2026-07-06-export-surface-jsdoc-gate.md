@@ -36,7 +36,7 @@ Three exemption families keep the gate from demanding boilerplate, in the spirit
 
 ## Consequences
 
-- A new export cannot land undocumented: `verify-export-jsdoc` fails `doc-sync`, which pre-push and CI already run. The 203 gaps found at adoption were filled in the same change, so the gate landed green.
+- A new export cannot land undocumented: `verify-export-jsdoc` fails `doc-sync` and CI. The 203 gaps found at adoption were filled in the same change, so the gate landed green.
 - Exported functions must annotate return types (universal at adoption, now load-bearing) and use identifier parameters where `@param` must name them.
 - Seam docs are canonical: an implementation inherits its heritage docs, and behavior notes worth keeping on the implementation are additions, not requirements.
 - The gate builds a `ts.Program` (~6s) — the one doc gate that pays for type resolution; acceptable inside `doc-sync`, which already compiles doc snippets.

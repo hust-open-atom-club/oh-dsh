@@ -36,7 +36,7 @@ exe 使用 [@yao-pkg/pkg](https://github.com/yao-pkg/pkg)（vercel/pkg 归档后
 
 exe 的 VFS 内是**构建产物形态的真实包树**（各包的 `lib/` + 真实 `node_modules`）。loader 通过标准动态 `import()` 解析插件名：裸包名从 VFS 内 loader 所在位置沿 `node_modules` 向上解析，自然落在 VFS 内。封闭集不需要白名单代码——VFS 中安装了什么，集合中就有什么；`import()` 集合外的名称会失败。
 
-部署根目录是 [`python/sdk-runtime/package.json`](../../../../python/sdk-runtime/package.json)（`dsh-jsonrpc-agent-pkg`，pnpm 工作区成员、零代码纯依赖清单），也是“exe 安装哪些插件”与“Python 运行时分发什么”的统一事实源。向 exe 添加插件，就是在清单中增加一行依赖后重新打包。[`scripts/verify-runtime-closure.ts`](../../../../scripts/verify-runtime-closure.ts) 遍历该清单覆盖的全部工作区包，要求每个非可选的工作区对等依赖（peer dependency）都显式列在运行时根目录，并报告“引用包 → 缺失对等依赖”的完整链路；CI 静态检查、pre-push 与 single-exe 构建都会在打包前运行该门禁。部署还会依据各包的 `files` 字段打包，因此 tsdown 拆出的共享分片必须被 `files` 覆盖。
+部署根目录是 [`python/sdk-runtime/package.json`](../../../../python/sdk-runtime/package.json)（`dsh-jsonrpc-agent-pkg`，pnpm 工作区成员、零代码纯依赖清单），也是“exe 安装哪些插件”与“Python 运行时分发什么”的统一事实源。向 exe 添加插件，就是在清单中增加一行依赖后重新打包。[`scripts/verify-runtime-closure.ts`](../../../../scripts/verify-runtime-closure.ts) 遍历该清单覆盖的全部工作区包，要求每个非可选的工作区对等依赖（peer dependency）都显式列在运行时根目录，并报告“引用包 → 缺失对等依赖”的完整链路；`pnpm run hygiene`、CI 静态检查与 single-exe 构建都会在打包前运行该门禁。部署还会依据各包的 `files` 字段打包，因此 tsdown 拆出的共享分片必须被 `files` 覆盖。
 
 ### 构建管线与产物
 
