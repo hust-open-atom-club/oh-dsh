@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> Token-system update (2026-07-22): the framework rulings here (CSS Modules + clsx, no component library, no tailwind, tokens-only colors) remain in force, but the two-layer `--bg-*`/`--text-*` token table and its `web-ui/src/style/global.css` home were replaced by the `--dsw-*` static+alias sheets in `packages/client/ui-theme/src/styles/` (dark = `body[data-ds-dark-theme]` override). Current authority: `missions/tasks/20260721-1520-web-plugin-rfc/architecture.md` §15.
+> Token-system update (2026-07-22): the framework rulings here (CSS Modules + clsx, no component library, no tailwind, tokens-only colors) remain in force, but the two-layer `--bg-*`/`--text-*` token table and its `web-ui/src/style/global.css` home were replaced by the `--dsw-*` static+alias sheets in `packages/client/ui-theme/src/styles/` (dark = `body[data-ds-dark-theme]` override) — the sheets themselves are the token authority.
 
 English | [中文](2026-07-19-web-styling-system.zh.md)
 

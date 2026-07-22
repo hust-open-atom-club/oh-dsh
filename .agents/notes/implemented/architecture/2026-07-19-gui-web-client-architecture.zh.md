@@ -43,28 +43,13 @@ dev 与 prod 同链：插件在 `tsdown --watch` 下重编译，刷新即重走�
 
 ## slot 体系：页面怎么拼
 
-页面是一棵坑位树；谁拥有区域谁声明坑位。契约只有一个家——`@deepseek-ai/dsh-client-ui-slots` 的 `SlotMap` 接口，经声明合并扩展。entry 只声明坑的轴与 **owner 份额**；注册方的注入 props 永不进全局表（「谁注入的放谁那里」）：
+slot 体系有自己的 RFC——[slot 体系标准](2026-07-22-slot-type-chain-implementation.md)——本文整体移交给它。此处只留一段定位摘要：壳只渲染 `'root'`；插件用单独一次 `register` 调用组合 UI——占坑、声明并授权子坑（`children` spec 对象）、声明 store、注入业务面；组件 props 分四份额自动推导到达（`PropsRuntime<K>` / `PropsRenderSlots<S>` / `PropsStore<H>` / inject），各有唯一真源。`SlotMap` 声明合并仍是类型权威，entry 只携带 owner 份额（「谁注入的，类型归谁」）；每个被渲染的注册项都在 per-entry 错误边界之内。
 
-```ts ignore-check
-declare module '@deepseek-ai/dsh-client-ui-slots' { interface SlotMap {
-  sidebar:      { kind: 'single'; scope: 'root';    owner: SidebarOwnerProps }
-  conversation: { kind: 'single'; scope: 'session'; owner: ConvOwnerProps; children: 'conversation.empty' }
-} }
-ctx.slots.define('sidebar', { kind: 'single', scope: 'root' })   // declare=类型，define=落账
-ctx.slots.register('sidebar', SidebarRoot, { inject: (b) => ({ /* ... */ }) })
-```
-
-- 三型：`single`（重复注册即 throw）、`list`（id/order）、`keyed`（运行时按 key 分发，重 key 即 throw）。define 之前 register 即 throw。两 scope：`root`（无会话语境）与 `session`——scope 决定下述注入形态。
-- **组件全量 props 一律引用组合，不重抄**：注册方组件声明 `OwnerOf<K> & StandardOf<K> & OwnInjected`——owner 份额从坑位 owner 的包引用、标配份额由框架供给（session 坑：`useSession`）、注册方自己的注入份额就地声明在组件旁。`register<K, I>` 在调用点强制组合：组件形参位是 `SlotComponent<ComposedProps<K, NoInfer<I>>>`（裸调用签名而非 `FC`——FC 的 `propTypes` 静态位对标配份额产生反变噪音），`I` 只从 inject 工厂返回值推断（`NoInfer` 钉死），组件漂移或工厂不匹配都在注册点编译报错。ui-conversation 的注入份额住 `src/client/contract/slots.ts`（`ConversationInjected` 族），各骨架组件的 props 是一行引用组合。
-- **转授=手写白名单+可选声明上限**：owner 组件经自己的 props 拿到白名单收窄的 `slots: ScopedSlots<'a' | 'b'>`，调 `slots.renderSlot(key, props)` 渲染；把收窄子集递给子组件走 `narrowSlots`（纯类型协变）。越权是编译错误，运行时白名单再兜住纯 JS 调用方。entry 可另声明 `children: <key>`——register 校验组件白名单 ⊆ 声明上限（可选可见层，不强制）。每个被渲染的注册项都包在 per-entry 错误边界里：注册方崩溃（组件或 inject 工厂）只黑自己那一格，装配错误（缺 provider）则重抛——接错线的壳大声失败而不是静默降级。
-- **props 三源合并**（出口组件来做；owner 只写第一份）：① owner 供参（身份、展示参数、冻结切片）——按 entry 的 owner 份额强类型，renderSlot 点即精确；② scope 标配注入——session 坑自动获得绑定正确 Session 的 `useSession`；③ 注册方的 `inject` 工厂，session 坑 per-(注册项 × 会话) 调一次、root 坑 per-注册项调一次，以 WeakMap 缓存——切回会话时复用缓存结果。inject 工厂收到装配句柄（`SessionBinding { sessionId, session, ctx }` 或 `RootBinding { ctx }`）——apply 世界的对象，永不进入 React。
-- 两条供给通道收拢闭环：`RootBindingProvider`（壳顶部挂一次）为 root 坑 inject 工厂供给 ctx；`createSessionProvider(deps)` 构造唯一的会话 provider——依赖倒置（`useCurrent` / `resolveBinding` / `renderBody`），web-react 永不 import runtime。它订阅当前会话 id、解析引用恒等的 binding、以 `key={id}` 重挂其 body，并把 body 渲染委托给装配方的 `renderBody` 闭包（坑位所有权留在 layout；provider 不认识坑名）。
-
-实现的家：注册表纯核在 `packages/client/ui-slots`（零依赖），出口组件/provider/uSES 桥在 `packages/client/web-react`。
+实现的家：注册表核心与 props 份额类型在 `packages/client/ui-slots`，出口组件/渲染器/uSES 桥在 `packages/client/web-react`。
 
 ## 服务与 scope 寻址
 
-服务是插件对其他插件的唯一 API 面（UI 组件与注入面都不是 API；无人调用的插件不挂服务——ui-trajectory 即最小插件样板：无 ctx 服务，只 merge 视图表）。名册：`ctx.connection`（api client + 流句柄）、`ctx.slots`（注册表包装层，发 `slots/changed`）、`ctx.sessions`（列表 store、scope 树、binding）、`ctx.loader`、`ctx.theme`、`ctx.i18n`、`ctx.layout`（导航 + 面板观看态）、`ctx.conversation`（send/cancel/selection/views/startSession）、`ctx.toolviews`（具名按工具渲染注册表，带按会话 scope 过滤）。
+服务是插件对其他插件的唯一 API 面（UI 组件与注入面都不是 API；无人调用的插件不挂服务——ui-trajectory 即最小插件样板：无 ctx 服务，只 merge 视图表）。名册：`ctx.connection`（api client + 流句柄）、`ctx.slots`（注册表包装层，发 `slots/changed`，渲染入口，渲染器安装缝）、`ctx.sessions`（列表 store、当前会话状态、scope 树）、`ctx.loader`、`ctx.theme`、`ctx.i18n`、`ctx.layout`（跨插件视图导航）、`ctx.conversation`（send/cancel/views/startSession）、`ctx.toolviews`（具名按工具渲染注册表，带按会话 scope 过滤）。过去住在服务 store 里的观看态（面板宽、选中、草稿）现按 [slot 体系标准](2026-07-22-slot-type-chain-implementation.md) 住 entry 声明的 store。
 
 SlotMap 之外还有两条同 declare-merge 惯例的类型化注册环：**视图环**（`ConversationViewMap`——entry 可声明 `chromeProps`/`extraProps` 扩展形状；`ConvViewPropsOf<Id>`/`ChromePropsOf<Id>` 组合基座+扩展，无声明的视图免费得基座，ui-trajectory 的两个 entry 带真 per-view props）与**工具环**（tool 名保持开放集——无全局键表；类型强化在 entry 内部：`ToolViewProps.block` 是 runtime 定义的真 `ToolCallBlock` union，register 同 slots 一样推断注册方注入份额）。
 
@@ -101,7 +86,7 @@ Notifier 微任务合批 ──► ConversationSnapshot 缓存 ──uSES──�
 
 胶水包就是整条 ctx↔React 边界；组件保持零框架依赖。
 
-- `createSnapshotStore<T>(init, opts)`：插件自有数据与壳观看态的 store 引擎——zustand vanilla + 草稿式更新，缺省 `flush: 'sync'`（受控输入要求同 tick 回响），帧驱动 store 可选 `'raf'` 合批，可选整值 localStorage 持久化，dev 深冻结。Session 对象与快照 store 同构满足 React 消费的唯一数据契约：`ObservableSnapshot<T>`（`getSnapshot`/`subscribe`）。
+- 快照 store 引擎**住 runtime 包**（zustand vanilla + 草稿式更新，缺省 `flush: 'sync'`，帧驱动 store 可选 `'raf'` 合批，可选整值 localStorage 持久化，dev 深冻结——全部从 `runtime` 的 `./client` 主出口导出，无子路径）：store 产物是裸的可观察源，不带任何 hook 成员。插件只经 [slot 体系标准](2026-07-22-slot-type-chain-implementation.md) 的 `defineStore` 声明触及引擎。web-react 在绑定处（`bindSnapshotSelector`，按源缓存）从 React 消费的唯一数据契约合成每个 hook：`ObservableSnapshot<T>`（`getSnapshot`/`subscribe`）——Session 对象与快照 store 同构满足它。业务插件包只依赖 runtime 与 ui-slots；web-react 是仅壳可用的胶水。
 - `bindSnapshotSelector(source)`：把一个源绑定为经 uSES-with-selector 的带类型 selector hook。uSES 契约四条按构造成立：getSnapshot 恒返缓存引用；subscribe 是绑定期闭包（引用永稳）；纯 CSR 不传 server snapshot；相等性缺省 `Object.is`，按调用可选 `shallowEqual`。
 - `useInvoke(fn)`：把异步动作包成引用恒定的触发器加 pending 标志；pending 走 per-hook 外部 store 经 uSES 读出（渲染路径零 setState），并发调用计数，invoke 引用永不变。
 - 相等性协议，全链一致：生产端结构共享；消费端以 `Object.is` 或 `shallowEqual` 短路；`React.memo` 浅比较。深比较全链禁止。
@@ -128,9 +113,9 @@ src/client/
 ## 怎么开发
 
 - **新 UI 功能** = 新插件包：package.json 声明 `dshClient`（+ `inject` 拓扑），浏览器半边写在 `src/client/`（apply 挂服务/建 store、注册 slot 与 toolview），无 host 逻辑时 node 半边保持空 apply，用共享预设构建。把插件加进 host 配置；清单与装载随之自动跟上。
-- **新 slot**：契约合并进 `SlotMap`，owner 处 `define`，经 owner 自己的 `ScopedSlots` 白名单渲染；注册方 `register`，按需带 inject 工厂。永不全局导出组件。
+- **新 slot**：见 [slot 体系标准 RFC](2026-07-22-slot-type-chain-implementation.md)——契约合并进 `SlotMap`，在父 entry 的 `children` 里声明，经自动注入的 `renderSlot` prop 渲染。永不全局导出组件。
 - **消费新帧类型**：带 sessionId → Session 分发 switch 加一个分支；host 级 → Manager 路由表；UI 需要时给 `ConversationSnapshot` 加字段并守住引用纪律。
-- **状态住哪**：per-session 且要跨切换存续 → Session 对象 / scope 挂账 store；单视图私有（选中、滚动）→ 组件状态；壳观看态（导航、面板宽、偏好）→ `ctx.layout` 的 store；业务数据 → 永远对象层，永不进观看态 store。
+- **状态住哪**：业务数据（事件、流式、待答）→ 永远对象层；父知道的 → renderSlot 现场的 owner props；单组件私有（滚动、搜索词、展开集）→ 组件状态；跨 entry 共享或跨重挂载存活（选中、草稿、面板宽）→ entry 声明的 store（[slot 体系标准](2026-07-22-slot-type-chain-implementation.md)）。
 - **通知通道**：帧驱动/异步 = `markDirty` 合批；受控输入需要同 tick 的用户手势直接回响 = `notifyNow`。
 
 ## Consequences
