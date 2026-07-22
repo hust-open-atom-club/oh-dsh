@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-08-self-referential-cordis-toolset.zh.md)
-
 ## Problem
 
 Everything in this harness is a cordis plugin, but the agent running inside that plugin runtime cannot see or touch it: it cannot enumerate the services and events around it, cannot extend itself with a new tool mid-session, and cannot compose capabilities it invents. Handing the model that power is worth exploring — a self-referential agent that inspects and modifies its own runtime — but it raises three correctness problems at once, and the design is about answering them rather than the raw "let the model run code" mechanic.

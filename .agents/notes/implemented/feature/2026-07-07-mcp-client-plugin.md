@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-07-mcp-client-plugin.zh.md)
-
 ## Problem
 
 The harness had no way to consume tools from the MCP (Model Context Protocol) ecosystem. MCP is the emerging standard for tool servers — GitHub, filesystem, databases, code search, and hundreds of community servers expose tools via MCP. Users want to point the harness at one or more MCP servers and have their tools appear as native model-facing tools, without writing per-server glue code.

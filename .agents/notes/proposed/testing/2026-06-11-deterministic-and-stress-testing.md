@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-06-11-deterministic-and-stress-testing.zh.md)
-
 ## Problem
 
 Several loop tests synchronize with `setTimeout(30)` sleeps — flakiness debt that wastes agent cycles on retries and can mask ordering bugs. Separately, our core architectural promise (any session log replays to identical derived history) is asserted in two tests but is cheap to assert *everywhere*. And the inbox wakeup race was verified by hand exactly once; nothing re-verifies it continuously.

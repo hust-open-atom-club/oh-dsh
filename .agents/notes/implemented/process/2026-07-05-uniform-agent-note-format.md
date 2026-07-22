@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-05-uniform-agent-note-format.zh.md)
-
 ## Problem
 
 Agent Note paths encoded lifecycle and class, but file contents still mixed headings, status formats, ADR and proposal templates, and proposal-era sections in implemented records. Authors copied whichever neighbor they found, and lifecycle moves could skip the required rewrite because no gate enforced an in-file contract.

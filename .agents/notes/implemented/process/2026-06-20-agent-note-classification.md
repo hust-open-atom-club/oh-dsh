@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-20-agent-note-classification.zh.md)
-
 ## Problem
 
 A lifecycle-only Agent Note tree — `proposed/` / `implemented/` / `rejected/` — does not record what *kind* of decision each file contains. A reader browsing one lifecycle cannot distinguish a new capability from a removal or a tooling-policy change without opening each file.

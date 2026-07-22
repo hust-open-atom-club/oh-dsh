@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-16-pnpm-over-yarn.zh.md)
-
 ## Problem
 
 The repo shipped on **Yarn 4** with the `node-modules` linker — a deliberately conservative choice that behaves like npm's flat layout while giving us Yarn's workspaces and `yarn constraints`. It worked. But Yarn 4's Plug'n'Play heritage makes the `node-modules` linker the off-the-beaten-path mode, and the broader JS ecosystem — tooling defaults, CI actions, Corepack examples, contributor familiarity — increasingly centers on pnpm. For a repo that is built primarily by agents and read by occasional human contributors, "the package manager most tools and people expect" has real value: fewer surprises, better-trodden failure paths, more copy-pasteable answers.

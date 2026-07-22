@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-05-subagent-provider-lifecycle-events.zh.md)
-
 ## Problem
 
 [The prompt-variables Agent Note](2026-07-05-prompt-variables-and-tool-guidance-ownership.md) makes `dsh-tool-subagent` DERIVE its model-facing wording from its provider: `SubagentProvider.inheritsParentContext` (spawn/ACP `false`, fork `true`) drives both the tool description and the `prompt` parameter description, so the fork tool stops lying about context inheritance. That fix created a cross-fiber data dependency: a tool's description is fixed at TOOL REGISTRATION (deliberately — the description is where tool-choice guidance lives), but the provider arrives on its own plugin fiber, on no particular schedule.

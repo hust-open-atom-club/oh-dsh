@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-06-node-engine-floor.zh.md)
-
 ## Problem
 
 The Node 22 branch of the root `engines.node` range is a contract for the installed workspace, not only for the runtime APIs the harness source calls directly. It must be no lower than package `engines.node` declarations for dependencies the workspace installs on that branch; otherwise `pnpm install --engine-strict` fails at an advertised LTS version, and non-strict installs run outside a dependency's supported runtime.

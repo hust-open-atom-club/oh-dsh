@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-08-agent-scope-contexts.zh.md)
-
 ## Problem
 
 One application needs to share infrastructure across many agents while letting each agent have its own tools, prompt contributions, policies, and listeners. Shared adapters, persistence, and user interfaces belong to the deployment; a persona, tool variant, or listener often belongs to one agent.
