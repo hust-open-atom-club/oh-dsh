@@ -75,7 +75,7 @@ Dynamic Cordis mounting follows the same rule: `cordis_mount` returns `{ id, plu
 
 Nested dispatch keeps the existing bounded `tool/code-dispatch.resultSummary` for diagnostics but does not persist canonical values. `tool/result` continues to persist only rendered content, error, and optional metadata. This is deliberately not a session-format change, so `SESSION_FORMAT_VERSION` remains unchanged and replay cannot recreate intermediate program values.
 
-The opaque `exec.parent` token marks nested calls. Presentation metadata and generic or tool-owned spill projections skip those calls because they have no direct result card and their canonical values never enter context. The outer `run_code` call alone computes presentation metadata, produces one card, and may spill its final post-policy presentation.
+The opaque `exec.parent` token marks nested calls. Presentation metadata and generic or tool-owned spill projections skip those calls because they have no direct result card and their canonical values never enter context. The outer `run_code` call alone produces one card and may spill its final post-policy presentation; its presenter reads durable `tool/result.content` directly instead of persisting a presentation-metadata copy.
 
 ## Testing
 
