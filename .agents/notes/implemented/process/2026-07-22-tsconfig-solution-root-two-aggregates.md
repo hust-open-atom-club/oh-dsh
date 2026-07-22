@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-22-tsconfig-solution-root-two-aggregates.zh.md)
+
 ## Problem
 
 The GUI split introduced a second aggregate program (`tsconfig.client.json`, [layering RFC](../architecture/2026-07-19-gui-layering-and-rpc-protocol.md)) while the root `tsconfig.json` kept doubling as the host aggregate, and `tsconfig.build.json` remained a third, hand-maintained full emit graph. That triple bookkeeping produced four concrete asymmetries:
