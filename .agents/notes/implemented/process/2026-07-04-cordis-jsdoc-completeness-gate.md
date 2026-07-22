@@ -10,7 +10,7 @@ The AGENTS.md rule ("every export has a JSDoc explaining semantics") is prose-ch
 
 ## Decision
 
-Extend `scripts/gen-cordis-catalog.ts` — the same walk, the same `@mode` precedent — to enforce JSDoc COMPLETENESS on everything it catalogs. `verify-cordis-catalog` runs inside `doc-sync`, which both CI and the lefthook pre-push hook already execute, so the gate needs zero new wiring (quality-gates principle: one source of truth).
+Extend `scripts/gen-cordis-catalog.ts` — the same walk, the same `@mode` precedent — to enforce JSDoc COMPLETENESS on everything it catalogs. `verify-cordis-catalog` runs inside `doc-sync`, so relevant documentation changes and CI exercise the same gate without separate wiring.
 
 The contract:
 
@@ -32,7 +32,7 @@ Negative-path tests in `packages/core/agent/tests/gen-cordis-catalog.spec.ts` dr
 
 ## Consequences
 
-- A new event or service method cannot land with an undocumented parameter or result: the generator refuses to regenerate and `verify-cordis-catalog` fails pre-push and in CI. The ~139 gaps found at adoption were filled in the same change, so the gate landed green.
+- A new event or service method cannot land with an undocumented parameter or result: the generator refuses to regenerate and `verify-cordis-catalog` fails `doc-sync` and CI. The ~139 gaps found at adoption were filled in the same change, so the gate landed green.
 - The service surface must annotate return types explicitly and use identifier parameters. Neither constraint bound at adoption (every method already annotated; no destructured seam parameters existed); both are now load-bearing requirements a violating change will discover mechanically.
 - The general AGENTS.md JSDoc rule ("one-liners when one line suffices") acquires a stricter carve-out on this surface: a one-line summary still suffices only when the method has no parameters and a void result.
 - `@param` on `next` or `this` stays legal but unchecked — a deliberate asymmetry: the gate enforces the payload contract and refuses to demand boilerplate.

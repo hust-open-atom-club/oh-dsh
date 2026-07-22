@@ -24,7 +24,7 @@ description: Use when reviewing a pull request in the deepseek-harness repo — 
 3. **Core type docs match.** Changes to spine or seam vocabulary update the appropriate [core-data-structures](../../../docs/core-data-structures/core.md) page and any `type-equiv` entry. Internal types need no catalog entry.
 4. **Registrations clean up.** Verify each new registry contribution satisfies the disposal-test contract in [packages/AGENTS.md](../../../packages/AGENTS.md).
 5. **Invariant companions are semantic.** For every touched `./invariant`, require an owner event-stream or mutable-data relationship at its authoritative boundary; service or method presence, plugin metadata or effects, and fixed pure examples belong in type, load, or unit tests. Accept an empty installer when its package-specific reason establishes that no plausible runtime relationship exists; do not demand an invented check merely to eliminate emptiness ([repository rule](../../../AGENTS.md#conventions); [package contract](../../../packages/AGENTS.md)).
-6. **Required gates pass.** Trust the [current readiness sequence](../../../AGENTS.md#run-the-ci-gates-locally-before-marking-a-pr-ready) and `pnpm run check:pre-push` for their enforced inventory; review the semantic gaps they cannot detect.
+6. **Required evidence exists.** Verify the author ran the [relevant local checks](../../../AGENTS.md#run-relevant-checks-locally) for the diff and that CI covers the exhaustive matrix; review the semantic gaps neither can detect.
 
 ## Manual checks
 
