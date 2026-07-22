@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-17-filesystem-tool-schemas.zh.md)
+
 ## Problem
 
 [The filesystem capability-seam Agent Note](../architecture/2026-06-17-filesystem-capability-seam.md) defines the filesystem capability seam (`ctx.fs`), the package split (`dsh-fs`, `dsh-fs-local`, `dsh-tool-fs`, plus the `dsh-fs-policy` policy plugin), and the observed-file/stale-version policy for read-before-write/edit checks — which the [split-fs-seam](../simplification/2026-06-26-fsspec-style-fs-seam.md) and [event-gate](../architecture/2026-06-26-file-context-as-event-gate.md) Agent Notes moved off `ctx.fs` into the `dsh-fs-policy` plugin on the `fs/*` event gate. The remaining decision for the first filesystem tool delivery is the model-facing schema surface: what arguments the model sees for `read`, `write`, and `edit`.

@@ -2,6 +2,8 @@
 
 Status: rejected — the deferred capability vocabulary (`outputSchema`/`structured`, `toolFilter`, `sendMessage`/`resume`) is intentionally reserved surface: the seam advertises the full intended contract ahead of its implementations by design, so providers and consumers grow into a stable shape rather than re-negotiating it per capability. The consumer-evidence analysis below records the decision-time state.
 
+English | [中文](2026-07-04-prune-unimplemented-subagent-vocabulary.zh.md)
+
 ## Problem
 
 The [subagent seam](../../implemented/feature/2026-06-21-subagent-capability-seam.md) shipped a two-tier capability design: start-time capability flags checked by the service, and optional runtime methods on `SubagentRun`. Three start-time features and both optional runtime methods have zero implementations and zero callers:

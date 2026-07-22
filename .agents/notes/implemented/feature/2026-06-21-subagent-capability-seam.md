@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-21-subagent-capability-seam.zh.md)
+
 > The full seam is shipped: the `dsh-subagent` interface and `dsh-tool-subagent` consumer; the two in-process backends (`dsh-subagent-spawn`, `dsh-subagent-fork`); the nested-agent snapshot infrastructure ([per-session snapshot replay](../testing/2026-06-22-subagent-snapshot-replay.md)); and the out-of-process `dsh-subagent-acp` backend ([its Agent Note](2026-06-22-acp-subagent-backend.md)).
 
 ## Problem

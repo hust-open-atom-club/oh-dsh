@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-02-result-time-applied-hunk-diffs.zh.md)
+
 ## Problem
 
 The [tagged render-intent union](2026-07-02-tool-render-intent-union.md) gave `dsh-tool-fs` write/edit a `card:'diff'` at CALL time, derived purely from the tool's args: write ⇒ `{oldText:null, newText:content}` (the whole new file), edit ⇒ `{oldText:old_string, newText:new_string}` (the bare replaced snippet). An editor renders that as an inline diff, but it is a **context-free** diff — the bare `old_string`→`new_string` with no surrounding lines, and a `replace_all` that touched five scattered sites still renders as one snippet pair.

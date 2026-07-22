@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-30-interception-seams.zh.md)
+
 ## Problem
 
 The harness needs a hooks subsystem: users extend or gate the agent at lifecycle points the way Claude Code (CC) and Codex do. The key reframe driving this design is that **"native hooks" are not a package** — a native hook is just an ordinary Cordis plugin subscribing to the canonical lifecycle events. So the real product is a *powerful, well-typed canonical event surface*; the CC/Codex bridges (the `dsh-hooks-claude` / `dsh-hooks-codex` packages) are merely translators that map an external shell-hook protocol onto that same surface. Anything a bridge can do, a plain plugin can do directly — more powerfully (no serialization boundary, full `ctx`, typed returns).

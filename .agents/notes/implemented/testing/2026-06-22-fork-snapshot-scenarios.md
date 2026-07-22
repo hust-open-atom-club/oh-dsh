@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-22-fork-snapshot-scenarios.zh.md)
+
 ## Problem
 
 The [seed-boundary Agent Note](2026-06-22-fork-child-replay-seed-boundary.md) made fork-child replay route correctly: `dsh-llm-replay` derives a child's script from the events at or after its persisted `seedLength` boundary, so a fork child's inherited parent prefix is not replayed as the child's own model calls. But it shipped with **no recorded fork scenario** — the slice was exercised only by `llm-replay`'s unit tests (a synthetic child fixture) and a persistence round-trip test. The full-transcript snapshot tier, the one net that boots the real `acp-agent` and replays an end-to-end nested transcript, had only spawn children (`subagent-spawn`, `subagent-multi`). A fork-routing regression that left the unit tests green would still have escaped the tier built to catch transcript regressions.

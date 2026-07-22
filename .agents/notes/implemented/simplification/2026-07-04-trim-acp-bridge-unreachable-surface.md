@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-trim-acp-bridge-unreachable-surface.zh.md)
+
 ## Problem
 
 Two pieces of `dsh-acp` surface were unreachable from any shipped configuration:

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-prune-producerless-vocabulary-variants.zh.md)
+
 ## Problem
 
 The merge-extensible vocabulary maps are designed to grow by declaration merging, and the codebase already states the admission policy on `TurnEndReasonMap` (`packages/core/session/src/types.ts`): a variant like `refusal` is "deliberately omitted until" an adapter or loop first emits it. Three declared vocabulary items violated that policy — each had no producer and no consumer, and two had not even a test:

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-30-subagent-observe-enrich.zh.md)
+
 ## Problem
 
 The hooks subsystem ([interception seams Agent Note](2026-06-30-interception-seams.md)) lets a plugin observe and gate the agent at lifecycle points. Claude Code and Codex both expose **SubagentStart / SubagentStop** hooks, and CC's carry the subagent's final message. The harness already emits `subagent/start` and `subagent/end` lifecycle events ([the subagent capability-seam](2026-06-21-subagent-capability-seam.md)), but their payloads were minimal (`provider`, `id`, and on end `stopReason`) — not enough for a hooks bridge to report WHAT a subagent produced without separately reaching for the live run.

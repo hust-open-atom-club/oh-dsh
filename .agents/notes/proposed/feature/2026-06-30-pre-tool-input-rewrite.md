@@ -2,6 +2,8 @@
 
 Status: proposed
 
+English | [中文](2026-06-30-pre-tool-input-rewrite.zh.md)
+
 ## Problem
 
 The [interception-seams Agent Note](../../implemented/feature/2026-06-30-interception-seams.md) defines `tools/pre-execute` as an allow/deny/ask gate over an execution whose identity is already protected and whose arguments are deeply frozen. Claude Code's `PreToolUse` hook also offers `updatedInput`, so a faithful bridge needs an explicit rewrite mechanism. A rewrite cannot be a mutation escape hatch on the existing execution object: it must keep the durable history, audit record, presentation, and executed value consistent.

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-03-filesystem-directory-listing-seam.zh.md)
+
 ## Problem
 
 `@deepseek-ai/dsh-fs` is the provider seam for filesystem access, with local and future non-local backends behind the same `ctx.fs` contract. Before this change it could resolve paths, stat targets, read text, stream text, write text, and edit text. That was enough for model-facing file tools, but not for non-model-facing consumers that need to enumerate directories without importing `node:fs`.

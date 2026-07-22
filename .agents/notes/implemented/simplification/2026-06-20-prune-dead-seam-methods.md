@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-prune-dead-seam-methods.zh.md)
+
 > **Implementation note:** Only `SessionPersistence.has()` and `.delete()` were removed. `BashExecutor.get()` and `.list()` remain because removing their one-line lookup surface required substantially more completion-tracking machinery in consumers. Their id branding is covered by the [branded-ids Agent Note](../architecture/2026-06-20-branded-ids.md).
 
 ## Problem

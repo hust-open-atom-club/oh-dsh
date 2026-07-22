@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-11-runtime-arg-validation.zh.md)
+
 ## Problem
 
 `defineTool` ([the custom schema DSL](2026-06-11-custom-schema-dsl.md)) gives tool authors a typed `execute(args)` via the `InferArgs<S>` mapping. But that type is a compile-time claim about a value that arrives at runtime as model-generated JSON: nothing forced the model to honor the schema, so a malformed call — missing a required key, a string where a number was declared, an enum value outside the set — reached `execute` typed-in-name-only. The tool body then either crashed on the bad shape (a generic stack trace the model can't act on) or, worse, silently misbehaved. Meanwhile the converter already encodes the exact structure a validator would need to walk.

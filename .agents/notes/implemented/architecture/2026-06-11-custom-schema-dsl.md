@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-11-custom-schema-dsl.zh.md)
+
 ## Problem
 
 Tool parameters must reach the model as standard JSON Schema while giving tool authors typed `execute(args)` without casts. Schemastery already serves plugin config, but the tool-author API needs per-property `required: true` booleans rather than JSON Schema's separate `required` array.

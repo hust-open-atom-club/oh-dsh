@@ -2,6 +2,8 @@
 
 Status: proposed
 
+English | [中文](2026-07-04-prune-dead-core-spine-surface.zh.md)
+
 ## Problem
 
 Several package-root exports, result fields, and convenience methods have no production consumer. They survive because tests import internals through public entry points or because a type anticipated a caller that never arrived. Each item is small in isolation, but together they enlarge the SDK contract, generated catalogs, documentation, and regression matrix without enabling a shipped path.

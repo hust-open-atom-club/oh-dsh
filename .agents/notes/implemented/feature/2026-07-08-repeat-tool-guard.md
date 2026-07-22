@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-08-repeat-tool-guard.zh.md)
+
 ## Problem
 
 A model stuck in a loop re-issues the same tool call with byte-identical arguments — re-running a failing grep, re-reading an unchanged file, polling a command that already gave its answer — and each round trip burns tokens, wall-clock, and (for paid APIs) money without adding information. The harness has nothing that notices: the loop has no step budget, no plugin tracks call repetition, and the model only escapes when it happens to vary its own behavior. The failure mode is real and cheap to detect — [pi-repeat-tool-guard](https://github.com/Kingwl/pi-repeat-tool-guard) ships exactly this as a pi coding-agent extension: count consecutive identical calls and, past a threshold, append a `<system-reminder>` telling the model to stop repeating itself and change course.

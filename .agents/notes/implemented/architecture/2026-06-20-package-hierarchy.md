@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-package-hierarchy.zh.md)
+
 The later [fold-stdio-helper](../simplification/2026-07-04-fold-stdio-ui-helper.md) decision superseded the original `support/ui-stdio` placement, and the [redundant-agent removal](../simplification/2026-07-20-remove-stdio-and-echo-agents.md) subsequently removed that surface entirely. The uniform depth-two hierarchy remains the decision owned here.
 
 ## Problem

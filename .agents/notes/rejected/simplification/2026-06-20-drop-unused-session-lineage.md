@@ -2,6 +2,8 @@
 
 Status: rejected — `parentSession` is part of the documented fork/sub-agent seam and is already preserved by the agent/session resume path. The field is future-facing, but it is not accidental dead state.
 
+English | [中文](2026-06-20-drop-unused-session-lineage.zh.md)
+
 ## Problem
 
 `SessionHeader.parentSession` records the session a new session was forked from. It is defined in `dsh-session`, preserved by persistence backends, copied through resume, documented as lineage metadata, and covered by round-trip tests. The repo has no production fork UI or sub-agent flow that reads it. The planned sub-agent/fork seam is still a TODO, so the field is currently stored future shape.

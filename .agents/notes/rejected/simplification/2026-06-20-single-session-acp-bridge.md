@@ -2,6 +2,8 @@
 
 Status: rejected — Zed is the current target ACP client and its ACP implementation is explicitly multi-session: it stores live sessions in a `HashMap<SessionId, AcpSession>`, tracks `pending_sessions`, joins concurrent loads for the same id, and tests close-during-load behavior.
 
+English | [中文](2026-06-20-single-session-acp-bridge.zh.md)
+
 ## Problem
 
 The ACP bridge now supports multiple live sessions on one JSON-RPC connection. That capability brings multi-entry session maps, reverse session/agent lookups, per-session prompt state, loading ids, demux for every event, cross-session teardown, and isolation concerns for future permission prompts and background tasks. The older [multi-session ACP proposal](../../implemented/feature/2026-06-14-acp-multi-session.md) still tracks the unfinished permission-ownership piece; this Agent Note is the competing simplification path.

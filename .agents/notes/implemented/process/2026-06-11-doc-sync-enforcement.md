@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-11-doc-sync-enforcement.zh.md)
+
 ## Problem
 
 AGENTS.md promises that docs and code stay strictly in sync, but the promise was verified by eyeball. Review caught drift twice — a cookbook example contradicting the type policy, and a README citing the wrong `registerAdapter` call. Out-of-sync docs are worse than no docs, and this codebase is built primarily by agents that follow gates far more reliably than prose (mechanical quality gates). Two classes of doc drift are mechanically checkable: code blocks that no longer compile, and the event-taxonomy table that duplicates the `interface Events` declarations.
