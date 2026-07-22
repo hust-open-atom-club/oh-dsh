@@ -8,7 +8,7 @@ Tool parameters must reach the model as standard JSON Schema while giving tool a
 
 ## Decision
 
-A small custom DSL in dsh-tools: `SchemaSpec` (per-property specs with `required: true` booleans), type-level `InferArgs<S>` mapping a spec to the argument type (required keys non-optional, others genuinely optional via `?`), a runtime `schemaSpecToJsonSchema()` converter, and `defineTool()` tying them together. Raw JSON-Schema `ToolDefinition`s remain accepted by `ToolRegistry.register()` — that's how MCP-sourced tools arrive.
+This decision is superseded by the [unified JSON-value schema DSL](2026-07-20-unified-json-value-schema-dsl.md), which retains the small authoring surface while making parameters and typed values share one vocabulary. `ParameterSchemaSpec` keeps per-property `required: true`; `InferArgs<S>` maps required keys to non-optional properties; `parameterSchemaSpecToJsonSchema()` compiles the implicit open object root; and `defineTool()` ties inference, compilation, and validation together. Raw JSON-Schema `ToolDefinition`s remain accepted by `ToolRegistry.register()` for MCP and other external tools.
 
 ## Alternatives considered
 
@@ -17,5 +17,5 @@ A small custom DSL in dsh-tools: `SchemaSpec` (per-property specs with `required
 ## Consequences
 
 - First-party tool authors get zero-cast typed args; the type gymnastics cost stays inside the core package (sanctioned by the AGENTS.md type-safety policy).
-- The DSL is deliberately small (string/number/boolean/object/array, enum, default, nested properties/items). Gaps vs full JSON Schema (unions, formats, constraints) are accepted until real tools demand them.
+- The owning unified note defines the current nodes, literal constraints, unions, JSON-value boundary, and object-openness rules.
 - The `InferArgs` mapping is regression-tested at the type level after an early optionality bug.
