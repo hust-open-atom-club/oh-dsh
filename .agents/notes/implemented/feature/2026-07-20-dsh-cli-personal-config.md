@@ -22,6 +22,8 @@ Two coupled pieces, aligned with the `apps/` assembly tier proposed by the `dsh 
 
 The PTY smoke's launcher isolates `$DSH_HOME` to a per-test directory, exactly as it already isolates `DSH_AGENTS_HOME`, so a developer's real personal overlay cannot leak into fixtures; only the dsh CLI reads personal config, so no other test launcher needed changes.
 
+Hot-reload interplay: the include re-applies its `patches` on every config re-read (the [config hot-reload resilience Agent Note](../bug-fix/2026-07-20-config-hot-reload-resilience.md)), so a live `cordis.yml` edit keeps the personal overlay applied.
+
 ## Alternatives considered
 
 **A standalone `bin/dsh` wrapper owning the `dsh` name.** Rejected after reading PR #443: that PR establishes `apps/cli` as the `dsh` CLI with subcommand dispatch (`web`, `-p`) and leaves the default slot unclaimed. Two competing `dsh` entrypoints would collide in `$PATH` and in product identity; claiming the default slot inside the same package shape confines the eventual merge conflict to the small dispatch chain.
