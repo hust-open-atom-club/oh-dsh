@@ -4,13 +4,13 @@ Status: implemented
 
 ## Problem
 
-`defineTool` ([the custom schema DSL](2026-06-11-custom-schema-dsl.md)) gives tool authors a typed `execute(args)` via the `InferArgs<S>` mapping. But that type is a compile-time claim about a value that arrives at runtime as model-generated JSON: nothing forced the model to honor the schema, so a malformed call — missing a required key, a string where a number was declared, an enum value outside the set — reached `execute` typed-in-name-only. The tool body then either crashed on the bad shape (a generic stack trace the model can't act on) or, worse, silently misbehaved. Meanwhile the converter already encodes the exact structure a validator would need to walk.
+`defineTool` ([the unified schema DSL](2026-07-20-unified-json-value-schema-dsl.md)) gives tool authors a typed `execute(args)` via the `InferArgs<S>` mapping. But that type is a compile-time claim about a value that arrives at runtime as model-generated JSON: nothing forced the model to honor the schema, so a malformed call — missing a required key, a string where a number was declared, or a literal outside the declared set — reached `execute` typed-in-name-only. The tool body then either crashed on the bad shape or silently misbehaved.
 
 ## Decision
 
-`validateArgs(spec, args): string[]` interprets a `SchemaSpec` over a runtime value, returning human-readable violations (empty = valid), and is total (never throws). `defineTool` runs it before the typed body; on violations it throws `ToolArgsError` (`code: 'INVALID_ARGS'`, message listing the violations), which the registry's existing execute-waterfall catch turns into an `isError` result the model reads and self-corrects from.
+`validateArgs(spec, args): string[]` compiles a `ParameterSchemaSpec` and delegates to the shared `validateJsonSchemaValue()` walker, returning human-readable violations for a well-formed declaration. `defineTool` snapshots the compiled parameter schema at definition time and runs that validation before the typed body; violations throw `ToolArgsError` (`INVALID_ARGS`), which the registry returns as an error result the model can correct.
 
-The validator mirrors `schemaSpecToJsonSchema` semantics exactly — same structure walked, same rules: top level must be a non-array object; required keys come only from `required: true`; extra keys are allowed (no `additionalProperties: false`); `default` is not applied; an `object`/`array` prop without `properties`/`items` only type-checks; `enum` is membership. Raw-registered (MCP) tools are not touched — they validate their own input.
+The validator and compiler therefore share exact semantics: the implicit parameter root is an open object; required keys come only from `required: true`; defaults remain annotations; explicit nested objects honor their declared openness; arrays recurse through `items`; scalar literal constraints are type-correct; and `oneOf` accepts exactly one matching branch. Raw-registered tools own their input validation.
 
 ## Consequences
 

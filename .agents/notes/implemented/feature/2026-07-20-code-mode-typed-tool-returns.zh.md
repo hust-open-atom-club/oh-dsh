@@ -75,7 +75,7 @@ Code Mode 通过运行时请求中的 `{ name: "ToolCallError", memberNameProper
 
 嵌套分发会为诊断保留既有的有界 `tool/code-dispatch.resultSummary`，但不会持久化规范值。`tool/result` 继续只持久化渲染后的内容、错误和可选元数据。这并非会话格式变更，因此 `SESSION_FORMAT_VERSION` 保持不变，回放也无法重建程序的中间值。
 
-不透明的 `exec.parent` token 用于标识嵌套调用。由于这些调用没有直接对应的结果卡片，而且其规范值永远不会进入上下文，展示元数据以及通用或工具自有的输出落盘投影都会跳过它们。只有外层 `run_code` 调用会生成一张卡片，并且可能将 post-policy 处理后的最终展示写入落盘文件；它的展示逻辑直接读取持久化的 `tool/result.content`，而不是持久化一份展示元数据副本。
+不透明的 `exec.parent` token 用于标识嵌套调用。由于这些调用没有直接对应的结果卡片，而且其规范值永远不会进入上下文，展示元数据以及通用或工具自有的输出落盘投影都会跳过它们。只有外层 `run_code` 调用会生成一张卡片，并且可能将 post-policy 处理后的最终展示写入落盘文件；`run_code` 有意既不声明结果展示器，也不声明展示元数据，因此 ACP 和 TUI 通过其通用的原始内容回退机制，使用持久化的 `tool/result.content` 补全该卡片。
 
 ## 测试
 
