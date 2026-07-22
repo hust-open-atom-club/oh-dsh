@@ -12,13 +12,13 @@ The implementation needs enough state to preserve real ownership and settlement 
 
 ## Decision
 
-The runtime uses one mechanism per independent fact. Scope routing has an opaque carrier; each live registry object has one entry record; each create or resume operation has one transaction; typed same-process calls borrow readonly values; real data boundaries materialize once; the cooperative prompt-assembly result is authoritative; and worker/process code retains separate terminal and quiescence state only where different owners can genuinely race.
+The runtime uses one mechanism per independent fact. Scope routing has an opaque carrier and shared layer store; each live registry object has one entry record; each create or resume operation has one transaction; typed same-process calls borrow readonly values; real data boundaries materialize once; the cooperative prompt-assembly result is authoritative; and worker/process code retains separate terminal and quiescence state only where different owners can genuinely race.
 
 The design can be skimmed as seven choices:
 
 | Problem | Authoritative mechanism |
 |---|---|
-| Select global plus one agent's registrations | Opaque scope key and routing carrier |
+| Select global plus one agent's registrations | Opaque scope key, routing carrier, and shared layer store |
 | Own one live agent or session | One registry entry captured by its disposer |
 | Coordinate create/resume | One `AgentCreationTransaction` |
 | Protect durable, queued, model, or wire data | Materialize once at that boundary |
@@ -68,11 +68,11 @@ A `ScopeKey` is an opaque object compared by identity. The harness uses the live
 
 The receiver is a small carrier rather than a transparent proxy for the domain object. Code that needs the agent receives the explicit event argument; code that needs registration ownership receives `agent.ctx`.
 
-### Registry reads overlay one exact map
+### Registry reads overlay one exact layer
 
-Scope-aware registries store global contributions separately from identity-keyed local contributions. A read resolves the global layer and at most one local layer; it never traverses parentage.
+Scope-aware registries use `ScopedLayers` to own one eager global aggregate and lazily created identity-keyed aggregates. A read resolves the global layer and at most one exact local layer; it never creates state or traverses parentage. Registration visibility and Cordis effect ownership derive from the same context, and reclamation waits until the concrete layer's complete aggregate is empty ([decision](2026-07-12-scoped-layers-store.md)).
 
-Each service retains its domain rule. Named prompt values and tools use local shadowing, tool restrictions filter globals before local tools are added, and events select listener audiences rather than registered data. Scope supplies identity and ownership, not a universal merge algorithm.
+Each service retains its domain rule. Named command and prompt views use the shared insertion-ordered shadow merge; tools keep a richer resolver because restrictions filter globals before local tools are added and the reserved Code Mode transport is inserted separately. Prompt variables and tool guards retain live iteration, while tool-provider membership is materialized per assembly. Scope supplies storage lifecycle and named shadowing, not a universal registry view.
 
 ### Fused dispatch helpers prevent subject drift
 

@@ -74,17 +74,17 @@ export class AnonymousEntries<V> {
 
 - 构造器只创建一次 `global`，调用的是 `createLayer(undefined)`。只有 `effect()` 会创建专属层；`peek()` 和 `merge()` 从不创建专属层，而 `peek(undefined)` 返回 `undefined`，因为全局层已经显式存在。
 - `merge()` 是唯一会物化结果的通用读取接口。它按插入顺序复制全局命名条目，再按专属条目的插入顺序应用这些条目；同名条目完成遮蔽，但不会移动无关名称。
-- `NamedEntries.insert()` 以原子方式检查并插入，返回幂等且只撤销该精确条目的 undo，并通过调用方提供的工厂取得所属注册表的精确重名诊断。查询与迭代器保留 `Map` 的原生顺序和活遍历语义。
-- `AnonymousEntries.append()` 为每次登记分配唯一内部键，因此值相等的回调或其他值仍彼此独立。其迭代器是保留插入顺序的活迭代器。
+- `NamedEntries.insert()` 以原子方式检查并插入，返回幂等且只撤销该精确条目的 undo，并通过调用方提供的工厂取得所属注册表的精确重名诊断。查询与迭代器保留 `Map` 的原生顺序，并在同一个非空表 generation 内保持活遍历；清空表会开启新的 generation，因此尚未结束的迭代器无法观察到自我替换。
+- `AnonymousEntries.append()` 为每次登记分配唯一内部键，因此值相等的回调或其他值仍彼此独立。其迭代器保留插入顺序，并采用同样的 generation 活遍历边界。
 - `effect()` 通过 `scopeOf(ctx)` 导出键，并把 action 挂到同一个 `ctx.effect()` 上。它只接受一个同步 action，且该 action 只返回一个同步 undo；action 要么返回其 undo，要么必须在保留任何贡献之前抛错。helper 不会规范化更宽泛的 Cordis `Effect` union。
 - `effect()` 在调用 `onChange` 前收集 action 的 undo，并原样返回 `ctx.effect()` 的 disposer。销毁时先运行 action undo 再通知；Cordis 保证其幂等性；只有整个层的 `ScopeLayer.isEmpty()` 变为 true 后，helper 才删除专属层。
 - `options.notify` 默认为 `true`。回调自身的策略仍具最终效力：工具与提示词的 change 回调可以抛错并触发登记回滚；`CommandService.notifyChange()` 会隔离观察者失败；工具 guard 传入 `notify: false`。
 
 ## 注册表迁移
 
-`dsh-tools` 定义一个 `ToolLayer`，其中包含命名工具以及匿名的已编译 restriction 和 guard 登记。`ToolRegistry` 保留其私有领域解析器，由它处理可见定义、限制前的已知名称、可限制的全局名称、专属遮蔽、restriction，以及保留的 `run_code` 插入。guard 求值继续先活遍历全局登记，再活遍历专属登记，因此重入时新增的登记保持现有行为。
+`dsh-tools` 定义一个 `ToolLayer`，其中包含命名工具以及匿名的已编译 restriction 和 guard 登记。`ToolRegistry` 保留其私有领域解析器，由它处理可见定义、限制前的已知名称、可限制的全局名称、专属遮蔽、restriction，以及保留的 `run_code` 插入。guard 求值会先活遍历全局登记，再活遍历专属登记：向非空 generation 新增的登记可以在当前分发中运行，而 guard 表清空后的自我替换则从下一次分发开始运行。
 
-`dsh-system-prompt` 定义一个 `PromptLayer`，其中包含命名的段落与变量，以及匿名工具提供方。组装流程在求值前合并段落，因此被遮蔽的提供方不会被调用。每次组装只物化一次工具提供方成员集合。变量提供方继续先活遍历全局表，再活遍历专属表，从而保留重入登记行为。
+`dsh-system-prompt` 定义一个 `PromptLayer`，其中包含命名的段落与变量，以及匿名工具提供方。组装流程在求值前合并段落，因此被遮蔽的提供方不会被调用。每次组装只物化一次工具提供方成员集合。变量提供方会先活遍历全局表，再活遍历专属表：向非空 generation 新增的提供方可以在当前组装中运行，而变量表清空后的自我替换则从下一次组装开始运行。
 
 `dsh-commands` 定义一个单表层，其中包含 `NamedEntries<RegisteredCommand>`。生效视图使用 `merge()`；`CommandService` 则保留对定义的规范化与冻结处理、精确重名诊断、经过排序的不可变描述符、直接执行、HMR（热模块替换）清理，以及对各个 `commands/change` 观察者分别隔离失败的行为。
 
@@ -120,7 +120,7 @@ export class AnonymousEntries<V> {
 
 ## 验证
 
-- `dsh-scope` 单元测试覆盖全局构造、专属层延迟构造、非创建式读取、命名合并顺序与遮蔽、聚合回收、工厂与 action 失败清理、通知顺序与回滚、`notify: false`、effect 标签、原始 disposer 身份、幂等拆除、调用方提供的重名错误、相同匿名值的独立登记和活迭代器。
-- 工具、系统提示词和命令专项测试套件覆盖 restriction、保留传输处理、已知名称与可限制名称的一致性、guard 重入、校验顺序、精确诊断、section 先遮蔽再求值、提供方快照成员关系、variable 重入、隔离失败的命令观察者、冻结且有序的视图、直接执行和生命周期销毁。
+- `dsh-scope` 单元测试覆盖全局构造、专属层延迟构造、非创建式读取、命名合并顺序与遮蔽、聚合回收、工厂与 action 失败清理、通知顺序与回滚、`notify: false`、effect 标签、原始 disposer 身份、幂等拆除、调用方提供的重名错误、相同匿名值的独立登记、活迭代器，以及表清空后的 generation 脱离。
+- 工具、系统提示词和命令专项测试套件覆盖 restriction、保留传输处理、已知名称与可限制名称的一致性、guard 重入与自我替换、校验顺序、精确诊断、section 先遮蔽再求值、提供方快照成员关系、variable 重入与自我替换、隔离失败的命令观察者、冻结且有序的视图、直接执行和生命周期销毁。
 - 作用域核心数据的类型等价性检查将 `ScopeLayer` 文档与其源声明绑定。仓库级的文档、模块图、构建、hygiene、覆盖率与构建产物门禁会覆盖包根导出与包边界。
 - 现有 ACP（Agent Client Protocol）、headless 和 TUI 无密钥快照继续作为工具 schema、提示词组装和人类命令的回归边界。实现不会更新任何预期 transcript（文本记录）。
