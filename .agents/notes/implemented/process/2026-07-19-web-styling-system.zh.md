@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> token 体系更新（2026-07-22）：本文框架裁决（CSS Modules + clsx、无组件库、无 tailwind、组件只用 token）仍然生效，但两层 `--bg-*`/`--text-*` token 表及其宿主 `web-ui/src/style/global.css` 已被 `packages/client/ui-theme/src/styles/` 的 `--dsw-*` static+alias 双层表取代（暗色=`body[data-ds-dark-theme]` 覆写）。现行权威：`missions/tasks/20260721-1520-web-plugin-rfc/architecture.md` §15。
+> token 体系更新（2026-07-22）：本文框架裁决（CSS Modules + clsx、无组件库、无 tailwind、组件只用 token）仍然生效，但两层 `--bg-*`/`--text-*` token 表及其宿主 `web-ui/src/style/global.css` 已被 `packages/client/ui-theme/src/styles/` 的 `--dsw-*` static+alias 双层表取代（暗色=`body[data-ds-dark-theme]` 覆写）——样式表本身即 token 权威。
 
 [English](2026-07-19-web-styling-system.md) | 中文
 
