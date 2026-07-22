@@ -16,9 +16,9 @@ Status: implemented
 
 生产 CI 包含 5 次大型运行器执行和 1 个标准运行器聚合作业。主 Node 门禁清单不再分片：
 
-- `node 24 / complete` 使用一台 96 核 Linux 运行器。只需执行一次代码检出、设置、缓存恢复和安装，即可供全部 42 项主门禁使用。`run-gates` 最多同时启动 32 项相互独立的门禁；ESLint 使用 32 个工作线程，覆盖率最多使用 12 个，快照回放最多使用 16 个。构建会立即与类型检查、覆盖率、lint 和文档工作同时启动，而快照回放和发布消费方仍显式依赖生成的 `lib/` 输出。
+- `node 24 / complete` 使用一台 96 核 Linux 运行器。只需执行一次代码检出、设置、缓存恢复和安装，即可供全部 42 项主门禁使用。`run-gates` 最多同时启动 16 项相互独立的门禁；ESLint 使用 16 个工作线程，覆盖率最多使用 12 个，快照回放最多使用 8 个。第一批短门禁释放调度器槽位后，构建会立即启动，而快照回放和发布消费方仍显式依赖生成的 `lib/` 输出。拉取请求会恢复 pnpm 和 ESLint 缓存但不保存，因此缓存压缩和上传不会延长必需作业；master 上的串行参考会在拉取请求关键路径之外刷新这些缓存。
 - Node 22.19 和 Node 26 分别使用 4 核和 32 核 Linux 池运行各自的运行时兼容性冒烟测试。Python 3.10 使用 8 核 Linux 池运行完整的无密钥 SDK 套件。这些作业属于环境契约，并非主 Node 门禁清单的分片。
-- `windows node 24 / complete` 使用一台 32 核 Windows 运行器。一次设置供必需的包构建、必需的生产网站构建以及完整的观测性可移植性清单共用。任何必需项失败都会使作业失败；观测项失败则报告为非阻塞。ESLint 保持单线程，因为 16 个 ESLint 工作线程耗时 174.54 秒，外层调度器则保留 32 个槽位。
+- `windows node 24 / complete` 使用一台 32 核 Windows 运行器。一次设置供必需的包构建、必需的生产网站构建以及完整的观测性可移植性清单共用。任何必需项失败都会使作业失败；观测项失败则报告为非阻塞。ESLint 保持单线程，因为 16 个 ESLint 工作线程耗时 174.54 秒；覆盖率最多使用 12 个工作线程，外层调度器则保留 16 个槽位。该作业仅恢复由 master 刷新的较小 ESLint 缓存，并在干净环境中执行 pnpm 安装，而不恢复或保存包含大量文件的包存储。
 
 原有的门禁级和粗粒度主流程分片作业已从工作流中移除。相应的静态、lint、覆盖率、快照和场景分片选择器也已从仓库中移除，因此未使用的诊断路径无法继续维系第二套 CI 架构。
 
@@ -38,11 +38,13 @@ Status: implemented
 
 Windows 仓库工作在超过 16 核后收益很小，但 32 核池可以让完整的外层清单同时启动。一次[重新定向的生产验证](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29907581119/attempts/2)在 173 秒内完成了单机 Windows 完整清单，其中包括覆盖率和快照回放，因此 Windows 继续采用合并执行方式。
 
+客户端包依赖图增大后，缓存机制和调度器压力也成为实测工作负载的一部分。在[一次分支头精确的生产运行](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29912577681)中，Linux 的仓库门禁耗时 39 秒，完整作业耗时 69 秒；Windows 的仓库门禁耗时 117 秒，完整作业耗时 228 秒。Windows pnpm 缓存的 154 MB 归档下载耗时约 2 秒，但解压耗时 27 秒，随后安装耗时 23 秒，作业结束后的保存又耗时 14 秒。一次[无缓存的全规格运行轨迹](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29913033155)在 27 秒内完成了同一台 32 核 Windows 运行器上的安装。因此，生产环境不使用 Windows 包存储缓存，在对延迟敏感的拉取请求作业中使用只恢复不保存的缓存，并限制外层并发度，以免类型检查、lint、覆盖率和构建在同一台主机上过度争用资源。
+
 两项主机效应仍构成这项决策的依据。一个标准 Node 26 作业曾在总共 67 秒的耗时中，把 36 秒用在 `Set up job` 上，因此各项环境契约使用不同的大型运行器池，而非标准容量。一个 Linux 候选作业在注册 50 KB 的 Bubblewrap 包时耗时 18 秒，因为托管映像扫描了 202,507 个包数据库文件。[`scripts/prepare-ci-bubblewrap.sh`](../../../../scripts/prepare-ci-bubblewrap.sh) 改为验证固定包内容并将其解压到临时运行器目录，执行功能性隔离探针，并让这项准备工作与依赖安装重叠执行。
 
 覆盖率仍限制为 12 个 fork。32 个 fork 曾两次导致 Node 24 的 CJS 词法分析器崩溃，后来一次使用 16 个 fork 的运行又复现了工作进程丢失和无效的覆盖率结果。12 个 fork 能保留进程余量，同时不会成为单机关键路径。
 
-工作流保留 3 项手动测量套件。`suite=larger-runner-benchmark` 比较所有规格下相互独立的关键通道，`suite=consolidated-runner-benchmark` 比较完整聚合流程，`suite=serial-reference` 则继续作为未分片的跨平台完整性判定基准。当拉取请求无法生成合并提交时，`suite=optimized-larger-runners` 会直接针对分支引用触发与生产环境完全相同的拓扑。
+工作流保留 2 项手动测量套件。`suite=larger-runner-benchmark` 比较所有规格下相互独立的关键通道，`suite=consolidated-runner-benchmark` 比较完整聚合流程。只有在 `master` 移动时，才运行完整的 Linux、macOS 和 Windows 串行参考；拉取请求只运行优化后的作业。
 
 ## 曾考虑的替代方案
 
