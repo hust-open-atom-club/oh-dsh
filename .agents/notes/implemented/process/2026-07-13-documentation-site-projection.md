@@ -18,6 +18,8 @@ Locale home projections retain only the canonical YAML frontmatter. The reposito
 
 The projector parses Markdown links without reserializing the document. A link to another published source becomes a site-relative route; a link to an unpublished repository file becomes a GitHub source link; a repository image becomes a raw GitHub URL. Missing relative targets fail projection. Unit tests pin these transformations, and `docs:check` runs the projector tests plus a production VitePress build as part of `doc-sync` and the parallel documentation gates.
 
+`website/AGENTS.md` is the only maintained Markdown file in the website subtree. The projector test enumerates tracked and unignored files and rejects any other website Markdown, so site-specific locale, route, API, or generated source copies cannot bypass the publication manifest.
+
 Mermaid renders the canonical diagrams. The website workspace explicitly declares the five packages that `vitepress-plugin-mermaid` asks Vite to prebundle because pnpm's strict dependency isolation otherwise makes those transitive packages unavailable to the local development server; Knip records this runtime-only use as an intentional dependency exception.
 
 Site publication remains separate from site construction. A dedicated GitHub Actions workflow runs the existing documentation gates, uploads `website/.dist` as a Pages artifact, and deploys only after the build succeeds. `actions/configure-pages` supplies the destination's base path to VitePress at build time, so the private Pages origin, a later public project path, and a custom domain do not require distinct checked-in configurations. Pages visibility remains a repository hosting setting rather than a workflow permission.
@@ -38,6 +40,6 @@ Site publication remains separate from site construction. A dedicated GitHub Act
 
 ## Consequences
 
-Documentation facts have one editable home, public routes remain stable across source moves, and the site can include generated references without committing another generated copy. Local development watches canonical inputs and regenerates the disposable projection. Merges that affect the documentation site deploy the checked result to Pages, while manual dispatch provides a recovery and validation entry point.
+Documentation facts have one editable home, public routes remain stable across source moves, and the site can include generated references without committing another generated copy. Local development watches canonical inputs and regenerates the disposable projection. The layout gate makes an obsolete site-specific Markdown tree a merge failure instead of ignored build input. Merges that affect the documentation site deploy the checked result to Pages, while manual dispatch provides a recovery and validation entry point.
 
 The publication manifest is a maintained allowlist, and link projection adds a small repository-specific build adapter. A new kind of Markdown link behavior needs a projector test. Mermaid support also increases the client bundle size, but preserves diagrams already used by the canonical documentation.
