@@ -17,7 +17,7 @@ The organization keeps twelve x64 larger-runner pools in the repo-restricted `ds
 Production CI assigns each of the six Linux pool sizes exactly once, assigns one 32-core Windows pool, and keeps only the final aggregator on a standard runner. The version and language jobs are environment contracts rather than slices of one gate inventory; the primary Node work has three coarse lanes instead of a gate-level shard matrix:
 
 - `node 24 / core` uses the 96-core Linux pool. One checkout, setup, cache restore, and install feeds 36 unsharded static, lint, documentation, hygiene, build, and artifact gates. `run-gates` starts up to 32 independent gates and ESLint uses 32 workers. Build starts eagerly; its artifact consumers still wait for emitted output.
-- `node 24 / cpu` uses the 64-core Linux pool for six CPU- or dependency-critical gates: typecheck, coverage, build followed by snapshot replay, and two Node 24 compatibility smokes. Coverage and snapshot each use at most 16 workers. This lane builds separately so snapshot replay consumes same-lane output. Coverage stays below 32 forks because that setting twice caused Node 24's CJS lexer to terminate a Vitest worker and invalidate coverage.
+- `node 24 / cpu` uses the 64-core Linux pool for six CPU- or dependency-critical gates: typecheck, coverage, build followed by snapshot replay, and two Node 24 compatibility smokes. Coverage uses at most 12 workers and snapshot uses at most 16. This lane builds separately so snapshot replay consumes same-lane output. Coverage stays at 12 forks because 32 forks crashed Node 24's CJS lexer twice and a later 16-fork run reproduced the same worker loss and invalid coverage.
 - `node 24 / production site` uses the 16-core Linux pool for the longest independent primary gate. This is one coarse split, not a shard matrix: the job performs one setup and one production VitePress build.
 - Node 22.19 compatibility, Python 3.10, and Node 26 compatibility use the 4-, 8-, and 32-core Linux pools respectively. Distinct labels avoid both standard-runner setup outliers and the delayed second allocation observed when two jobs shared one pool.
 - `windows node 24 / complete` uses the 32-core Windows pool. One setup feeds the required package build, the required production site build, and the complete observational portability inventory. The outer scheduler has 32 slots. Required failures fail the job; observational failures are printed as non-blocking and preserve their former advisory status. ESLint itself stays single-threaded because 16 ESLint worker threads increased full-lint time to 174.54 seconds; outer gate concurrency uses the runner without multiplying Windows worker startup and TypeScript project loading.
@@ -25,6 +25,8 @@ Production CI assigns each of the six Linux pool sizes exactly once, assigns one
 The Windows shape followed two cold-path observations. A first candidate used two 16-core Windows jobs, and GitHub took 93 seconds to provision the second same-label runner despite the configured autoscaling ceiling. A later [documentation-head validation](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29900502413) took 266 seconds on a separate Windows blocking job after spending 138 seconds restoring a 153 MB pnpm cache. Combining all Windows work on one 32-core box removed the duplicate setup wave.
 
 Two later runs set the Linux boundaries. A [standard-runner validation](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29902209492) took 67 seconds for Node 26 even though repository work took five seconds, because GitHub spent 36 seconds in `Set up job`. Moving the environment contracts to distinct larger pools removed that lottery. The next [all-larger-runner validation](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29902541203) took 68 seconds on the 96-core primary job: repository work remained 26 seconds, but setup, cache, install, and finalization consumed 42 seconds. Moving typecheck, coverage, and the build-to-snapshot dependency chain to one coarse 64-core lane reduced the 96-core lane's repository critical path to 14.81 seconds without returning to per-gate shards.
+
+A [documentation-head repeat](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29903735616) showed that 16 coverage forks still admitted the CJS-lexer crash. The coverage process completed its remaining tests in 23.73 seconds, but the dead worker left one file below threshold and correctly failed the lane. Twelve forks completed the same gate in 26.06 seconds in the final run, keeping the CPU lane below one minute while restoring process headroom.
 
 The workflow retains four manual diagnostics. `suite=larger-runner-benchmark` compares isolated critical lanes across every size, `suite=consolidated-runner-benchmark` compares whole aggregates, `suite=sharded-reference` preserves the former production shard topology, and `suite=serial-reference` remains the unsharded cross-platform completeness oracle. `suite=optimized-larger-runners` runs the exact production topology against a branch ref when a pull request cannot form a merge commit.
 
@@ -44,19 +46,19 @@ Those isolated results showed that setup dominated but did not identify the prod
 
 The Linux 32-core failure was the first CJS-lexer worker crash. The 96-core aggregate was the only successful all-size result at the one-minute boundary. Although Windows repository work gained little above 16 cores, the 32-core pool can start the complete outer inventory together and, more importantly, removes an entire paid setup from production.
 
-The exact [all-pool validation run](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29903067274) passed every job at the tested branch head:
+The exact [all-pool validation run](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29904080103) passed every job at the tested branch head:
 
 | Production job (pool) | Active time | Repository work | Result |
 |---|---:|---:|---:|
-| Node 22.19 compatibility (Linux 4) | 26 s | compatibility smokes | passed |
-| Python 3.10 (Linux 8) | 22 s | complete keyless SDK suite | passed |
-| Production site (Linux 16) | 39 s | VitePress in 22.57 s | passed |
-| Node 26 compatibility (Linux 32) | 24 s | compatibility smokes | passed |
-| Primary CPU (Linux 64) | 53 s | 6 gates in 23.70 s | passed |
-| Primary core (Linux 96) | 47 s | 36 gates in 14.81 s | passed |
-| Windows complete (Windows 32) | 109 s | 37 gates in 32.71 s | passed |
+| Node 22.19 compatibility (Linux 4) | 30 s | compatibility smokes | passed |
+| Python 3.10 (Linux 8) | 31 s | complete keyless SDK suite | passed |
+| Production site (Linux 16) | 51 s | VitePress in 24.23 s | passed |
+| Node 26 compatibility (Linux 32) | 27 s | compatibility smokes | passed |
+| Primary CPU (Linux 64) | 56 s | 6 gates in 26.07 s | passed |
+| Primary core (Linux 96) | 49 s | 36 gates in 15.58 s | passed |
+| Windows complete (Windows 32) | 102 s | 37 gates in 29.98 s | passed |
 
-All seven paid jobs began in the same second. The slowest non-Windows job finished in 53 seconds. The Windows job spent 20 seconds restoring its pnpm cache and 15 seconds installing dependencies, so its 109-second active time measures hosted setup variance as well as repository work. Every non-Windows job stays below one minute and the sole Windows job stays below three minutes.
+All seven paid jobs began within one second. The slowest non-Windows job finished in 56 seconds. The Windows job spent 21 seconds restoring its pnpm cache and 14 seconds installing dependencies, so its 102-second active time measures hosted setup variance as well as repository work. Every non-Windows job stays below one minute and the sole Windows job stays below three minutes.
 
 ## Alternatives considered
 
