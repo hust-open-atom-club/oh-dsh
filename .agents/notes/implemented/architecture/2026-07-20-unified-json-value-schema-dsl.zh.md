@@ -16,7 +16,7 @@ Status: implemented
 
 `InferValue<S>` 和 `InferArgs<P>` 根据同一份声明推导 TypeScript 值，`valueSchemaSpecToJsonSchema()` 和 `parameterSchemaSpecToJsonSchema()` 也将这些声明编译为 JSON Schema。精确类型推导以 16 层容器为界，超过后使用 `JsonValue`，从而避免 TypeScript 的类型实例化栈限制作者能声明的嵌套深度。`assertSupportedJsonSchema()` 会拒绝不受支持或位置错误的关键字；`validateJsonSchemaValue()` 则以无损 `JsonValue` 边界校验受支持的子集，不允许 `undefined`、负零、非有限数、稀疏数组、循环引用、非普通对象、函数、symbol 及其他需要强制转换的值。作者侧 schema 编译、原始 schema 断言、值校验、schema 到 TypeScript 的渲染、注册表数据分离，以及动态 Cordis 的跨运行域规范化与克隆均使用显式工作栈，因此运行时嵌套只受可用内存限制，不受 JavaScript 调用栈限制。
 
-对象根限制属于消费方规则，不属于 schema 词汇本身。subagent 和工作流中由调用方定义的结构化输出通过 `assertObjectJsonSchema()` 和 `ObjectJsonSchema` 保持对象根限制；工具输出可以使用任意根类型。动态 Cordis 注册会把跨 JavaScript 运行域传入的 schema 重建为当前运行时持有的 JSON，保留原始包装层的默认开放语义，并要求直接使用 DSL 声明的对象明确选择开放方式，然后再调用同一编译器。
+对象根限制属于消费方规则，不属于 schema 词汇本身。subagent 和工作流中由调用方定义的结构化输出通过 `assertObjectJsonSchema()` 和 `ObjectJsonSchema` 保持对象根限制；工具输出可以使用任意根类型。动态 Cordis 注册会把跨 JavaScript 运行域传入的 schema 重建为当前运行时持有的 JSON，保留原始包装层的默认开放语义，并要求直接使用 DSL 声明的对象明确选择开放方式，然后再调用同一编译器。动态边界会在规范化之前拒绝 JSON 不可见的记录键和非普通 schema 数组，因此不会静默丢弃约束，也不会触发自定义迭代逻辑。
 
 ## 备选方案
 
@@ -32,4 +32,4 @@ Status: implemented
 - 显式的对象开放方式和类型正确的字面量约束会让格式错误的声明在编写或注册阶段快速失败，而不是拖到后续模型调用时才失败。
 - 有界类型推导会为常规声明保留有用的精确类型，并将异常深的尾部结构退化为 `JsonValue`；运行时 schema 强制执行在任意深度仍保持精确。
 - 原始工具仍可直接注册范围更广的 JSON Schema，但统一代码生成会把不受支持的 schema 视为未知类型，不会假装自己能够强制执行。
-- 运行时和编译期测试覆盖所有根类型、恰好匹配一个分支时的重叠／无匹配行为、原始 schema 的默认开放语义、显式开放方式、有损 JSON 值、类型推导，以及核心投影和动态投影中的深层嵌套。
+- 运行时和编译期测试覆盖所有根类型、恰好匹配一个分支时的重叠／无匹配行为、原始 schema 的默认开放语义、显式开放方式、有损 JSON 值、类型推导、核心投影和动态投影中的深层嵌套、动态注册中 JSON 不可见的键，以及非普通 schema 数组。
