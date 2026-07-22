@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-07-21-tui-auto-title-default-on.zh.md)
 
+> **Superseded** by the [session-title consolidation Agent Note](../simplification/2026-07-22-tui-titles-from-session-title-service.md): the TUI-local `autoTitle` generation is removed; titles come from the log-backed session-title service, and the terminal rename consumes `session/title` events.
+
 ## Problem
 
 The [auto-title Agent Note](2026-07-21-tui-auto-pane-title.md) shipped `autoTitle` off by default and, on a resumed session, kept the static title because the first `user/message` was already logged. In use both choices defeated the feature's purpose. A per-session descriptive pane title is what makes one tmux pane or terminal tab distinguishable from the next; leaving it off by default means the product ships an inert feature that almost no user turns on, and skipping re-derivation on resume means a resumed session — exactly the long-lived session most worth labelling — falls back to the shared static string. The user asked for a descriptive per-session name to be the normal experience.

@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-07-21-tui-auto-pane-title.md) | 中文
 
+> **已被取代**：见[标题归一 Agent Note](../simplification/2026-07-22-tui-titles-from-session-title-service.md)。TUI 本地的 `autoTitle` 生成已移除；标题来自日志承载的 session-title 服务，终端重命名消费 `session/title` 事件。
+
 > **已被取代**（就默认值与恢复行为而言），见[自动标题默认开启 Agent Note](2026-07-21-tui-auto-title-default-on.md)：`autoTitle` 现默认开启，恢复会话会从已存储的首条消息重新推导标题，而非保留静态标题。下文的 OSC 0 路径、一次性门闩、模型概括形态、发出后不等待其返回的调用，以及每一条失败兜底，均仍然成立。
 
 ## Problem

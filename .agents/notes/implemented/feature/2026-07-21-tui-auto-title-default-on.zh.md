@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-07-21-tui-auto-title-default-on.md) | 中文
 
+> **已被取代**：见[标题归一 Agent Note](../simplification/2026-07-22-tui-titles-from-session-title-service.md)。TUI 本地的 `autoTitle` 生成已移除；标题来自日志承载的 session-title 服务，终端重命名消费 `session/title` 事件。
+
 ## Problem
 
 [自动标题 Agent Note](2026-07-21-tui-auto-pane-title.md) 交付时 `autoTitle` 默认关闭，并且在恢复会话中因首条 `user/message` 已入日志而保留静态标题。实际使用中这两个选择都违背了该功能的初衷。让一个 tmux 窗格或终端标签页区别于下一个的，正是每会话各异的描述性窗格标题；默认关闭意味着产品交付了一个几乎无人开启的惰性功能，而恢复时不重新推导，则意味着恢复会话——恰恰是最值得标记的长命会话——退回到共用的静态字符串。用户要求把每会话的描述性名称做成常态体验。

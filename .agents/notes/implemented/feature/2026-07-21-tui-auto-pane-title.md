@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-07-21-tui-auto-pane-title.zh.md)
 
+> **Superseded** by the [session-title consolidation Agent Note](../simplification/2026-07-22-tui-titles-from-session-title-service.md): the TUI-local `autoTitle` generation is removed; titles come from the log-backed session-title service, and the terminal rename consumes `session/title` events.
+
 > **Superseded** for the default and the resume behavior by the [auto-title default-on Agent Note](2026-07-21-tui-auto-title-default-on.md): `autoTitle` now defaults on, and a resumed session re-derives its title from the stored first message instead of keeping the static one. The OSC 0 path, the one-shot latch, the model-summary shape, the fire-and-forget call, and every failure fallback below stand.
 
 ## Problem
