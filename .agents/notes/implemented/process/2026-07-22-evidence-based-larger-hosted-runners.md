@@ -14,76 +14,58 @@ Larger runners make it possible to pay setup once and parallelize inside the rep
 
 The organization keeps twelve x64 larger-runner pools in the repo-restricted `dsh-larger-ci` group: Ubuntu 24.04 and Windows 2025 at 4, 8, 16, 32, 64, and 96 cores. Public IPs are disabled. Each pool has an autoscaling ceiling of 256; the ceiling does not allocate idle machines or remove the need to bound workflow demand.
 
-Production CI assigns each of the six Linux pool sizes exactly once, assigns one 32-core Windows pool, and keeps only the final aggregator on a standard runner. The version and language jobs are environment contracts rather than slices of one gate inventory; the primary Node work has three coarse lanes instead of a gate-level shard matrix:
+Production CI uses five larger-runner executions and one standard-runner aggregator. The primary Node inventory is not sharded:
 
-- `node 24 / core` uses the 96-core Linux pool. One checkout, setup, cache restore, and install feeds 36 unsharded static, lint, documentation, hygiene, build, and artifact gates. `run-gates` starts up to 32 independent gates and ESLint uses 32 workers. Build starts eagerly; its artifact consumers still wait for emitted output.
-- `node 24 / cpu` uses the 64-core Linux pool for six CPU- or dependency-critical gates: typecheck, coverage, build followed by snapshot replay, and two Node 24 compatibility smokes. Coverage uses at most 12 workers and snapshot uses at most 16. This lane builds separately so snapshot replay consumes same-lane output. Coverage stays at 12 forks because 32 forks crashed Node 24's CJS lexer twice and a later 16-fork run reproduced the same worker loss and invalid coverage.
-- `node 24 / production site` uses the 16-core Linux pool for the longest independent primary gate. This is one coarse split, not a shard matrix: the job performs one setup and one production VitePress build.
-- Node 22.19 compatibility, Python 3.10, and Node 26 compatibility use the 4-, 8-, and 32-core Linux pools respectively. Distinct labels avoid both standard-runner setup outliers and the delayed second allocation observed when two jobs shared one pool.
-- `windows node 24 / complete` uses the 32-core Windows pool. One setup feeds the required package build, the required production site build, and the complete observational portability inventory. The outer scheduler has 32 slots. Required failures fail the job; observational failures are printed as non-blocking and preserve their former advisory status. ESLint itself stays single-threaded because 16 ESLint worker threads increased full-lint time to 174.54 seconds; outer gate concurrency uses the runner without multiplying Windows worker startup and TypeScript project loading.
+- `node 24 / complete` uses one 96-core Linux runner. One checkout, setup, cache restore, and install feeds all 42 primary gates. `run-gates` starts up to 32 independent gates; ESLint uses 32 workers, coverage uses at most 12, and snapshot replay uses at most 16. Build starts immediately beside typecheck, coverage, lint, and documentation work, while snapshot replay and publication consumers retain explicit dependencies on emitted `lib/` output.
+- Node 22.19 and Node 26 use the 4- and 32-core Linux pools for their runtime compatibility smokes. Python 3.10 uses the 8-core Linux pool for the complete keyless SDK suite. These are environment contracts, not slices of the primary Node gate inventory.
+- `windows node 24 / complete` uses one 32-core Windows runner. One setup feeds the required package build, required production site build, and complete observational portability inventory. Required failures fail the job; observational failures are reported as non-blocking. ESLint stays single-threaded because 16 ESLint workers took 174.54 seconds, while the outer scheduler retains 32 slots.
 
-The Windows shape followed two cold-path observations. A first candidate used two 16-core Windows jobs, and GitHub took 93 seconds to provision the second same-label runner despite the configured autoscaling ceiling. A later [documentation-head validation](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29900502413) took 266 seconds on a separate Windows blocking job after spending 138 seconds restoring a 153 MB pnpm cache. Combining all Windows work on one 32-core box removed the duplicate setup wave.
+The former gate-level and coarse primary shard jobs are absent from the workflow. Their static, lint, coverage, snapshot, and scenario shard selectors are also absent from the repository, so an unused diagnostic path cannot preserve a second CI architecture.
 
-Two later runs set the Linux boundaries. A [standard-runner validation](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29902209492) took 67 seconds for Node 26 even though repository work took five seconds, because GitHub spent 36 seconds in `Set up job`. Moving the environment contracts to distinct larger pools removed that lottery. The next [all-larger-runner validation](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29902541203) took 68 seconds on the 96-core primary job: repository work remained 26 seconds, but setup, cache, install, and finalization consumed 42 seconds. Moving typecheck, coverage, and the build-to-snapshot dependency chain to one coarse 64-core lane reduced the 96-core lane's repository critical path to 14.81 seconds without returning to per-gate shards.
+An [exact-head all-size benchmark](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29908491351) ran the complete unsharded primary Node aggregate on every Linux pool before the eager-build correction:
 
-A [documentation-head repeat](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29903735616) showed that 16 coverage forks still admitted the CJS-lexer crash. The coverage process completed its remaining tests in 23.73 seconds, but the dead worker left one file below threshold and correctly failed the lane. Twelve forks completed the same gate in 26.06 seconds in the final run, keeping the CPU lane below one minute while restoring process headroom.
-
-One later exact-head run exposed a host-image tax rather than a repository bottleneck: the CPU lane completed its six gates in 28 seconds but took 66 seconds overall because registering the 50 KB Bubblewrap package scanned the runner's 202,507-file package database and consumed 18 seconds. `scripts/prepare-ci-bubblewrap.sh` instead downloads the pinned Ubuntu 24.04 package payload, verifies its archive checksum, extracts it into the ephemeral runner directory, and runs the same functional confinement probe used by the provider. Dependency installation and this sub-second preparation still overlap. This preserves the real Bubblewrap coverage without mutating the hosted image or adding another shard.
-
-The workflow retains four manual diagnostics. `suite=larger-runner-benchmark` compares isolated critical lanes across every size, `suite=consolidated-runner-benchmark` compares whole aggregates, `suite=sharded-reference` preserves the former production shard topology, and `suite=serial-reference` remains the unsharded cross-platform completeness oracle. `suite=optimized-larger-runners` runs the exact production topology against a branch ref when a pull request cannot form a merge commit.
-
-The first [twelve-size critical-lane benchmark](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29895295659) used a workflow-only commit on top of the standard-runner [baseline](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29850033610), so the code, lockfile, and commands were identical:
-
-| Critical job | Standard | 4 cores | 8 cores | 16 cores | 32 cores | 64 cores | 96 cores |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Linux typecheck | 56 s | 38 s | 35 s | 40 s | 35 s | 44 s | 40 s |
-| Windows production site | 160 s | 117 s | 103 s | 113 s | 75 s | 105 s | 108 s |
-
-Those isolated results showed that setup dominated but did not identify the production size. A [whole-aggregate benchmark without native ESLint concurrency](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29897826082) found a 69-second single-threaded Linux lint gate. After enabling native Linux ESLint concurrency, the [second whole-aggregate benchmark](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29898331705) produced these active job times:
-
-| Job | 4 cores | 8 cores | 16 cores | 32 cores | 64 cores | 96 cores |
+| Complete Linux primary | 4 cores | 8 cores | 16 cores | 32 cores | 64 cores | 96 cores |
 |---|---:|---:|---:|---:|---:|---:|
-| Linux complete primary | 147 s | 104 s | 95 s | failed at 57 s | 66 s | 60 s |
-| Windows blocking builds | 137 s | 127 s | 113 s | 107 s | 105 s | 131 s |
+| Active time | 243 s | 144 s | 103 s | 87 s | 62 s | 65 s |
 
-The Linux 32-core failure was the first CJS-lexer worker crash. The 96-core aggregate was the only successful all-size result at the one-minute boundary. Although Windows repository work gained little above 16 cores, the 32-core pool can start the complete outer inventory together and, more importantly, removes an entire paid setup from production.
+The 96-core trace spent 39.14 seconds in repository gates. Typecheck occupied 25.71 seconds, then a scheduler dependency delayed the 2.13-second build and 11.29-second snapshot replay until it finished. The same run already proved build and typecheck independently, and the former CPU lane ran them concurrently. Removing that dependency makes lint at 33.30 seconds the measured critical gate while preserving dependencies only for consumers of build output. The 64-core trace exposed the same idle chain: typecheck, build, and snapshot consumed 44.85 seconds in sequence while its independent lint and documentation builds finished in 36.83 and 36.15 seconds. More cores therefore become useful only after the repository scheduler can feed them.
 
-The exact [all-pool validation run](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29905362252) passed every job at the tested branch head:
+The same benchmark measured the required Windows build surfaces across every provisioned size:
 
-| Production job (pool) | Active time | Repository work | Result |
-|---|---:|---:|---:|
-| Node 22.19 compatibility (Linux 4) | 26 s | compatibility smokes | passed |
-| Python 3.10 (Linux 8) | 23 s | complete keyless SDK suite | passed |
-| Production site (Linux 16) | 48 s | VitePress in 25 s | passed |
-| Node 26 compatibility (Linux 32) | 28 s | compatibility smokes | passed |
-| Primary CPU (Linux 64) | 46 s | 6 gates in 25.74 s | passed |
-| Primary core (Linux 96) | 42 s | 36 gates in 15.13 s | passed |
-| Windows complete (Windows 32) | 137 s | 37 gates in 37.74 s | passed |
+| Windows blocking builds | 4 cores | 8 cores | 16 cores | 32 cores | 64 cores | 96 cores |
+|---|---:|---:|---:|---:|---:|---:|
+| Active time | 152 s | 104 s | 104 s | 92 s | 103 s | 110 s |
 
-All seven paid jobs began within one second. The slowest non-Windows job finished in 48 seconds. The Windows job spent 25 seconds checking out, 22 seconds enabling Developer Mode, 19 seconds restoring its pnpm cache, and 16 seconds installing dependencies, so its 137-second active time measures hosted setup variance as well as repository work. Every non-Windows job stays below one minute and the sole Windows job stays below three minutes.
+Repository work gains little above 16 Windows cores, but the 32-core pool can start the complete outer inventory together. A [retargeted production validation](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29907581119/attempts/2) completed the full one-box Windows inventory in 173 seconds, including coverage and snapshot replay, so Windows remains consolidated.
+
+Two host effects remain part of the decision. A standard Node 26 job once spent 36 of its 67 seconds in `Set up job`, which is why environment contracts use distinct larger-runner pools instead of standard capacity. A Linux candidate spent 18 seconds registering a 50 KB Bubblewrap package because the hosted image scanned 202,507 package-database files. [`scripts/prepare-ci-bubblewrap.sh`](../../../../scripts/prepare-ci-bubblewrap.sh) instead verifies and extracts the pinned payload into the ephemeral runner directory, runs a functional confinement probe, and overlaps that preparation with dependency installation.
+
+Coverage remains capped at 12 forks. Thirty-two forks crashed Node 24's CJS lexer twice, and a later 16-fork run reproduced the worker loss and invalid coverage result. Twelve forks preserve process headroom without becoming the single-host critical path.
+
+The workflow retains three manual measurement suites. `suite=larger-runner-benchmark` compares isolated critical lanes across every size, `suite=consolidated-runner-benchmark` compares whole aggregates, and `suite=serial-reference` remains the unsharded cross-platform completeness oracle. `suite=optimized-larger-runners` dispatches the exact production topology against a branch ref when a pull request cannot form a merge commit.
 
 ## Alternatives considered
 
-**Keep the former shard topology in production.** The shards can be fast when provisioned together, but 49 larger-runner jobs repeat setup and create more chances for a cold outlier. The 231-second Windows control demonstrated that a short lint shard does not protect the end-to-end job target.
+**Keep the three coarse primary Linux lanes.** The core, CPU, and production-site jobs met the latency targets, but they paid three setup waves and left primary Node work sharded after larger runners were available. The all-size trace showed that one unnecessary dependency, not a lack of host capacity, kept the single-box aggregate above one minute.
 
-**Select a production size from the critical-lane benchmark.** Four cores looked cost-effective for isolated typecheck and site builds, but the full aggregate found repository-wide lint and dependent artifact work that those commands did not represent.
+**Keep the former gate-level shard topology as a manual reference.** A dormant second topology kept hundreds of workflow lines, selector modules, and scenario-partition behavior alive. The all-size and serial suites provide timing and completeness controls without preserving production code that no required job exercises.
 
-**Run the production site inside the Linux core aggregate.** This reached 50 seconds with warm hosted setup, then crossed the threshold at 64 seconds when the site gate took 29.05 seconds. One coarse independent site job protects the target without returning to gate-level sharding.
+**Use the 64-core pool for the complete primary aggregate.** Its sampled active time was three seconds lower than the 96-core result because hosted setup was nine seconds faster, but its repository gates were 5.72 seconds slower. Production uses 96 cores for the shorter controllable critical path; the benchmark suite retains both pools so a sustained image or pricing change can reverse that choice with evidence.
 
-**Keep every primary gate on the 96-core Linux runner.** Repository work completed in 26 seconds, but a 42-second cold path still pushed the job to 68 seconds. The 64-core CPU lane owns the three longest independent or dependency-critical paths; the remaining 36-gate core inventory completes its repository work in 14.81 seconds.
+**Keep build behind typecheck.** This orders independent compiler invocations and turns snapshot replay into a three-stage critical chain. Build output has its own success dependency, so only snapshot and publication consumers wait for it.
 
-**Keep required and observational Windows checks in separate jobs.** The split preserved status semantics at the workflow level but paid setup twice, and a cold cache pushed the required job to 266 seconds. `run-gates` now preserves those semantics inside one process: build and production site are required, while the remaining inventory is explicitly non-blocking.
+**Keep compatibility and Python on standard runners.** Warm standard runs can fit, but runner setup alone has crossed the non-Windows target. Distinct larger pools isolate these environment contracts from that allocation lottery.
 
-**Prebuild before starting the Linux aggregate.** This moved build onto the setup path and produced a 66-second candidate. Starting build eagerly inside `run-gates` preserves artifact dependencies while overlapping it with unrelated checks.
+**Keep required and observational Windows checks in separate jobs.** The split preserves status semantics at the workflow level but pays setup twice. `run-gates` preserves the same required versus non-blocking distinction inside one process.
 
-**Use native ESLint worker concurrency on Windows.** Sixteen workers made lint more than five times slower than the final single-threaded result. Outer gate parallelism uses the 32-core runner without multiplying ESLint's Windows worker startup and TypeScript project loading.
-
-**Keep compatibility and Python on standard runners.** Warm runs completed in 43 seconds or less, but one Node 26 job later spent 36 seconds in GitHub setup and crossed the target despite only five seconds of repository work. Distinct larger pools stabilize those environment contracts; the three-second final aggregator remains on a standard runner because it begins only after the paid jobs release capacity.
+**Install Bubblewrap through the system package manager.** This uses the host's package database and can dominate the job even when the payload is tiny. Pinned extraction plus a confinement probe preserves the runtime contract without mutating the hosted image.
 
 ## Consequences
 
-The all-pool validation consumed one billed minute at each Linux size and three billed 32-core Windows minutes. At the configured larger-runner rates, its larger-runner cost was $1.058. A Windows run below 120 seconds costs $0.896 instead; both shapes remain inside the three-minute target. The all-size critical benchmark cost $2.936. GitHub rounds each larger-runner job up to a whole minute, so reducing paid job count from 49 to seven matters as much as shortening repository work.
+Primary Node CI has one job, one setup wave, one complete gate inventory, and no shard selectors. Together with two Node compatibility executions, Python, and Windows, production has five paid larger-runner executions instead of seven coarse-lane executions or 49 gate-level executions.
 
-The existing zero-dollar Actions budget did not block larger-runner jobs. The repo-only runner group, bounded workflow topology, manual benchmark triggers, and job timeouts are the observed cost controls; the budget is not treated as an execution guard.
+GitHub rounds each larger-runner execution up to a whole minute, so eliminating setup waves reduces billed time as well as workflow complexity. The final aggregator remains on a standard runner because it begins only after the paid jobs release capacity.
 
-Production CI depends on the organization-owned runner names in this note and in `.github/workflows/ci.yml`. Missing or renamed pools leave jobs queued instead of falling back to standard capacity. Manual all-size, consolidated, former-shard, and serial suites remain available so image, dependency, scheduler, or pricing changes can be remeasured before changing production labels.
+The current targets are observed performance contracts, not cancellation deadlines. Exact-head production runs must show every non-Windows job below one minute and the consolidated Windows job below three minutes; manual all-size and serial suites remain available when image, dependency, scheduler, or pricing changes need remeasurement.
+
+Production CI depends on the organization-owned runner labels in [`.github/workflows/ci.yml`](../../../../.github/workflows/ci.yml). Missing or renamed pools leave jobs queued instead of falling back to standard capacity. All twelve pools remain provisioned so the manual benchmarks can re-evaluate the production size without an administrative setup cycle.
