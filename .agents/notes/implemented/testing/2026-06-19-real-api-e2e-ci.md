@@ -56,6 +56,8 @@ The repo secret is named `DEEPSEEK_API_KEY_EXTERNAL`; it is mapped to the `DEEPS
 
 The job runs only `test:e2e` on Node 24; keyless gates and version compatibility belong to the main CI workflow. Tests run unbuilt through the workspace paths map with a bounded configurable worker pool, per-test retries, and a job timeout. Superseded PR runs are cancelled, while push and scheduled runs complete for post-merge signal.
 
+The DeepSeek native `web_search` probe is registered but skipped. The live Anthropic-compatible endpoint can return a successful response without structured source blocks, so its positive-source assertion is not a reliable merge signal; unit coverage still pins response parsing, but CI does not prove the live source-block wire shape.
+
 ## Security
 
 The repository's first CI secret requires a recorded threat model because access differs between same-repository, fork, and Dependabot pull requests and changes when the repository becomes public.
