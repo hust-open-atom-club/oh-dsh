@@ -54,6 +54,7 @@ The first-party tools preserve their existing Native text while returning domain
 | `skill` | `{ name, provider, resourceBase?, content }` |
 | `todo_write` | `{ todos, counts }` |
 | `ask_user_question` | `{ answers: [{ id, selected, custom? }] }` |
+| `exit_plan_mode` | `{ approved: true }` |
 | `cordis_inspect` / `cordis_mount` / `cordis_unmount` | Inspection text or typed dynamic-mount handles |
 | `structured_output` | `{ recorded: true }` |
 | `run_code` | `{ logs: string[], result?: JsonValue }` |
