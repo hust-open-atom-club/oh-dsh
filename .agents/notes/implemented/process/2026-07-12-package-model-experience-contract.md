@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-12-package-model-experience-contract.zh.md)
-
 ## Problem
 
 A package README can explain APIs and runtime mechanics without answering the questions that dominate an agent harness's behavior and cost: what from this package reaches a model request, under which conditions, how long those tokens remain, and whether later requests preserve a reusable KV-cache prefix. The omission is especially hard to audit in a plugin architecture. A consumer may turn a backend result into a tool message, a policy plugin may replace success with an error, compaction may remove old history, and an agent-scoped registration may change one agent's prompt or schemas while leaving every other agent unchanged. Reading only the nominally model-facing packages therefore misses real context effects, while reading source across every dependency is too expensive for routine review.

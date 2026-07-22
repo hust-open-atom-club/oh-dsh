@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-05-skill-system.zh.md)
-
 ## Problem
 
 Agent products have converged on a skill pattern: keep the request prompt small by listing only available instruction bundles, then load the full body when the model decides a task matches. Codex, Claude Code, OpenCode, and Kimi Code differ in details, but all separate discovery metadata from complete instructions so a workspace can carry reusable behavior without paying the full prompt cost on every turn.

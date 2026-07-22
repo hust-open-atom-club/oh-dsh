@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-12-subagent-persona-tool-filter-and-depth.zh.md)
-
 ## Problem
 
 A reusable subagent provider answers how to run a child, but different delegation tools need different child behavior. One deployment may want a reviewer persona, a research-only tool set, or a hard recursion bound without creating a new provider for every combination.

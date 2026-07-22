@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-18-compaction-capability-seam.zh.md)
-
 ## Problem
 
 A long-running agent conversation grows without bound. As the event log accumulates turns, the derived message history eventually approaches the model's context window — the model then truncates mid-response (`max-tokens`) or degrades. **Compaction** is the mitigation: replace a run of older history with a concise summary, keeping recent context intact.
