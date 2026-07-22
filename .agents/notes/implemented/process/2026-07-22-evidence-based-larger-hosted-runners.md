@@ -28,6 +28,8 @@ Two later runs set the Linux boundaries. A [standard-runner validation](https://
 
 A [documentation-head repeat](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29903735616) showed that 16 coverage forks still admitted the CJS-lexer crash. The coverage process completed its remaining tests in 23.73 seconds, but the dead worker left one file below threshold and correctly failed the lane. Twelve forks completed the same gate in 26.06 seconds in the final run, keeping the CPU lane below one minute while restoring process headroom.
 
+One later exact-head run exposed a host-image tax rather than a repository bottleneck: the CPU lane completed its six gates in 28 seconds but took 66 seconds overall because registering the 50 KB Bubblewrap package scanned the runner's 202,507-file package database and consumed 18 seconds. `scripts/prepare-ci-bubblewrap.sh` instead downloads the pinned Ubuntu 24.04 package payload, verifies its archive checksum, extracts it into the ephemeral runner directory, and runs the same functional confinement probe used by the provider. Dependency installation and this sub-second preparation still overlap. This preserves the real Bubblewrap coverage without mutating the hosted image or adding another shard.
+
 The workflow retains four manual diagnostics. `suite=larger-runner-benchmark` compares isolated critical lanes across every size, `suite=consolidated-runner-benchmark` compares whole aggregates, `suite=sharded-reference` preserves the former production shard topology, and `suite=serial-reference` remains the unsharded cross-platform completeness oracle. `suite=optimized-larger-runners` runs the exact production topology against a branch ref when a pull request cannot form a merge commit.
 
 The first [twelve-size critical-lane benchmark](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29895295659) used a workflow-only commit on top of the standard-runner [baseline](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29850033610), so the code, lockfile, and commands were identical:
@@ -46,19 +48,19 @@ Those isolated results showed that setup dominated but did not identify the prod
 
 The Linux 32-core failure was the first CJS-lexer worker crash. The 96-core aggregate was the only successful all-size result at the one-minute boundary. Although Windows repository work gained little above 16 cores, the 32-core pool can start the complete outer inventory together and, more importantly, removes an entire paid setup from production.
 
-The exact [all-pool validation run](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29904080103) passed every job at the tested branch head:
+The exact [all-pool validation run](https://github.com/deepseek-harness/deepseek-harness/actions/runs/29905362252) passed every job at the tested branch head:
 
 | Production job (pool) | Active time | Repository work | Result |
 |---|---:|---:|---:|
-| Node 22.19 compatibility (Linux 4) | 30 s | compatibility smokes | passed |
-| Python 3.10 (Linux 8) | 31 s | complete keyless SDK suite | passed |
-| Production site (Linux 16) | 51 s | VitePress in 24.23 s | passed |
-| Node 26 compatibility (Linux 32) | 27 s | compatibility smokes | passed |
-| Primary CPU (Linux 64) | 56 s | 6 gates in 26.07 s | passed |
-| Primary core (Linux 96) | 49 s | 36 gates in 15.58 s | passed |
-| Windows complete (Windows 32) | 102 s | 37 gates in 29.98 s | passed |
+| Node 22.19 compatibility (Linux 4) | 26 s | compatibility smokes | passed |
+| Python 3.10 (Linux 8) | 23 s | complete keyless SDK suite | passed |
+| Production site (Linux 16) | 48 s | VitePress in 25 s | passed |
+| Node 26 compatibility (Linux 32) | 28 s | compatibility smokes | passed |
+| Primary CPU (Linux 64) | 46 s | 6 gates in 25.74 s | passed |
+| Primary core (Linux 96) | 42 s | 36 gates in 15.13 s | passed |
+| Windows complete (Windows 32) | 137 s | 37 gates in 37.74 s | passed |
 
-All seven paid jobs began within one second. The slowest non-Windows job finished in 56 seconds. The Windows job spent 21 seconds restoring its pnpm cache and 14 seconds installing dependencies, so its 102-second active time measures hosted setup variance as well as repository work. Every non-Windows job stays below one minute and the sole Windows job stays below three minutes.
+All seven paid jobs began within one second. The slowest non-Windows job finished in 48 seconds. The Windows job spent 25 seconds checking out, 22 seconds enabling Developer Mode, 19 seconds restoring its pnpm cache, and 16 seconds installing dependencies, so its 137-second active time measures hosted setup variance as well as repository work. Every non-Windows job stays below one minute and the sole Windows job stays below three minutes.
 
 ## Alternatives considered
 
@@ -80,7 +82,7 @@ All seven paid jobs began within one second. The slowest non-Windows job finishe
 
 ## Consequences
 
-The all-pool validation consumed one billed minute at each Linux size and two billed 32-core Windows minutes. At the configured larger-runner rates, its larger-runner cost was $0.896. The all-size critical benchmark cost $2.936. GitHub rounds each larger-runner job up to a whole minute, so reducing paid job count from 49 to seven matters as much as shortening repository work.
+The all-pool validation consumed one billed minute at each Linux size and three billed 32-core Windows minutes. At the configured larger-runner rates, its larger-runner cost was $1.058. A Windows run below 120 seconds costs $0.896 instead; both shapes remain inside the three-minute target. The all-size critical benchmark cost $2.936. GitHub rounds each larger-runner job up to a whole minute, so reducing paid job count from 49 to seven matters as much as shortening repository work.
 
 The existing zero-dollar Actions budget did not block larger-runner jobs. The repo-only runner group, bounded workflow topology, manual benchmark triggers, and job timeouts are the observed cost controls; the budget is not treated as an execution guard.
 
