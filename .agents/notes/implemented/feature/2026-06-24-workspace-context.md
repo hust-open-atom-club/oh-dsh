@@ -18,11 +18,11 @@ The plugin does not statically inject `fs`. Providerless product trees therefore
 
 ### File Names And Precedence
 
-The default per-directory candidate list is `['AGENTS.md', 'CLAUDE.md']`. The list is configurable as `instructionFileCandidates`, and `AGENTS.md` is an ordinary first candidate rather than a hidden priority. In one directory, only the first existing regular-file candidate loads. With defaults, `AGENTS.md` is native and `CLAUDE.md` is a compatibility fallback.
+The default per-directory candidate list is `['AGENTS.md', 'CLAUDE.md']`. The list is configurable as `instructionFileCandidates`, and `AGENTS.md` is an ordinary first candidate rather than a hidden priority. In one directory, only the first existing regular-file candidate loads. With defaults, `AGENTS.md` is native and `CLAUDE.md` is a compatibility fallback. A second list, `localInstructionFileCandidates` (default `['AGENTS.local.md', 'CLAUDE.local.md']`), loads an additive local overlay after the base file in the same directory; the [default local overlay](2026-07-21-local-instruction-overlay.md) owns that decision.
 
-Candidate entries are same-directory file names. Empty entries, `.`/`..`, and entries containing `/` or `\` are ignored. Lowercase names, local variants, and other same-directory names can be opted into explicitly; rule directories and import semantics are outside this contract.
+Candidate entries are same-directory file names. Empty entries, `.`/`..`, and entries containing `/` or `\` are ignored. Other same-directory names can be opted into explicitly; rule directories and import semantics are outside this contract.
 
-The user-global file is fixed at `$DSH_HOME/AGENTS.md` and is not affected by `instructionFileCandidates`. `$DSH_HOME` defaults to `~/.dsh`, matching the harness-level home role of `~/.codex` or `~/.claude` rather than introducing a plugin-specific home. Tilde expansion and the default live in `dsh-paths` so future harness features share the same convention.
+The user-global file is fixed at `$DSH_HOME/AGENTS.md`, is not affected by either candidate list, and has no local overlay. `$DSH_HOME` defaults to `~/.dsh`, matching the harness-level home role of `~/.codex` or `~/.claude` rather than introducing a plugin-specific home. Tilde expansion and the default live in `dsh-paths` so future harness features share the same convention.
 
 ### Baseline Prefix
 
@@ -84,4 +84,4 @@ The system is event-driven rather than watch-driven. Edits are not visible at th
 
 ## Deferred
 
-Bash-derived path reporting, recursive startup scans, file watchers, lowercase defaults, `.claude/CLAUDE.md`, `.claude/rules/*.md`, import directives, ACP `additionalDirectories`, trust acknowledgements, and model-generated summaries are deferred. Same-directory private variants can be configured today; directory rule systems and imports need their own precedence and trust designs.
+Bash-derived path reporting, recursive startup scans, file watchers, lowercase defaults, `.claude/CLAUDE.md`, `.claude/rules/*.md`, import directives, ACP `additionalDirectories`, trust acknowledgements, and model-generated summaries are deferred. Project-directory `.local.` overlays now load by default (the [default local overlay](2026-07-21-local-instruction-overlay.md) owns that decision); a user-global overlay, directory rule systems, and imports still need their own precedence and trust designs.
