@@ -34,14 +34,14 @@ idle 检测属于后端行为，不是第二条公共 seam。远程或容器后�
 
 实现不提供插件加载期 auto-start 会话。`terminal_open` 只在 agent 工具调用期间创建会话，此时所有权和所属的事件溯源会话都已确定。未来的声明式启动功能必须通过尚未发布的 agent setup 组合，而不能创建全局共享终端。
 
-agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出。后端或工具插件 reload 不会遗留会话：所有权持续存放在 `PtyService` 中，直到 agent 结束，与 [`ctx.tasks`](../../../../packages/tasks/tasks/README.md) 的服务持有记录模式一致。
+agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出。未发布的后端 setup 同样是受追踪的生命周期操作：owner 或服务 dispose 会中止服务自有的 signal，等待后端结算与回滚完成后才返回。即使后端 reject，或返回的会话在回滚 close 时失败，调用方取消仍会原样保留其 `AbortSignal.reason`；该清理失败不会替换调用方原因，而会继续受追踪，留待后续 owner 或服务 dispose 处理。由 lifecycle dispose 触发的回滚 close 失败会使 spawn 与该 lifecycle dispose 都 reject，而 `PtyBackendCleanupError` 让后端在不替换调用方取消的前提下，为该 lifecycle dispose 保留自身的启动清理失败。若调用方取消先于 dispose 完成结算，该清理失败会继续作为受追踪的 owner activity 保留，直到后续 owner 或服务 dispose 消费并报告它，因此沙箱模式策略不会把清理失败误判为静默。后端或工具插件 reload 不会遗留会话：所有权持续存放在 `PtyService` 中，直到 agent 结束，与 [`ctx.tasks`](../../../../packages/tasks/tasks/README.md) 的服务持有记录模式一致。服务会先同步把会话预留给一次活跃发送，再返回该操作；后台发送同样会在 task id 对外可见前完成预留。第二次发送会以 `SEND_ACTIVE` 失败，因此输出与取消无法跨越操作所有权。
 
 ### 安全与进程边界
 
 注册的 `shell` 后端只约束终端如何启动，不约束启动后输入的命令。因此 `dsh-pty-local` 在 spawn 前应用两层保护：
 
 - 它使用与 `bash-local` 相同的凭证形态名称策略构建清洗后的子进程环境，移除环境中的 `*KEY*`、`*SECRET*`、`*TOKEN*` 和 harness 管理的变量，除非显式的可信映射提供这些值。
-- 它要求 `ctx.sandbox` 和共享的 `ctx.sandboxPolicy`。后端在 spawn 时，以部署默认值为底折叠 owner 的有效 session mode，并只包装一次 shell argv；该 mode 与 workspace root 在 PTY 的整个生命周期中充当进程边界。`danger-full-access` 是现有的显式无约束选择，不另设 PTY 私有 bypass。
+- 它要求 `ctx.sandbox` 和共享的 `ctx.sandboxPolicy`。后端在 spawn 时，以部署默认值为底折叠 owner 的有效 session mode，并只包装一次 shell argv；该 mode 与 workspace root 在 PTY 的整个生命周期中充当进程边界。只要 owner 有任何已打开的 PTY 或尚未发布的 spawn，任何会改变生效 `sandbox/mode` 的写入都会在提交前被拒绝，并提示先等待创建操作结算，再关闭这些会话；不会改变生效模式的写入仍然有效。这项进行中的预留从后端 setup 持续到发布完成，因此不存在降级后又出现权限更宽的终端这一竞态。`danger-full-access` 是现有的显式无约束选择，不另设 PTY 私有 bypass。
 
 沙箱限制本地进程副作用，但不会让任意 shell 输入自动安全：网络调用和其他外部副作用仍由部署策略治理。工具描述会说明 PTY 会话比一次性工具更难审计，只应在确实需要持久状态或交互式 stdin 时使用。
 
@@ -58,19 +58,21 @@ agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出�
 | `terminal_close` | 关闭一个会话并等待进程树静默退出 | `{ killed }` |
 | `terminal_list` | 列出调用方的活会话 | 按 owner 隔离的会话摘要 |
 
-`terminal_send({ sessionId, text, submit?, run_in_background? })` 将 `text` 视为 UTF-8 字节，并由工具实现在解析阶段把 `submit` 默认成 `true`。`submit` 为 true 时先写入文本，再写入平台 Enter 序列；为 false 时只写文本，使控制字符和 REPL 片段无需隐藏的内容启发式即可发送。
+ACP 渲染契约精确且不携带位置信息。`terminal_send` 只为前台发送使用 terminal 调用卡片和结果卡片；后台形式使用通用 `execute` 卡片。`terminal_open`、`terminal_read`、`terminal_signal`、`terminal_close` 和 `terminal_list` 分别使用通用 `execute`、`read`、`execute`、`delete` 和 `read` 卡片。所有 PTY 工具都不发出 `locations`。
 
-前台发送返回有界的渲染增量和两个独立事实：`waitReason`（`stdin_read | inferred_idle | timeout | session_exit`）与 `sessionStatus`（`running`，或携带退出码或信号的 `exited`）。`session_exit` 指 PTY 顶层 shell 进程退出，不指由 shell 消费状态的任意前台命令。timeout 从不意味着进程已经退出。
+`terminal_send({ sessionId, text, submit?, run_in_background? })` 将 `text` 视为 UTF-8 字节，并由工具实现在解析阶段把 `submit` 默认成 `true`。`submit` 为 true 时先写入文本，再写入平台 Enter 序列；为 false 时只写文本，使控制字符和 REPL 片段无需隐藏的内容启发式即可发送。`enableRunInBackground` 默认为 true；设为 false 时，schema 中会移除 `run_in_background`，调用方即使强行把这个未声明参数传入执行流程，也会被拒绝。
 
-当 `run_in_background: true` 时，`dsh-tool-pty` 在 `ctx.tasks` 上注册进行中的发送，并立即返回 `taskId`。`task_output(wait: true)` 负责等待、读取增量输出并记录最终结果；`task_kill` 将取消转发为 `SIGINT`，只有 PTY 后端拥有的 teardown 路径可以升级信号。若 task 对外接口不存在，后台模式必须在写入输入前失败。设计不新增 PTY 专用的 `sleep` 工具或通用唤醒 seam。
+前台发送返回有界的渲染增量和两个独立事实：`waitReason`（`stdin_read | inferred_idle | timeout | session_exit`）与 `sessionStatus`（`running`，或携带退出码或信号的 `exited`）。`session_exit` 指 PTY 顶层 shell 进程退出，不指由 shell 消费状态的任意前台命令。timeout 从不意味着进程已经退出。`dsh-tool-pty.maxResultBytes` 默认为 262144；低于 64 的值会被拒绝，以确保创建确认保留 registry 签发的 id；每个单文本 UTF-8 结果在加入规范化的工具或流水线错误、等待、会话、分页、截断、通用 task 状态包装、策略拒绝或短路以及 post-execute 替换或阻断后，仍受该值限制；终端定义自有的末端 `finalizeContent` callback 会原样保留策略刻意返回的结构化多 block 内容。渲染器会为后缀预留空间并保持代码点边界，而不会把后端载荷上限当作面向模型结果的最终上限。
 
-`terminal_read` 从最新保留行向后分页。后端同时对保留的 scrollback 和完整返回值执行行数与 UTF-8 字节上限，因此单个超长行无法绕过限制。`truncated` 用于区分保留数据丢失与普通 viewport 增量。
+当 `run_in_background: true` 时，`dsh-tool-pty` 在 `ctx.tasks` 上注册进行中的发送，并立即返回 `taskId`。生产方把 `maxResultBytes` 写入 task 快照，使 `task_output`、kill 返回的终态状态和完成通知在加上通用元数据后，仍对完整结果执行同一上限。`task_output(wait: true)` 负责等待、读取增量输出并记录最终结果；`task_kill` 会解析当前前台 PGID 并发送真正的 `SIGINT`，即使应用已禁用终端 `ISIG` 也同样如此，且后续升级仍只通过 PTY 后端拥有的 teardown 路径进行。若 task 对外接口不存在，后台模式必须在写入输入前失败。设计不新增 PTY 专用的 `sleep` 工具或通用唤醒 seam。
+
+`terminal_read` 从最新保留行向后分页。后端同时对保留的 scrollback 和返回页载荷执行行数与 UTF-8 字节上限，因此单个超长行无法绕过后端上限；工具随后再限制包含分页与截断元数据的完整渲染页。`truncated` 用于区分保留数据丢失与普通 viewport 增量。
 
 `terminal_signal` 接受闭合集 `SIGINT | SIGTERM | SIGKILL | SIGTSTP | SIGHUP`。后端在执行时解析终端前台进程组。当目标组是顶层 shell 时拒绝 `SIGKILL`，并指引调用方使用 `terminal_close`；进程组解析失败时操作直接失败，而不是向猜测的 PID 发送信号。
 
 ### 本地就绪检测
 
-本地后端先识别受控 bash 启动时发出的私有 OSC prompt marker，再执行 3 个有界 fallback 层级。marker 在输出到达模型前被移除，使两个平台上的普通 shell 命令都无需固定等待静默阈值。尚未发布的 startup 不会把零输出静默视为就绪；timeout 会拒绝 spawn。所有时间参数都是经校验的配置字段：`pollIntervalMs`、`exactProbeAfterMs`、`idleSilenceMs` 和 `timeoutMs`。
+本地后端先识别受控 bash 启动时发出的私有 OSC prompt marker，并且只有在该 marker 后出现可打印的 prompt 文本时才据此声明 prompt 就绪；除此之外，它还运行 3 个有界 fallback 层级。在 data callback 之间保留这项状态，可以适配 macOS 分开交付 OSC marker 与 `PS1` 的情况；单独的 marker 不会发布空 MOTD。marker 在输出到达模型前被移除，使两个平台上的普通 shell 命令都无需固定等待静默阈值。尚未发布的 startup 不会把零输出静默视为就绪；timeout 会拒绝 spawn。若调用方取消在 startup 期间胜出，后端会关闭私有会话并原样抛出 `AbortSignal.reason`；尚不可观察的前台 PGID 不会再用查找错误覆盖取消原因。所有时间参数都是经校验的配置字段：`pollIntervalMs`、`exactProbeAfterMs`、`idleSilenceMs` 和 `timeoutMs`。
 
 在 Linux 上，检查器从 `/proc/<shellPid>/stat` 读取 shell 的终端前台 PGID，枚举该进程组中的每个进程与线程，并检查它们当前的 syscall。Tier 1 只有观察到 stdin 等待才返回正结果：直接 `read(0)`、获准读取且含 fd 0 的 `select`/`pselect6` 或 `poll`/`ppoll` 参数，或者含 fd 0 的 epoll interest list。无法读取的进程内存和未识别的 syscall 都是 miss，绝不作为正向猜测。架构表只包含对应 Linux UAPI 定义的 syscall number；不支持的架构跳过 Tier 1。
 
@@ -78,7 +80,7 @@ macOS 没有精确 syscall 层。任何前台进程组输出静默都会返回 `
 
 Tier 2 在持续 `idleSilenceMs` 没有输出后返回 `inferred_idle`，因此 sleep 或网络阻塞的命令可能看似 ready。Tier 3 在 `timeoutMs` 后返回 `timeout`，避免前台工具调用无限占住 agent。结果保留这些区别；调用方可以通过 `ctx.tasks` 等待、向前台组发信号，或从另一个会话排查。
 
-`node-pty` data 通知进入同一个流式 decoder 和终端 parser。parser 的 carry 状态处理跨 chunk 的 UTF-8 与终端查询序列。当前实现只规范化行式输出并检测 alternate-screen 进入，不承诺正确操作全屏应用。
+`node-pty` data 通知进入同一个终端 parser。parser 的 carry state 会处理跨 callback 的控制序列和位于 callback 末尾的回车；因此，即使 CRLF 被拆开，也只会生成一个换行，而不会产生改变分页的空行。实现会规范化行式输出，但不承诺正确操作全屏应用。
 
 ### 模型可见输出与持久性
 
@@ -88,9 +90,9 @@ Tier 2 在持续 `idleSilenceMs` 没有输出后返回 `inferred_idle`，因此 
 
 ### 进程树 teardown
 
-顶层 `node-pty` 子进程是所有权锚点。关闭时，后端先停止 callback，再按父 PID 以子进程优先顺序捕获该 PID 及其传递子进程、发送 `SIGTERM`、关闭 PTY 并等待静默，然后在可配置的 `disposeGraceMs` 后向已验证的存活者发送 `SIGKILL`，并等待它们离开进程表。每个捕获的 PID 都包含进程启动身份，避免 PID 复用把升级信号发给无关进程。
+顶层 `node-pty` 子进程是所有权锚点。关闭时，后端先停止 callback，再按父 PID 以子进程优先顺序捕获其传递子进程、发送 `SIGTERM` 并等待，然后重新扫描关停期间 fork 出的子进程，向剩余子孙进程树发送 `SIGKILL`，并在 shell 仍存活时验证每个非僵尸子孙进程都已离开进程表。身份匹配的 Linux 僵尸进程已无可执行工作，因此视为静止；shell 关闭时会回收它或将其重新挂接给负责回收的父进程。完成这些步骤后，后端才用 shell 自身的 TERM、宽限等待、KILL 序列停止 shell。每个捕获的 PID 都包含进程启动身份，避免 PID 复用把升级信号发给无关进程。
 
-teardown 独立报告根进程退出与存活进程清理。它不会只因 shell 退出就声称成功；dispose 只有在已捕获的进程树成员全部消失后才完成，否则返回结构化清理失败并列出存活者。即使某个 close 失败，服务 dispose 仍会清空其后端、预留与 owner detacher 注册表。所有权绝不会扩大到根 PID 所属 POSIX 会话的全部成员。
+teardown 独立报告根进程退出与存活进程清理。它不会只因 shell 退出就声称成功；dispose 只有在已捕获的进程树中不再存在非静止成员后才完成，否则返回清理失败并列出存活者。失败的 close 不会永久缓存：注册表与本地会话各自仅在关闭围栏仍指向该次失败尝试时才将其清除，因此外部存活进程状态改变后，后续的显式 close 或生命周期 close 会重试，且不会干扰较新的并发尝试。即使某个 close 失败，服务 dispose 仍会清空其后端、预留与 owner detacher 注册表。所有权绝不会扩大到根 PID 所属 POSIX 会话的全部成员。
 
 ### 组合与推行
 
@@ -115,9 +117,12 @@ plugins:
       timeoutMs: 30000
       disposeGraceMs: 3000
   '@deepseek-ai/dsh-tool-pty':
+    config:
+      enableRunInBackground: true
+      maxResultBytes: 262144
 ```
 
-包提供简洁的工具指引，说明持久状态、owner 隔离、不确定的 idle 结果、清理，以及无需交互时优先使用现有一次性工具。它不增加全局 system prompt 推荐，也不在已发布的默认配置中挂载 PTY；专用 ACP 与 headless 快照 overlay 覆盖 opt-in 组合。
+包提供简洁的工具指引，说明持久状态、owner 隔离、不确定的 idle 结果、清理，以及无需交互时优先使用现有一次性工具。已发布的基础示例不挂载 PTY：PTY 仅通过专用组合 opt-in，ACP 与 headless 快照 overlay 覆盖该组合。`dsh-tool-pty` 实例一旦启用，6 个工具和 `run_in_background` 就会默认启用；部署可通过配置仅禁用后台参数。
 
 ### 推迟的工作
 
@@ -147,9 +152,9 @@ plugins:
 
 ## 验证
 
-- 每文件覆盖率固定 owner 隔离、并发预留、生命周期清理、就绪层级、sanitizer carry state、UTF-8 上限、task 集成、schema 和 render intent。
-- Linux 进程 fixture 覆盖非 leader 与非主线程的 stdin 等待、不可读进程状态、受支持的 syscall 表、不支持的架构和误报拒绝；同一单元测试套件通过注入覆盖 macOS 检查器逻辑。
-- 真实 `node-pty` 测试在受支持宿主上覆盖 shell 状态、共享沙箱策略、环境清洗、信号、忽略 `SIGTERM` 的子进程，以及 dispose 返回后立即静默。
+- 每文件覆盖率固定 owner 隔离、并发预留、未发布 spawn 的取消与等待式 teardown、沙箱模式变更拒绝、可重试的生命周期清理、就绪层级、sanitizer carry state、完整 UTF-8 结果上限、task 集成、schema 和精确 render intent。
+- Linux 进程 fixture 覆盖非 leader 与非主线程的 stdin 等待、僵尸进程静止性、不可读进程状态、受支持的 syscall 表、不支持的架构和误报拒绝；同一单元测试套件通过注入覆盖 macOS 检查器逻辑。
+- 真实 `node-pty` 测试在受支持宿主上覆盖 shell 状态、共享沙箱策略、环境清洗、raw mode 下的前台 `SIGINT`、忽略 `SIGTERM` 的子进程，以及 dispose 返回后立即静默。
 - Loader 驱动的 `cordis.yml` 测试挂载真实三包组合；ACP 与 headless 快照通过 opt-in overlay 固定 6 个 schema、有界结果、错误渲染和 terminal/generic card。
 - 包契约、架构图、核心数据结构、生成目录和 website API 描述同一个已发布接口。
 - 仓库 CI 等价序列负责类型、lint、覆盖率、快照、文档、构建、hygiene、demo 和 built-entry 验证。

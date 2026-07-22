@@ -34,14 +34,14 @@ Idle detection is backend behavior, not a second public seam. A remote or contai
 
 There are no plugin-load auto-start sessions. `terminal_open` creates a session only during an agent tool call, when ownership and the owning event-sourced session are known. A future declarative startup feature must compose through unpublished agent setup rather than create shared global terminals.
 
-Agent-scope disposal closes registrations first, then awaits quiescent teardown of every owned PTY. Backend or tool-plugin reload does not orphan sessions: ownership lives in `PtyService` until the agent ends, following the same service-owned-record pattern as [`ctx.tasks`](../../../../packages/tasks/tasks/README.md).
+Agent-scope disposal closes registrations first, then awaits quiescent teardown of every owned PTY. Unpublished backend setup is a tracked lifecycle operation: owner or service disposal aborts its service-owned signal, waits for backend settlement and rollback, and only then returns. Caller cancellation retains its exact `AbortSignal.reason` even when the backend rejects or returns a session whose rollback close fails; that cleanup failure remains tracked for later owner or service disposal instead of replacing the caller reason. A lifecycle-triggered rollback close failure rejects both the spawn and the disposing lifecycle, while `PtyBackendCleanupError` lets a backend preserve its own failed startup cleanup for the disposing lifecycle without replacing a caller cancellation. When caller cancellation settles before disposal, the cleanup failure remains tracked owner activity until later owner or service disposal consumes and reports it, so sandbox-mode policy cannot mistake failed cleanup for quiescence. Backend or tool-plugin reload does not orphan sessions: ownership lives in `PtyService` until the agent ends, following the same service-owned-record pattern as [`ctx.tasks`](../../../../packages/tasks/tasks/README.md). The service reserves the session synchronously for one active send before returning its operation, including before a background task id becomes visible; a second send fails with `SEND_ACTIVE`, so output and cancellation cannot cross operation ownership.
 
 ### Security and process boundary
 
 A registered `shell` backend constrains how a terminal starts; it does not constrain commands typed after startup. `dsh-pty-local` therefore applies two protections before spawning:
 
 - It builds a scrubbed child environment using the same credential-shaped-name policy as `bash-local`, removing ambient `*KEY*`, `*SECRET*`, `*TOKEN*`, and harness-managed variables unless an explicit trusted mapping supplies them.
-- It requires `ctx.sandbox` and the shared `ctx.sandboxPolicy`. At spawn, the backend resolves the owner's effective session mode over the deployment default and wraps the shell argv once; that mode and workspace root remain the process boundary for the PTY lifetime. `danger-full-access` is the existing explicit unconfined choice rather than a PTY-specific bypass.
+- It requires `ctx.sandbox` and the shared `ctx.sandboxPolicy`. At spawn, the backend resolves the owner's effective session mode over the deployment default and wraps the shell argv once; that mode and workspace root remain the process boundary for the PTY lifetime. A write that would change the effective `sandbox/mode` is rejected before commit while the owner has any open PTY or unpublished spawn, with an instruction to wait for creation to settle and close those sessions first; same-effective-mode writes remain valid. The pending reservation spans backend setup through publication, so there is no race in which a wider terminal appears after a downgrade. `danger-full-access` is the existing explicit unconfined choice rather than a PTY-specific bypass.
 
 Sandboxing confines local process effects but does not make arbitrary shell input safe: network calls and other external side effects remain governed by deployment policy. Tool descriptions state that PTY sessions are less auditable than one-shot tools and should be used only when persistence or interactive stdin is necessary.
 
@@ -58,19 +58,21 @@ The implementation uses only public `node-pty` capabilities: child PID, `data` a
 | `terminal_close` | Close one session and await process-tree quiescence | `{ killed }` |
 | `terminal_list` | List the caller's live sessions | owner-scoped session summaries |
 
-`terminal_send({ sessionId, text, submit?, run_in_background? })` treats `text` as UTF-8 bytes and resolves `submit` to `true` in the tool implementation. When `submit` is true it writes the platform Enter sequence after the text; when false it writes only the text, allowing control characters and REPL fragments without hidden content heuristics.
+The ACP render contract is exact and location-free. `terminal_send` uses terminal call/result cards only for foreground sends; its background form is generic `execute`. `terminal_open`, `terminal_read`, `terminal_signal`, `terminal_close`, and `terminal_list` use generic `execute`, `read`, `execute`, `delete`, and `read` cards respectively. No PTY tool emits `locations`.
 
-Foreground sends return a bounded rendered delta and two independent facts: `waitReason` (`stdin_read | inferred_idle | timeout | session_exit`) and `sessionStatus` (`running` or `exited` with exit code or signal). `session_exit` refers to the PTY's top-level shell process, not an arbitrary foreground command whose status the shell consumes. A timeout never implies process exit.
+`terminal_send({ sessionId, text, submit?, run_in_background? })` treats `text` as UTF-8 bytes and resolves `submit` to `true` in the tool implementation. When `submit` is true it writes the platform Enter sequence after the text; when false it writes only the text, allowing control characters and REPL fragments without hidden content heuristics. `enableRunInBackground` defaults to true; false removes `run_in_background` from the schema and rejects the same undeclared argument if a caller forces it through execution.
 
-With `run_in_background: true`, `dsh-tool-pty` registers the in-flight send on `ctx.tasks` and returns immediately with `taskId`. `task_output(wait: true)` waits, reads incremental output, and records the final result; `task_kill` forwards cancellation as `SIGINT` and escalates only through the PTY backend's owned teardown path. If the task surface is absent, background mode fails before writing input. No PTY-specific `sleep` tool or general wake-up seam is added.
+Foreground sends return a bounded rendered delta and two independent facts: `waitReason` (`stdin_read | inferred_idle | timeout | session_exit`) and `sessionStatus` (`running` or `exited` with exit code or signal). `session_exit` refers to the PTY's top-level shell process, not an arbitrary foreground command whose status the shell consumes. A timeout never implies process exit. `dsh-tool-pty.maxResultBytes` defaults to 262144, rejects values below 64 so creation acknowledgements retain registry-issued ids, and caps each single-text UTF-8 result after normalized tool or pipeline errors, wait, session, pagination, truncation, generic task-status wrappers, policy denials or short-circuits, and post-execute replacements or blocks; the terminal definitions' last-mile `finalizeContent` callback leaves deliberately structured multi-block policy content unchanged. The renderer reserves suffix space and preserves code-point boundaries instead of treating the backend payload cap as the final model bound.
 
-`terminal_read` pages backward from the newest retained line. The backend enforces both line and UTF-8 byte caps on retained scrollback and the complete returned value, so one oversized line cannot bypass the bound. `truncated` distinguishes retention loss from an ordinary viewport delta.
+With `run_in_background: true`, `dsh-tool-pty` registers the in-flight send on `ctx.tasks` and returns immediately with `taskId`. The producer places `maxResultBytes` on the task snapshot so `task_output`, terminal kill status, and completion notices enforce the same complete-result cap after generic metadata. `task_output(wait: true)` waits, reads incremental output, and records the final result; `task_kill` resolves the current foreground PGID and delivers a real `SIGINT`, including when the application has disabled terminal `ISIG`, and escalates only through the PTY backend's owned teardown path. If the task surface is absent, background mode fails before writing input. No PTY-specific `sleep` tool or general wake-up seam is added.
+
+`terminal_read` pages backward from the newest retained line. The backend enforces both line and UTF-8 byte caps on retained scrollback and the returned page payload, so one oversized line cannot bypass the backend bound; the tool then caps the fully rendered page including pagination and truncation metadata. `truncated` distinguishes retention loss from an ordinary viewport delta.
 
 `terminal_signal` accepts the closed set `SIGINT | SIGTERM | SIGKILL | SIGTSTP | SIGHUP`. The backend resolves the terminal foreground process group at execution time. `SIGKILL` is rejected when that group is the top-level shell, directing the caller to `terminal_close`; a failed group lookup fails the operation instead of signaling a guessed PID.
 
 ### Local readiness detection
 
-The local backend first recognizes a private OSC prompt marker emitted by its controlled bash startup, then runs three bounded fallback tiers. The marker is removed before output reaches the model and avoids a fixed silence delay for ordinary shell commands on both platforms. Unpublished startup does not accept zero-output silence as readiness; timeout rejects the spawn. All timings are validated config fields: `pollIntervalMs`, `exactProbeAfterMs`, `idleSilenceMs`, and `timeoutMs`.
+The local backend first recognizes a private OSC prompt marker emitted by its controlled bash startup, then requires printable prompt text after that marker before declaring prompt readiness and runs three bounded fallback tiers. Carrying that state across data callbacks covers macOS delivery where the OSC marker and `PS1` arrive separately; the marker alone can no longer publish an empty MOTD. The marker is removed before output reaches the model and avoids a fixed silence delay for ordinary shell commands on both platforms. Unpublished startup does not accept zero-output silence as readiness; timeout rejects the spawn. If caller cancellation wins during startup, the backend closes the private session and propagates the exact `AbortSignal.reason`; a foreground PGID that is not observable yet cannot replace cancellation with a lookup error. All timings are validated config fields: `pollIntervalMs`, `exactProbeAfterMs`, `idleSilenceMs`, and `timeoutMs`.
 
 On Linux, the inspector reads the shell's terminal foreground PGID from `/proc/<shellPid>/stat`, enumerates every process and thread in that process group, and probes their current syscalls. A positive Tier 1 result requires an observed stdin wait: direct `read(0)`, a permitted read of a `select`/`pselect6` or `poll`/`ppoll` argument containing fd 0, or an epoll interest list containing fd 0. Unreadable process memory and unrecognized syscalls are misses, never positive guesses. Architecture tables contain only syscall numbers defined by the corresponding Linux UAPI; unsupported architectures skip Tier 1.
 
@@ -78,7 +80,7 @@ On macOS there is no exact syscall tier. Output silence returns `inferred_idle` 
 
 Tier 2 returns `inferred_idle` after `idleSilenceMs` without output. A sleeping or network-blocked command can therefore look ready. Tier 3 returns `timeout` after `timeoutMs` so a foreground tool call cannot hold the agent indefinitely. The result preserves the distinction; callers may wait through `ctx.tasks`, signal the foreground group, or inspect from another session.
 
-`node-pty` data notifications feed one streaming decoder and terminal parser. Parser carry state handles UTF-8 and terminal query sequences split across chunks. The implementation normalizes line-oriented output and detects alternate-screen entry, but it does not promise correct interaction with a full-screen application.
+`node-pty` data notifications feed one terminal parser. Parser carry state handles control sequences and a trailing carriage return split across callbacks, so a divided CRLF produces one newline rather than a pagination-changing blank line. The implementation normalizes line-oriented output, but it does not promise correct interaction with a full-screen application.
 
 ### Model-visible output and durability
 
@@ -88,9 +90,9 @@ Background sends use the existing task completion notice and `task_output` resul
 
 ### Process-tree teardown
 
-The top-level `node-pty` child is the ownership anchor. On close, the backend stops callbacks, snapshots that PID and its transitive descendants by parent PID in children-first order, sends `SIGTERM`, closes the PTY, waits for quiescence, then sends `SIGKILL` to verified survivors after configurable `disposeGraceMs` and waits for them to leave the process table. Every captured PID includes process-start identity so reuse cannot redirect escalation.
+The top-level `node-pty` child is the ownership anchor. On close, the backend stops callbacks, snapshots its transitive descendants by parent PID in children-first order, sends `SIGTERM`, waits, rescans for children forked during shutdown, sends `SIGKILL` to the remaining descendant tree, and verifies that every non-zombie descendant left the process table while the shell is still alive. A matching Linux zombie has no executable work and therefore counts as quiescent, allowing shell shutdown to reap or reparent it. Only then does the backend stop the shell with its own TERM/grace/KILL sequence. Every captured PID includes process-start identity so reuse cannot redirect escalation.
 
-Teardown reports root exit and survivor cleanup independently. It does not claim success merely because the shell exited; disposal resolves only after no captured tree member remains or returns a structured cleanup failure naming the survivors. Service disposal still clears its backend, reservation, and owner-detacher registries when a close fails. It never broadens ownership to every member of the root PID's POSIX session.
+Teardown reports root exit and survivor cleanup independently. It does not claim success merely because the shell exited; disposal resolves only after no captured non-quiescent tree member remains or returns a cleanup failure naming the survivors. A failed close is not cached forever: the registry and local session each clear the fence only when it still names that failed attempt, so a later explicit or lifecycle close retries after the external survivor condition changes without disturbing a newer concurrent attempt. Service disposal still clears its backend, reservation, and owner-detacher registries when a close fails. It never broadens ownership to every member of the root PID's POSIX session.
 
 ### Composition and rollout
 
@@ -115,9 +117,12 @@ plugins:
       timeoutMs: 30000
       disposeGraceMs: 3000
   '@deepseek-ai/dsh-tool-pty':
+    config:
+      enableRunInBackground: true
+      maxResultBytes: 262144
 ```
 
-The package ships concise tool guidance explaining persistent state, owner isolation, uncertain idle results, cleanup, and the preference for existing one-shot tools when interaction is unnecessary. It does not add a global system-prompt recommendation or mount PTY in shipped defaults; dedicated ACP and headless snapshot overlays exercise the opt-in composition.
+The package ships concise tool guidance explaining persistent state, owner isolation, uncertain idle results, cleanup, and the preference for existing one-shot tools when interaction is unnecessary. It does not mount PTY in the base shipped examples: PTY is opt-in through the dedicated composition, while ACP and headless snapshot overlays exercise it. Within an enabled `dsh-tool-pty` instance, the six tools and `run_in_background` are enabled by default; deployments may disable only the background argument with config.
 
 ### Deferred work
 
@@ -147,9 +152,9 @@ The package ships concise tool guidance explaining persistent state, owner isola
 
 ## Verification
 
-- Per-file coverage pins owner fencing, concurrent reservations, lifecycle cleanup, readiness tiers, sanitizer carry state, UTF-8 bounds, task integration, schemas, and render intents.
-- Linux process fixtures cover non-leader and non-main-thread stdin waits, unreadable process state, supported syscall tables, unsupported architectures, and false-positive rejection; macOS inspector logic is injected into the same unit suite.
-- Real `node-pty` tests exercise shell state, shared sandbox policy, environment scrubbing, signals, a TERM-ignoring descendant, and immediate post-disposal quiescence on supported hosts.
+- Per-file coverage pins owner fencing, concurrent reservations, unpublished-spawn cancellation and awaited teardown, sandbox-mode change rejection, retriable lifecycle cleanup, readiness tiers, sanitizer carry state, complete UTF-8 bounds, task integration, schemas, and exact render intents.
+- Linux process fixtures cover non-leader and non-main-thread stdin waits, zombie quiescence, unreadable process state, supported syscall tables, unsupported architectures, and false-positive rejection; macOS inspector logic is injected into the same unit suite.
+- Real `node-pty` tests exercise shell state, shared sandbox policy, environment scrubbing, raw-mode foreground `SIGINT`, a TERM-ignoring descendant, and immediate post-disposal quiescence on supported hosts.
 - A Loader-driven `cordis.yml` test mounts the real three-package composition, while ACP and headless snapshots pin the six schemas, bounded results, error rendering, and terminal/generic cards through opt-in overlays.
 - Package contracts, the architecture map, core data structures, generated catalogs, and the website API describe the same shipped surface.
 - The repository CI-equivalent sequence owns type, lint, coverage, snapshot, documentation, build, hygiene, demo, and built-entry verification.
