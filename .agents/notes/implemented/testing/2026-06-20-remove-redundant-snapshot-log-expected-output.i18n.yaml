@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write
+2026-06-20-remove-redundant-snapshot-log-goldens.md: 18d0a4491eb10a3b4dc56d3d63285c219ba6a00a
+2026-06-20-remove-redundant-snapshot-log-goldens.zh.md: 5675c69862b6052ed3f3e4710461cc1478b9fa7d

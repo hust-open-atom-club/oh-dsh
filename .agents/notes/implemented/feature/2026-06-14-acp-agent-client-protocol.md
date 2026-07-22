@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-14-acp-agent-client-protocol.zh.md)
+
 ## Problem
 
 The harness originally exposed agents only through a readline loop. That surface could carry text, but it gave an editor no structured way to create or resume sessions, correlate prompt completion, stream reasoning and tool activity, render tool-specific UI, ask for permission, or cancel one conversation without disturbing another. ACP defines those interactions as JSON-RPC over stdio, and Zed is the target client used to make concrete compatibility decisions.

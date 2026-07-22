@@ -2,6 +2,8 @@
 
 Status: rejected — Workflow progress is an intentional observation surface; make it useful through a consumer instead of deleting it.
 
+English | [中文](2026-07-12-collapse-workflow-to-foreground-core.zh.md)
+
 ## Problem
 
 The workflow capability executes foreground JavaScript that composes subagents, but it also carries an unconsumed progress-observation system. No production listener subscribes to any of the six `workflow/*` events; listeners exist only in workflow tests. Nevertheless the seam defines run/phase/agent outcome payloads, the worker sends phase/log/agent lifecycle protocol messages, the host forwards them through a `liveAgents` pairing ledger, and the engine maintains run ids solely to correlate those notifications.

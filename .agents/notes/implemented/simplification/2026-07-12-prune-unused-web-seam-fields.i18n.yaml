@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write
+2026-07-12-prune-unused-web-seam-fields.md: 9fd05da282c22d78dc98e232ef2c23cd6e9c4ea3
+2026-07-12-prune-unused-web-seam-fields.zh.md: 650b6b74c808c719bcea9783c60064936427ffee

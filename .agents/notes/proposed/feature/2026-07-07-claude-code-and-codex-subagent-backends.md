@@ -2,6 +2,8 @@
 
 Status: proposed
 
+English | [中文](2026-07-07-claude-code-and-codex-subagent-backends.zh.md)
+
 ## Problem
 
 The subagent seam ([the seam Agent Note](../../implemented/feature/2026-06-21-subagent-capability-seam.md)) hosts multiple named providers on `ctx.subagents`, and the ACP backend ([the ACP backend Agent Note](../../implemented/feature/2026-06-22-acp-subagent-backend.md)) proved the seam generalizes across a process boundary; its Future-providers section explicitly named the Codex app-server and the Claude Code Agent SDK as mechanically similar siblings. Those two are the engines actually worth delegating to today: a harness turn should be able to hand a self-contained task to a real Claude Code or a real Codex — a separate product with its own model, tools, and sandbox — and get back one final answer, without the parent deployment leaking its secrets into the child or the child's behavior silently depending on whatever `~/.claude` / `~/.codex` state exists on the host machine.

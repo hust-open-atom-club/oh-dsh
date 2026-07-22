@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-29-todo-write-tool.zh.md)
+
 ## Problem
 
 The harness gives the model bash and subagent tools but no way to record a structured task list. A todo list serves two co-equal purposes: it steers the model to plan multi-step work and keep the active task unambiguous (at most one active, exactly one while work remains), and it gives the human a live progress checklist. The ACP protocol has a native `plan` sessionUpdate that editors (Zed) already render, but the bridge never emitted one. Every reference coding agent surveyed (claude-code, opencode, codex, oh-my-pi, pi) ships some form of this; the harness had nothing.

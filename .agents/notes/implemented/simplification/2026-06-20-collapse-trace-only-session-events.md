@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-collapse-trace-only-session-events.zh.md)
+
 ## Problem
 
 The session event vocabulary includes first-class events that are not part of replayable conversation history and have little or no production consumption. `usage` is already present as a model stream chunk before the loop also appends a separate `usage` event. `error` duplicates the `turn/end { kind: 'error', message, code }` reason for loop failures; ACP settlement reads the turn-end reason, ACP rendering ignores the `error` event, and `deriveMessages()` skips it.

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-10-session-query-service.zh.md)
+
 ## Problem
 
 Session history exists in two places: current `SessionStore` objects and an optional persistence backend. Consumers that need exact inspection would otherwise duplicate live-versus-persisted precedence, persistence lifecycle handling, raw-event surface classification, relationship tracing, and defensive cloning. Durable state can lag the live log between checkpoints, so persistence alone is not a truthful current source.

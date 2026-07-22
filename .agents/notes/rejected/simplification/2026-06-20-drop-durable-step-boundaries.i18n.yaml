@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write
+2026-06-20-drop-durable-step-boundaries.md: 16fdf17c3bc8907745df17e8a105d7978eafb274
+2026-06-20-drop-durable-step-boundaries.zh.md: 5613a84d5f1b5cf87109a2e04a4cb350ffd650a8

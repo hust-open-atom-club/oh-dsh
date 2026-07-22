@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-13-capability-seams.zh.md)
+
 ## Problem
 
 The harness has swappable capabilities — bash execution today, sandboxed/remote executors and alternative model providers tomorrow. A capability has three concerns that change at different rates and for different reasons: the *contract* (what the capability is), the *implementation* (how it runs), and the *consumer surface* (what the model and other plugins program against). Bundling them in one package couples those rates of change — swapping a local executor for a sandboxed one would churn the tool schemas the model sees, even though the model-facing contract never changed.

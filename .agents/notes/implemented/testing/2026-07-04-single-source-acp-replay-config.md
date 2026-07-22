@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-single-source-acp-replay-config.zh.md)
+
 ## Problem
 
 `examples/acp-agent` shipped two hand-maintained configs: `cordis.yml` (the live tree) and a `cordis.snapshot.yml` that mirrored it entry-for-entry with only the llm backend swapped — stripped of comments, the entire difference was the eight-line `llm-deepseek` stanza versus the two-line `llm-replay` stanza. Every app-shape change had to be made twice, and nothing gated the symmetry: if the copies drifted, the snapshot tier would silently exercise a different app than the one that ships — the ["green units, broken product" class of gap](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md) the snapshot tier exists to close, reintroduced one level up, with reviewer vigilance as the only defense.

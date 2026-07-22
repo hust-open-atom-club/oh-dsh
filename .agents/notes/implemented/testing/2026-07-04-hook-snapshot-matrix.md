@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-hook-snapshot-matrix.zh.md)
+
 ## Problem
 
 The hook bridges — [`dsh-hooks-claude`](../../../../packages/hooks/hooks-claude) (7 Claude Code hook points) and [`dsh-hooks-codex`](../../../../packages/hooks/hooks-codex) (5 Codex points) — map external hook commands onto the harness interception seams. They carry deep unit and coverage-spec coverage (every decision arm, every payload dialect, driven against a mocked seam) plus one key-gated e2e (`hooks.e2e.ts`, a live `PreToolUse` block). But the full-transcript snapshot tier — the one net that boots the real `acp-agent` subprocess, replays a recorded session keyless, and diffs the normalized ACP stdout + re-persisted log against committed expected outputs — covered exactly ONE hook: a Claude `UserPromptSubmit` block (`hook-cc-promptsubmit-block`).

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write
+2026-06-11-immutable-public-surfaces.md: c807b036bb57bd5e64290fd59bf422c4732e9080
+2026-06-11-immutable-public-surfaces.zh.md: 9ff40436915e194848ba163ed80fefe84a1b3da4

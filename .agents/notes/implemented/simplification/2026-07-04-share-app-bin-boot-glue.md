@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-share-app-bin-boot-glue.zh.md)
+
 ## Problem
 
 The stdio and ACP bins duplicated environment loading, fail-loud handling, entry validation, and boot logic, including subtle Loader failure behavior. Their copies had already drifted and lived in self-executing files excluded from unit coverage, making their helper exports unusable.

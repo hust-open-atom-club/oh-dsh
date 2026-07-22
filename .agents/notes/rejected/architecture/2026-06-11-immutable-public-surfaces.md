@@ -2,6 +2,8 @@
 
 Status: rejected — the pervasive `DeepReadonly<T>` type flip is replaced by source-owned runtime immutability in `Session` plus relational development assertions. See [source-owned session immutability and dev-mode invariants](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.md).
 
+English | [中文](2026-06-11-immutable-public-surfaces.zh.md)
+
 ## Problem
 
 The rejected proposal targeted an ownership hole that a `readonly SessionEvent[]` type alone cannot close: its elements remain mutable at runtime, so a cast or plain JavaScript can rewrite nested history. The implemented design closes that hole in `Session` by materializing and deep-freezing every accepted event and returning frozen array snapshots. In-flight prompt waterfalls remain intentionally transformable, so immutability is an ownership boundary rather than a blanket type rule.

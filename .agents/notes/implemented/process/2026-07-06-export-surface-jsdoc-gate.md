@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-06-export-surface-jsdoc-gate.zh.md)
+
 ## Problem
 
 The [cordis JSDoc completeness gate](2026-07-04-cordis-jsdoc-completeness-gate.md) made undocumented parameters and results impossible on the cordis surface — `interface Events` members and `ctx.<key>` service classes — but that surface is a fraction of what a plugin author imports. The AGENTS.md rule "every export (and non-obvious method) has a JSDoc explaining semantics" stayed prose-checkable only by review everywhere else, and nothing at all asked for `@param`/`@returns` on ordinary exported functions. A survey at adoption found 203 under-documented module-level exports across 34 packages: seam-adjacent helpers (`runBash`, `readForEdit`, `htmlToMarkdown`), format codecs, whole undocumented interfaces and type aliases — exactly the names an IDE consumer hovers.

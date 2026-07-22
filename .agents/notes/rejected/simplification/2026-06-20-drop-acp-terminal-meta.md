@@ -2,6 +2,8 @@
 
 Status: rejected — Zed is the current target client, and the terminal `_meta` convention is intentional Zed UX with a plain ACP fallback for other clients.
 
+English | [中文](2026-06-20-drop-acp-terminal-meta.zh.md)
+
 ## Problem
 
 The ACP bridge implements a Zed-specific terminal-card convention through `_meta.terminal_info`, `_meta.terminal_output`, and `_meta.terminal_exit`. The implemented [rich ACP bash rendering Agent Note](../../implemented/feature/2026-06-18-acp-terminal-and-tool-rendering.md) deliberately avoided ACP's client-side `terminal/create` because bash execution belongs in the harness, but still adopted the reference agents' display-only `_meta` convention. That gives a nicer Zed card at the cost of bridge state, capability negotiation, terminal ids, special update mapping, text fallback tests, and exit-pill parsing in `dsh-tool-bash`.
