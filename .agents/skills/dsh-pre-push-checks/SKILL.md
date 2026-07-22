@@ -1,13 +1,13 @@
 ---
 name: dsh-pre-push-checks
-description: Use before pushing, force-pushing, marking ready for review, claiming checks pass, or bypassing a local hook on a deepseek-harness branch, especially after merges, review fixes, package graph changes, docs/catalog updates, snapshots, e2e behavior, or built artifact changes.
+description: Use before pushing, force-pushing, marking ready for review, or claiming checks pass on a deepseek-harness branch to select the smallest tests and checks that cover the outgoing diff without reflexively running the full repository suite.
 ---
 
 # DSH Pre-Push Checks
 
-Use this skill to choose and run the smallest sufficient verification set before a `deepseek-harness` push. Do not treat the local pre-push hook as the full CI contract: CI also runs coverage, build, and built-bin smoke.
+Use this skill to run relevant local evidence once before a `deepseek-harness` push. Git hooks are intentionally narrow: pre-commit fixes staged lint, checks staged whitespace, and guards vendored-source metadata; pre-push runs only the incremental repository typecheck. CI owns exhaustive coverage and the platform matrix.
 
-## First Steps
+## Inspect the outgoing change
 
 1. Confirm the checkout and branch.
 
@@ -16,88 +16,80 @@ git status --short --branch
 git rev-parse --show-toplevel
 ```
 
-2. Inspect the outgoing diff.
+2. Inspect the diff against its actual base.
 
 ```sh
 git diff --stat
 git diff --name-only origin/$(git branch --show-current)...HEAD
 ```
 
-If the branch has no upstream or the command is not meaningful for the stack shape, use `git diff --name-only origin/master...HEAD` or the PR base branch.
+If the branch has no upstream or that range is not meaningful for the stack, compare with the PR base branch. After merging a changed base, reassess which behavior the combined diff can affect and rerun only checks invalidated by the merge.
 
-3. If the branch was just merged with `master`, or the user says master changed, run the gates after resolving the merge and before pushing or marking ready. Do not present a conflict-resolution commit as ready with only typecheck/lint evidence.
+## Select relevant evidence
 
-## Required Baseline
+There is no universal local baseline beyond the hooks. Every behavior change needs the narrowest available test or purpose-built check that would fail for its regression; add broader checks only for surfaces the diff actually reaches.
 
-Run these before every non-trivial push:
+- **Package or script behavior:** run the owning Vitest file or focused test name. Add adjacent package tests when a shared contract changes; leave repository-wide coverage to CI unless the change is genuinely cross-cutting or the user requests it.
+- **Documentation, Agent Notes, catalogs, or doc-linked comments:** run `pnpm run doc-sync`; run full lint when the documentation workflow requires it.
+- **Model-, editor-, CLI-, or terminal-visible output:** run the focused keyless snapshot or real runnable-example scenario that owns the output.
+- **Package manifests, public exports, build configuration, worker/bin entries, or built runtime paths:** run `pnpm run build`, the relevant hygiene checks, and the owning built-artifact smoke.
+- **Real provider or agent behavior:** run the relevant `pnpm run test:e2e` target when credentials are available; never print secrets.
 
-```sh
-pnpm run typecheck
-pnpm run lint
-pnpm run test:coverage
-```
+Do not manually repeat a passing check merely because commit or push follows. In particular, do not run typecheck immediately before pushing solely to duplicate the pre-push hook.
 
-Why `test:coverage`, not only `test`: CI enforces per-file 100% coverage. A branch can pass `pnpm run test` and still fail CI.
+### Focus unit coverage on the affected source
 
-## Add Gates By Touched Surface
-
-Run `pnpm run doc-sync` and `pnpm run verify-module-graph` when the diff touches Markdown docs, package manifests, package imports/exports, generated catalogs, Agent Notes, architecture docs, translation pairs, Mermaid diagrams, or comments that cite docs/packages.
-
-Run `pnpm run build` and `pnpm run hygiene` when the diff touches any package `package.json`, dependency graph, public exports, build config, declaration surface, bundled runtime path, or code that will be consumed from built `lib/`.
-
-Run snapshot tests when the diff changes ACP/editor-facing transcript behavior: ACP bridge updates, agent-loop observable output, tool call/result presentation, session log rendering, stdout/stderr protocol output, or snapshot fixtures.
+Test selection and coverage selection are separate. A Vitest file filter chooses which tests run, while the repository configuration otherwise measures every `packages/*/*/src/**/*.ts` file. When unit coverage is relevant, name both the owning tests and the source files or package whose coverage those tests must prove:
 
 ```sh
-pnpm run test:snapshot
+pnpm exec vitest run packages/<group>/<package>/tests/<behavior>.spec.ts \
+  --coverage \
+  --coverage.include='packages/<group>/<package>/src/**/*.ts'
 ```
 
-Run built-bin smoke tests after `pnpm run build` when app packages, app boot, package runtime imports, bin entries, loader behavior, or published artifact paths change.
+Use an exact source file when the behavior is truly confined to one module. Repeat `--coverage.include` for multiple affected files or packages, and pass every owning test file needed to exercise that scope. The configured per-file 100% thresholds still apply inside the selected source scope.
+
+When the owning tests are unclear, use Vitest's dependency graph to discover a candidate set, then inspect the selected tests before treating the run as evidence:
 
 ```sh
-DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples/headless-agent/tests/keyless-smoke.e2e.ts examples/tui-agent/tests/tui-keyless-smoke.e2e.ts packages/examples/cli-demo/tests/built-bin.e2e.ts packages/examples/acp-demo/tests/built-bin.e2e.ts
+pnpm exec vitest related packages/<group>/<package>/src/<changed>.ts \
+  --run \
+  --coverage \
+  --coverage.include='packages/<group>/<package>/src/<changed>.ts'
 ```
 
-Run real e2e when behavior depends on a real model/API, tool-use loop, ACP integration, prompt injection, or end-to-end agent UX. If `.env` is available, use it; do not print secrets.
+`vitest related` cannot discover behavior reached only through configuration, dynamic loading, subprocesses, workers, built artifacts, or external providers; select those owning tests explicitly. Do not use `--passWithNoTests`, lower coverage thresholds, or narrow `--coverage.include` merely to hide an uncovered affected file. If a selected package scope fails because one focused test does not cover it, add its other relevant owning tests or narrow the source scope only when the excluded modules cannot be affected by the change.
 
-```sh
-pnpm run test:e2e
-```
+## Full local rehearsal
 
-Run a targeted test first for the changed package, but never use targeted tests as the only push evidence unless the change is test-only and cannot affect shared behavior.
+Run the complete local approximation only when the user explicitly requests it, while diagnosing a CI failure, or when the change spans the repository so broadly that no narrower set is credible. Use the current workflow and package scripts as the inventory; do not recreate the removed `check:pre-push` aggregate.
 
-## Full Local CI Approximation
+## Handle failures
 
-Use this before high-risk pushes, after large merges, before asking for review on a major PR, or when prior pushes have caused CI churn. The authoritative command list is the root [AGENTS.md § Run the CI gates locally before marking a PR ready](../../../AGENTS.md#run-the-ci-gates-locally-before-marking-a-pr-ready); run that block rather than copying a local variant into this skill. Add `pnpm run test:e2e` when a key is available and the feature has real-agent behavior.
-
-## Handling Failures
-
-If a gate fails, stop and fix or explain the blocker. Do not push and hope CI differs.
+If a relevant check fails, stop and fix or explain the blocker. Do not push and hope CI differs.
 
 If a failure looks environment-specific, prove it:
 
 - Record the exact command, failing test, and platform-specific mismatch.
-- Confirm the relevant non-platform gates pass.
-- Prefer fixing the test for cross-platform determinism if the test is part of the required local gate.
-- Bypass a local hook only when the user explicitly asks to push or agrees, and state exactly which hook failed and why it is not expected to fail on CI.
+- Confirm the relevant non-platform evidence.
+- Prefer fixing cross-platform nondeterminism when the check is required.
+- Bypass a local hook only when the user explicitly asks or agrees, and report exactly what failed and why CI is expected to differ.
 
-Known pattern to watch for: Linux CI and macOS local behavior can differ for shell utilities such as `sed -i`. Treat this as evidence to investigate, not as automatic permission to bypass.
+## Push procedure
 
-## Push Procedure
-
-1. Local commits may happen before the full gate set, but do not push, mark ready, or claim checks pass until the relevant gates pass or any blocker is explicitly documented.
-2. Let the normal pre-commit hook run. If it changes files, inspect and commit or amend the change intentionally rather than hiding it.
-3. Push normally first so the pre-push hook can run.
-4. If a local hook is bypassed after user approval, use the narrow bypass and say so in the final response.
-5. After push, verify the remote ref matches local HEAD.
+1. Run the selected relevant checks once.
+2. Commit normally and inspect any files changed by the pre-commit fixer before continuing.
+3. Push normally so the incremental typecheck hook runs.
+4. Verify the remote ref matches local `HEAD`.
 
 ```sh
 git rev-parse HEAD origin/$(git branch --show-current)
 ```
 
-For GitHub PRs, check CI after push:
+For GitHub PRs, inspect remote CI after the push:
 
 ```sh
 gh pr checks
 ```
 
-If checks are pending, say pending. If checks fail, inspect logs before claiming the push is good.
+Report pending checks as pending. Inspect failures before attributing them to the branch or the environment.

@@ -2,24 +2,26 @@
 
 Status: implemented
 
+The hook/CI symmetry in this record is superseded by [Fast local Git hooks](2026-07-22-fast-local-git-hooks.md); CI remains the exhaustive enforcement path.
+
 ## Problem
 
 This codebase is developed primarily by coding agents. Agents follow enforced gates far more reliably than prose conventions, and "a lot of work" is not a cost argument when agents do the labor. Early evidence: tests that didn't typecheck shipped (vitest doesn't typecheck) and were only caught by a review.
 
 ## Decision
 
-Every AGENTS.md promise gets a command that exits non-zero, wired into git hooks and CI both calling the same package.json scripts:
+Every mechanically checkable AGENTS.md promise gets a command that exits non-zero. CI invokes the exhaustive set, while Git hooks reserve their latency budget for cheap local defects:
 
 - Max-strict TypeScript (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, …); examples, tests, and scripts typecheck in CI via the root no-emit `tsconfig.json` while package/vendor code stays behind its own project-reference boundary.
 - ESLint strict-type-checked + @stylistic (the house style, enforced), including file-local duplicated logic checks; vendored code excluded.
 - jscpd detects cross-file clones in package production TypeScript and repository scripts; narrow source-range exceptions document deliberately parallel implementations.
 - Per-file 100% coverage on `packages/*/*/src` (v8); unreachable defensive guards carry `/* v8 ignore */ ` with stated reasons instead of deletion.
 - knip (dead code/deps), publint (package correctness), workspace constraints (workspace rules: private, cordis peer+dev, uniform version, ESM), and a NodeNext consumer typecheck for built package declarations.
-- lefthook pre-commit (lint staged, typecheck, vendor-manifest guard) and pre-push (tests, hygiene); CI runs the full matrix on node 22.19/24/26 plus built application smokes for the Headless, TUI, ACP, JSON-RPC, workflow, and code-runtime entry paths.
+- lefthook pre-commit fixes staged lint, rejects staged whitespace, and checks the vendor manifest; pre-push runs incremental typecheck. CI runs the full matrix on node 22.19/24/26 plus built application smokes for the Headless, TUI, ACP, JSON-RPC, workflow, and code-runtime entry paths.
 
 ## Consequences
 
-- Conventions survive agent turnover; violations fail fast and locally.
+- Conventions survive agent turnover; cheap commit/push defects fail locally and exhaustive violations fail in CI.
 - The gates themselves are code to maintain; config changes are reviewed like any change.
 - 100%-coverage pressure can produce assertion-free tests — mutation testing is the planned counterweight (see [the mutation-testing proposal](../../proposed/testing/2026-06-11-mutation-testing.md)).
 

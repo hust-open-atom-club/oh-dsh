@@ -28,7 +28,7 @@ This supersedes the hand-copies: the session.md `hook/*` table, the compact READ
 
 ## Consequences
 
-- The catalog cannot drift: a vocabulary or envelope change the committed file doesn't reflect fails `verify-persistence-catalog` in the pre-push hook and CI, and a new merged event with no JSDoc fails the generator outright — a plugin can no longer add an undocumented on-disk record type.
+- The catalog cannot drift: a vocabulary or envelope change the committed file doesn't reflect fails `verify-persistence-catalog` in `doc-sync` and CI, and a new merged event with no JSDoc fails the generator outright — a plugin can no longer add an undocumented on-disk record type.
 - Event prose has a single home, the JSDoc at the declaration; the catalog preserves that JSDoc and any nested field comments without flattening or paraphrasing them.
 - The `SurfaceEventType` union is now structurally load-bearing for docs: renaming an event without updating the union (or vice versa) fails the generator, not just the compiler.
 - The badge derivation assumes the union stays a closed set of string literals with exactly one owner; a refactor away from that shape must update the generator in the same change.

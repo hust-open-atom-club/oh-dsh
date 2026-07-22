@@ -43,4 +43,4 @@ Both are `doc-sync` members, in the `verify-md-wrap` style (tsx ESM, verify-don'
 - Every Agent Note sits under a class folder. A reader can browse one folder to see all simplifications or all testing decisions within a lifecycle.
 - Two more fast tsx scripts in the `doc-sync` chain; no new dependency (the mdast/GFM stack was already present for `verify-md-wrap`/`verify-md-links`).
 - Adding a class is a deliberate act: amend the `const` in `scripts/agent-note-tree.ts` and the [Classification section](../../README.md#classification), not just `mkdir` a folder. The gate rejects an unknown folder, so an ad-hoc class can't slip in.
-- Source-comment doc references are now gated too — a moved or renamed doc that a `.ts` comment cites fails the pre-push hook, closing a drift class `verify-md-links` structurally could not see.
+- Source-comment doc references are gated too — a moved or renamed doc that a `.ts` comment cites fails `verify-doc-refs` in `doc-sync` and CI, closing a drift class `verify-md-links` structurally could not see.

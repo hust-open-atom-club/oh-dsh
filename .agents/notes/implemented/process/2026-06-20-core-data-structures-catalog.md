@@ -32,7 +32,7 @@ The durability requirement was specific: the doc shows the **literal** current t
 - Complete type declarations and their JSDoc are pasted verbatim into a dedicated ` ```ts type-equiv ` fence. A concise ` ```ts public-api ` fence carries the source-equivalent ambient projection for a class whose implementation bodies do not belong in the catalog. `doc-typecheck` recognizes both and skips them (the bare declarations are not standalone-compilable), and **excludes them from the opt-out ratio** — they are a separately-checked category, not unchecked sketches.
 - A new `scripts/verify-type-equiv.ts` extracts each block via the TypeScript parser and asserts that its declaration structure and every JSDoc comment match the declared symbol, ignoring only formatting whitespace and non-JSDoc comments. Ordinary blocks retain the complete declaration. A `public-api` projection retains a class's public fields, constructor, accessors, and methods with their original JSDoc while removing implementation bodies and private or protected members. This is chosen over a compiled `_Check` assertion because source names and documentation identity, not assignability, are the properties the catalog preserves.
 - Provenance lives in a central `scripts/type-equiv.manifest.json` (`{ doc, symbol, source }` entries), **not** in directive comments in the prose. The script enforces a **1:1 correspondence**: every type-equiv block has exactly one manifest entry and vice versa, so a block can never be silently unchecked and an entry can never rot.
-- Wired into `doc-sync`, so it runs in the same lefthook pre-push and CI paths as the other doc gates.
+- Wired into `doc-sync`, so relevant documentation changes run it locally and CI runs it with the other documentation checks.
 
 ### Maintenance is the author's job, with a gate backstop
 
@@ -52,7 +52,7 @@ The spine-vs-seam rule was tested against `BashExecRequest`, tool schemas and de
 
 ## Consequences
 
-- The vocabulary now has a single home that **cannot silently drift**: a field or public class-member change in source fails `verify-type-equiv` in the pre-push hook and CI until the paste is refreshed. Cordis service methods remain owned by the generated services catalog rather than being duplicated here.
+- The vocabulary now has a single home that **cannot silently drift**: a field or public class-member change in source fails `verify-type-equiv` in `doc-sync` and CI until the paste is refreshed. Cordis service methods remain owned by the generated services catalog rather than being duplicated here.
 - The spine-vs-seam line is a reusable scoping tool, not a one-off: the same "the thing you write/hold/receive is core; the machinery that types/renders/persists it is a detail" rule is what later scoped the events/services catalog's harness-vs-inherited tiering.
 - The `ts type-equiv` fence is a third doc-block category alongside ` ```ts ` (compiled) and ` ```ts ignore-check ` (sketch). A later sibling added a fourth, ` ```ts cordis-catalog ` (generated signature), reusing the same skip-and-exclude treatment.
 - Adding or reshaping a core type now carries a documentation obligation the author must honor (the gate cannot detect a missing *new* type), backstopped by the `dsh-code-review` checklist.

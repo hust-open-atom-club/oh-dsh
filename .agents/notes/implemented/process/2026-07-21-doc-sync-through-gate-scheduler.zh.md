@@ -6,13 +6,13 @@ Status: implemented
 
 ## 问题
 
-`pnpm run doc-sync` 原本是把 24 个 `pnpm run` 子命令用 `&&` 串起来的链。每一环都要先付一次完整的 pnpm 包装层启动（workspace 解析、脚本查找、tsx 启动）才轮到脚本本体；在开发机上实测，24 个脚本本体合计约 34 秒即可跑完，而链式形态耗时约 3 分钟，且包装层的停顿在本地磁盘上同样复现，因此每位开发者和每条 CI 车道都在付这笔开销，并非只有网络文件系统上的检出受影响。这条链还是串行执行的，尽管各成员门禁只读且相互独立；它也在悄悄偏离 [scripts/run-gates.ts](../../../../scripts/run-gates.ts)：运行时 API 目录落地时 `verify-cordis-api` 加入了链，却从未加进 `docSyncLeafGates`，导致 CI 和 pre-push 从未把关该目录的新鲜度。
+`pnpm run doc-sync` 原本是把 24 个 `pnpm run` 子命令用 `&&` 串起来的链。每一环都要先付一次完整的 pnpm 包装层启动（workspace 解析、脚本查找、tsx 启动）才轮到脚本本体；在开发机上实测，24 个脚本本体合计约 34 秒即可跑完，而链式形态耗时约 3 分钟，且包装层的停顿在本地磁盘上同样复现，因此每位开发者和每条 CI 车道都在付这笔开销，并非只有网络文件系统上的检出受影响。这条链还是串行执行的，尽管各成员门禁只读且相互独立；它也在悄悄偏离 [scripts/run-gates.ts](../../../../scripts/run-gates.ts)：运行时 API 目录落地时 `verify-cordis-api` 加入了链，却从未加进 `docSyncLeafGates`，导致 CI 从未把关该目录的新鲜度。
 
 ## 决策
 
-`package.json` 中的 `doc-sync` 现在委托给既有的有界调度器——`tsx scripts/run-gates.ts doc-sync`——与 `check:pre-push` 和各 `check:ci:*` 脚本的做法一致（[并行 pre-push 门禁](2026-07-06-parallel-pre-push-gates.md)、[并行 GitHub CI 门禁](2026-07-06-parallel-github-ci-gates.md)）。新增的 `doc-sync` 模式恰好展开为 `docSyncLeafGates()`，使 `run-gates.ts` 里的叶子列表成为成员集合的唯一真源；那条可能与之漂移的链不复存在。与 `pre-push` 一样，该模式把默认并发上限设为四个 worker，因为多个文档门禁各自要构建完整的 `ts.Program`；`DSH_GATE_CONCURRENCY` 仍可覆盖。
+`package.json` 中的 `doc-sync` 委托给既有的有界调度器——`tsx scripts/run-gates.ts doc-sync`——与各 `check:ci:*` 脚本的做法一致（[并行门禁调度](2026-07-06-parallel-pre-push-gates.md)、[并行 GitHub CI 门禁](2026-07-06-parallel-github-ci-gates.md)）。`doc-sync` 模式恰好展开为 `docSyncLeafGates()`，使 `run-gates.ts` 里的叶子列表成为成员集合的唯一真源。本地模式把默认并发上限设为四个 worker，因为多个文档门禁各自要构建完整的 `ts.Program`；`DSH_GATE_CONCURRENCY` 仍可覆盖。
 
-这次整合暴露出的漂移在同一变更中修复：`docSyncLeafGates` 补上缺失的 `verify-cordis-api` 叶子，CI 和 pre-push 从此与其他生成文档一起把关生成的运行时 API 目录。
+`docSyncLeafGates` 包含 `verify-cordis-api`，因此相关的本地文档检查与 CI 会同其他生成文档一起把关生成的运行时 API 目录。
 
 ## 考虑过的替代方案
 

@@ -33,7 +33,7 @@ This **supersedes the event-taxonomy half** of [doc-sync enforcement](2026-06-11
 
 ## Consequences
 
-- The catalog cannot drift: a source change that the committed file doesn't reflect fails `verify-cordis-catalog` in the pre-push hook and CI. A new event with no `@mode` tag, a tag that contradicts its signature, or an unclassified signature type fails the generator outright.
+- The catalog cannot drift: a source change that the committed file doesn't reflect fails `verify-cordis-catalog` in `doc-sync` and CI. A new event with no `@mode` tag, a tag that contradicts its signature, or an unclassified signature type fails the generator outright.
 - Event and service-method contracts have a single home — the JSDoc at the declaration. The catalog repeats that original JSDoc inside its generated signature block and uses its description portion as entry prose, so thin source documentation yields a thin catalog entry.
 - The inherited tier is hand-summarized, so a vendor sync that adds/renames a cordis-core event or `ctx` member needs a matching edit to the curated table in `gen-cordis-catalog.ts`. This is the deliberate cost of not walking pinned vendor source; it changes rarely and is called out in the generator.
 - `verify-event-taxonomy.ts` is deleted and the `docs/architecture.md` event table is gone; anyone who linked to a specific table row now lands on the generated catalog instead.
