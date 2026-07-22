@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
-2026-07-22-evidence-based-larger-hosted-runners.md: 992a622f0d7a2662cc65353d6c4cd1350e1f3f5f
-2026-07-22-evidence-based-larger-hosted-runners.zh.md: 622911af8400fbe159038b69b440c0e97fb1f2cc
+2026-07-22-evidence-based-larger-hosted-runners.md: 8d3852c56e2289bd222a260f2685f6a941a0cb19
+2026-07-22-evidence-based-larger-hosted-runners.zh.md: 4e7f846db1be2d68a080381943012583636ed2c4

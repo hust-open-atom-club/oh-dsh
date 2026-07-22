@@ -8,9 +8,7 @@ The pre-push hook is the last local checkpoint before a branch leaves the machin
 
 Flattening those members directly into `lefthook.yml` solves the local hook only. CI has the same scheduling problem, and duplicating a long leaf list in YAML gives future script changes two places to drift.
 
-`publint` has the same shape one level lower. Each package is linted independently against its own manifest and built output, but the runner loops through every package in order. On this repo that makes one package-publication gate consume time proportional to the number of packages even though the checks do not share mutable state.
-
-The unit-suite gate is the sharpest instance of the parallel runner's own pressure. At vitest's all-core default it oversubscribed the machine against its concurrent siblings — build, snapshot, and the doc leaves — and the resulting CPU starvation blew the 5s per-test timeout on subprocess-spawning tests (the hooks bridges spawn shells; the sandbox probe `spawnSync`-es a launcher) with a shifting victim set from run to run.
+`publint` has the same shape one level lower. Each package is linted independently against its own manifest and built output, but invoking the CLI separately also asks the package manager to compute the same manifest-bounded publication view once per package. On this repo process and packing overhead dominate the publication checks.
 
 ## Decision
 
@@ -20,9 +18,7 @@ The `pre-push` mode expands into leaf gates for the unit suite, snapshot suite, 
 
 The build gate makes the hook self-contained from a clean worktree. `publint`, `verify-node-next-types`, and the pre-push form of `doc-typecheck` wait for that build output, while source-only gates continue in parallel.
 
-The unit-suite (`test`) gate runs `vitest` with a pool bounded to half the available cores by default; `DSH_TEST_MAX_WORKERS` overrides it, mirroring the coverage gate's `DSH_COVERAGE_MAX_WORKERS`. The bound lives only in the `pre-push` mode's gate; CI runs the coverage gate instead, so it never touches CI timing.
-
-[scripts/publint-all.ts](../../../../scripts/publint-all.ts) discovers the package list from `packages/<group>/<pkg>` and runs `publint` with a worker pool sized from `availableParallelism()`. `DSH_PUBLINT_CONCURRENCY` can cap or raise the worker count for local machines and CI runners with different resource profiles. Results are buffered per package and printed in deterministic package order, so parallel execution does not scramble each package's log block.
+[scripts/publint-all.ts](../../../../scripts/publint-all.ts) discovers the package list from `packages/<group>/<pkg>` and calls publint's supported API against an in-memory view of each manifest's declared publication files plus npm's mandatory metadata files. That keeps unpublished workspace files invisible to publint without a package-manager subprocess per package. A worker pool sized from `availableParallelism()` bounds parallel file loading and linting; `DSH_PUBLINT_CONCURRENCY` can cap or raise it, and results print in deterministic package order.
 
 The per-gate package scripts remain the vocabulary for ad hoc local runs. `hygiene` stays an aggregate `&&` chain the scheduler mirrors, while `doc-sync` has since moved its member list into the scheduler itself ([doc-sync through the gate scheduler](2026-07-21-doc-sync-through-gate-scheduler.md)).
 
@@ -33,9 +29,7 @@ The per-gate package scripts remain the vocabulary for ad hoc local runs. `hygie
 - **Require developers to build before pushing** - avoids one hook gate, but it makes `publint` fail in a clean worktree and turns the final local checkpoint into a convention instead of a runnable check.
 - **Background subcommands inside shell scripts** - can parallelize work, but it loses lefthook's job names, per-job timing, and failure grouping, and makes signal handling harder to reason about.
 - **Declare one publint lefthook job per package** - exposes maximum parallelism, but it turns the hook into a hand-maintained package inventory that drifts exactly when new packages are added.
-- **Run publint with unbounded concurrency** - minimizes elapsed time on small machines only by gambling with process count, memory pressure, package tarball creation, and readable logs.
-- **Leave the `test` gate at vitest's all-core default** - matches a standalone `pnpm run test`, but under the pre-push runner it overlaps three sibling gates and oversubscribes the machine, so subprocess-spawning tests intermittently blow their 5s timeout; bounding the pool trades a slower isolated `test` gate for a stable one.
-- **Raise the per-test timeout instead of bounding workers** - would cover the vitest-level timeouts, but the sandbox probe's own 5s `spawnSync` budget is a real-time product default the test asserts against, not a vitest timeout, so only lowering the concurrent process count keeps it green.
+- **Run publint with unbounded concurrency** - minimizes elapsed time on small machines only by gambling with file descriptors, memory pressure, and readable logs.
 
 ## Consequences
 
@@ -43,6 +37,4 @@ The hook's critical path becomes the slowest real gate instead of the sum of hid
 
 The hook file stays short, and the duplicated member list lives in [scripts/run-gates.ts](../../../../scripts/run-gates.ts), where CI and pre-push can share it. The cost is a custom scheduler script instead of pure lefthook configuration, plus a build in the local pre-push path.
 
-`publint-all.ts` becomes asynchronous code and buffers command output instead of inheriting stdio live. The payoff is package-level parallelism with stable output order and one environment variable for resource tuning.
-
-The bounded `test` gate runs slower in isolation than a full-machine `vitest run` but no longer starves its siblings, so the hook stops producing spurious per-test timeout failures at its default concurrency. A machine shared with other heavy processes can still spike past saturation beyond this hook's control; `DSH_TEST_MAX_WORKERS` and `DSH_GATE_CONCURRENCY` let a contributor tighten the footprint further when that happens.
+`publint-all.ts` becomes asynchronous code and formats API results after each package completes. The payoff is package-level parallelism with stable output order, one environment variable for resource tuning, and no repeated package-manager packing.
