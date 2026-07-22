@@ -86,7 +86,7 @@ Notifier 微任务合批 ──► ConversationSnapshot 缓存 ──uSES──�
 
 胶水包就是整条 ctx↔React 边界；组件保持零框架依赖。
 
-- 快照 store 引擎：zustand vanilla + 草稿式更新，缺省 `flush: 'sync'`（受控输入要求同 tick 回响），帧驱动 store 可选 `'raf'` 合批，可选整值 localStorage 持久化，dev 深冻结。插件只经 [slot 体系标准](2026-07-22-slot-type-chain-implementation.md) 的 `defineStore` 声明触及它；引擎的直接消费方只有框架（runtime 数据层、渲染器机械）。Session 对象与快照 store 同构满足 React 消费的唯一数据契约：`ObservableSnapshot<T>`（`getSnapshot`/`subscribe`）。
+- 快照 store 引擎**住 runtime 包**（zustand vanilla + 草稿式更新，缺省 `flush: 'sync'`，帧驱动 store 可选 `'raf'` 合批，可选整值 localStorage 持久化，dev 深冻结——全部从 `runtime` 的 `./client` 主出口导出，无子路径）：store 产物是裸的可观察源，不带任何 hook 成员。插件只经 [slot 体系标准](2026-07-22-slot-type-chain-implementation.md) 的 `defineStore` 声明触及引擎。web-react 在绑定处（`bindSnapshotSelector`，按源缓存）从 React 消费的唯一数据契约合成每个 hook：`ObservableSnapshot<T>`（`getSnapshot`/`subscribe`）——Session 对象与快照 store 同构满足它。业务插件包只依赖 runtime 与 ui-slots；web-react 是仅壳可用的胶水。
 - `bindSnapshotSelector(source)`：把一个源绑定为经 uSES-with-selector 的带类型 selector hook。uSES 契约四条按构造成立：getSnapshot 恒返缓存引用；subscribe 是绑定期闭包（引用永稳）；纯 CSR 不传 server snapshot；相等性缺省 `Object.is`，按调用可选 `shallowEqual`。
 - `useInvoke(fn)`：把异步动作包成引用恒定的触发器加 pending 标志；pending 走 per-hook 外部 store 经 uSES 读出（渲染路径零 setState），并发调用计数，invoke 引用永不变。
 - 相等性协议，全链一致：生产端结构共享；消费端以 `Object.is` 或 `shallowEqual` 短路；`React.memo` 浅比较。深比较全链禁止。

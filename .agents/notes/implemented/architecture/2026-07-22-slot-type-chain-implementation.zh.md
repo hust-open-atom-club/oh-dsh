@@ -51,7 +51,7 @@ ctx.slots.register({
 
 ### store 席位：引擎归框架，schema 归注册方
 
-框架拥有恰好一台订阅机械（uSES 快照 store 引擎——zustand vanilla + immer + 可选 localStorage 持久化）。store 里*装什么*是注册方的声明，且必须写成工厂函数，使模块级句柄根本无从存在（模块级句柄会成为跨插件重载存活的事实单例）：
+框架拥有恰好一台订阅机械：快照 store 引擎（zustand vanilla + immer + 可选 localStorage 持久化）住 **runtime 包**（`./client` 主出口——无子路径），产出裸的可观察源；web-react 在 outlet 处把它们绑定成 hook（按源缓存的 uSES 绑定）。store 里*装什么*是注册方的声明，且必须写成工厂函数，使模块级句柄根本无从存在（模块级句柄会成为跨插件重载存活的事实单例）：
 
 ```ts ignore-check
 export function createChatStore() {
@@ -80,7 +80,7 @@ hook 只许框架造：`useSession`、`useSessions`、`useStore`、`renderSlot` 
 
 ### 树上语境与渲染器安装缝
 
-`SessionProvider` 是框架组件，框架自接线（内部自读 runtime 的当前会话状态，装配方零传参），render-prop 形——`children(sessionId)` 外加 `empty` 分支，以 `key={sessionId}` 重挂。`BindingContext` 属机械内部；业务组件可见的 React Context 为零。inject 工厂有意在 outlet 内部执行（per-entry 错误边界接得住它们；崩溃的注册方只黑掉自己那一格，装配错误则重抛）；outlet 把树上语境当作仅机械可用的暗参读取——即「身份出自 register 闭包、现场出自树位置」的分工。
+`SessionProvider` 是框架组件，**以标配席形式送达**：`children` 里声明了 session scope 坑的 entry 经 prop 收到它（类型住 ui-slots，值由渲染器注入）——组件永不对它做值 import。它框架自接线（内部自读 runtime 的当前会话状态，装配方零传参），render-prop 形——`children(sessionId)` 外加 `empty` 分支，以 `key={sessionId}` 重挂。`BindingContext` 属机械内部；业务组件可见的 React Context 为零。inject 工厂有意在 outlet 内部执行（per-entry 错误边界接得住它们；崩溃的注册方只黑掉自己那一格，装配错误则重抛）；outlet 把树上语境当作仅机械可用的暗参读取——即「身份出自 register 闭包、现场出自树位置」的分工。
 
 渲染住在一条安装缝之后，runtime 因此保持 React-free：`SlotRenderer`（接口住 ui-slots，实现 `createSlotRenderer()` 住 web-react）在壳 boot 时经 `ctx.slots.install(...)` 安装一次；双重安装与安装前渲染均 throw。归属记账是服务里的单一 `Map<key, entry>`——账本、坑、贡献、渲染绑定、store 实例全部沿同一条 entry 轴生灭，跨插件重载的陈旧权威窗口由此在构造上关闭（已 dispose 的 entry 所捕获的 `renderSlot`，一进入口即抛陈旧授权（stale-authorization）错误）。
 
