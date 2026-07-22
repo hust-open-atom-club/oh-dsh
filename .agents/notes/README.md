@@ -1,5 +1,7 @@
 # Agent Notes
 
+English | [中文](README.zh.md)
+
 One kind of design doc lives here. An **Agent Note** records a decision or proposal that shapes this codebase — the *why* and *what we gave up*, the parts code and docs can't carry. This file is the front door and contract: where Agent Notes live, when to write one, and [the in-file format](#the-file-format).
 
 ## Layout and naming
