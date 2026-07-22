@@ -1,6 +1,8 @@
-# Agent Note: TSC-first build and one tsconfig
+# Agent Note: TSC-first build and one compiler ownership
 
 Status: implemented
+
+> Root project topology (which tsconfig owns which graph) has since moved to a solution root over two aggregate programs; see the [solution-root note](2026-07-22-tsconfig-solution-root-two-aggregates.md). The tsc-first pipeline decided here is unchanged.
 
 ## Problem
 
@@ -28,29 +30,29 @@ In-package relative imports use explicit `.ts` specifiers.
 
 `pnpm run build` is a two-stage build:
 
-- Stage 1: `tsc -b tsconfig.build.json` emits per-module `.js`, declarations `.d.ts`, JS sourcemaps `.js.map`, and declaration sourcemaps `.d.ts.map` into each package's `lib/types`. This is the authoritative TypeScript compilation result. For publish we keep `.d.ts` / `.d.ts.map` and ignore `.js` / `.js.map`.
-    - The build project uses the project-reference graph that `tsc -b` compiles. For example, root `tsconfig.build.json` references package and vendor tsconfigs. It validates and emits package/vendor build results.
+- Stage 1: `tsc -b` over the root solution emits per-module `.js`, declarations `.d.ts`, JS sourcemaps `.js.map`, and declaration sourcemaps `.d.ts.map` into each package's `lib/types`. This is the authoritative TypeScript compilation result. For publish we keep `.d.ts` / `.d.ts.map` and ignore `.js` / `.js.map`.
+    - The graph is the project-reference graph reachable from the root solution `tsconfig.json` through the two aggregates ([topology](2026-07-22-tsconfig-solution-root-two-aggregates.md)). It validates and emits package/vendor build results.
 - Stage 2: a bundler reads the emitted JS under `lib/types` and writes the bundled runtime entry as `lib/index.js` or `lib/index.mjs` (follow current behavior). This stage is bundling only. It must not read TypeScript source or emit declarations.
 
 `tsdown` is no longer the owner of TypeScript compilation or declaration output.
 
-`pnpm run typecheck` runs build mode over the root `tsconfig.json`.
-- The root `tsconfig.json` is the single development/typecheck project. It typechecks examples, tests, and scripts with `noEmit`, and validates package/vendor source through references.
-- Referenced package/vendor projects keep the same emit behavior as build, so typecheck can refresh their `lib/types` outputs instead of using a separate no-emit graph. Project-specific strictness changes live in the owning `packages/*/*/tsconfig.json` or `vendor/*/tsconfig.json`.
-- The root no-emit project disables `rewriteRelativeImportExtensions`; it emits nothing and includes tests that import helpers across project-reference boundaries. Package/vendor emit projects keep the rewrite enabled.
+`pnpm run typecheck` runs the same `tsc -b` graph.
+- The aggregates (`tsconfig.host.json`, `tsconfig.client.json`) typecheck examples, tests, and scripts with `noEmit`, and validate package/vendor source through references.
+- Referenced package/vendor projects keep the same emit behavior as build, so typecheck refreshes their `lib/types` outputs instead of using a separate no-emit graph. Project-specific strictness changes live in the owning `packages/*/*/tsconfig.json` or `vendor/*/tsconfig.json`.
+- The no-emit aggregates disable `rewriteRelativeImportExtensions`; they emit nothing and include tests that import helpers across project-reference boundaries. Package/vendor emit projects keep the rewrite enabled.
 
 The command orchestration shape is:
 
 ```sh
 pnpm run build:
-tsc -b tsconfig.build.json
+tsc -b
 tsdown
 
 pnpm run verify-node-next-types:
 tsx scripts/verify-node-next-types.ts
 
 pnpm run typecheck:
-tsc -b tsconfig.json
+tsc -b
 ```
 
 `pnpm run demo:*` still runs `src` directly through tsx and root paths, without a compile step.
@@ -65,7 +67,7 @@ tsc -b tsconfig.json
 Build responsibilities are clearer:
 
 - Each module under `packages/<group>/<pkg>` and `vendor/*` has one local tsconfig for build, typecheck, and tools that run source directly, such as `tsx` and `vitest`.
-- The `build` command uses `tsconfig.build.json`. `tsc -b` owns the publishable per-module `.js` and `.d.ts` output, and the bundler owns only `lib/index.*`.
+- The `build` command drives the root solution graph. `tsc -b` owns the publishable per-module `.js` and `.d.ts` output, and the bundler owns only `lib/index.*`.
     - `lib/types/*.d.ts` and `.d.ts.map` are the publish declaration output.
     - `lib/types/*.d.ts` uses explicit `.ts` relative specifiers, which TypeScript's NodeNext/Node16 resolver maps to sibling `.d.ts` files.
     - `lib/types/*.js` is only a bundler input and must not be used as a runtime entry or public import target.

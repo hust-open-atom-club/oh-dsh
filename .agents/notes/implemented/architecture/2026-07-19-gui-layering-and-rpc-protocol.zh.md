@@ -51,7 +51,7 @@ harness core packages ──────────────────┘ 
 - `webserver` 不依赖 `runtime`：它提供 `{ fetch }` 特定实现 ——「webserver ← runtime」只是运行时注入关系，不是包依赖。
 - client 侧跨包 import 插件包一律走 `/client` 子路径（裸包名会把第二份运行时实例内联进浏览器 bundle；tsdown 纯度门禁会改写或拒收）。
 
-TypeScript 以**两个聚合 program** 检查（`tsconfig.json` = host 侧 + 测试，排除 `packages/client`；`tsconfig.client.json` = client 各包及其测试）：两侧在相同键（`sessions`、`loader`）下以不同服务合并 cordis `Context` 接口，单一 program 会同时看到两份声明合并而报冲突。共享叶子包（session/llm/tools/apiproxy 等）只构建一次，由两个 program 共同引用。
+TypeScript 以 solution 根引用的**两个聚合 program** 检查（`tsconfig.json` = solution；`tsconfig.host.json` = host 侧 + 测试，排除 `packages/client`；`tsconfig.client.json` = client 各包及其测试）：两侧在相同键（`sessions`、`loader`）下以不同服务合并 cordis `Context` 接口，单一 program 会同时看到两份声明合并而报冲突。共享叶子包（session/llm/tools/apiproxy 等）只构建一次，由两个 program 共同引用（[拓扑](../process/2026-07-22-tsconfig-solution-root-two-aggregates.md)）。
 
 协议侧：TS interface（`packages/host/apiproxy/src/api/`，零 Node 依赖，浏览器可 import）；wire 消息统一为**双向模型**——每条逻辑消息由「谁发起 × request/response」定形（两轴四格，后文称四象限），与物理通道解耦；客户端统一继承 `AbstractApiClient`（协议不变量全在基类，平台差异只是 `doFetch` 传输切面）。
 
