@@ -24,7 +24,7 @@ Repository translations follow the sibling pairing contract: English `foo.md`, C
 - **Publish a generated catalog:** map the generated `docs/` file, but change its generator or source metadata rather than editing the catalog by hand.
 - **Change site structure:** update the manifest for ordinary pages; update VitePress configuration only when the existing sidebar, section, or locale model cannot express the change.
 
-Never edit or commit `website/.generated/`, `website/.cache/`, or `website/.dist/`. Never copy a maintained `docs/` page into `website/`.
+Never edit or commit `website/.generated/`, `website/.cache/`, or `website/.dist/`. Except for `website/AGENTS.md`, never add Markdown under `website/`; locale and route directories such as `website/zh-CN/`, `website/en/`, and `website/api/` are invalid source layouts. Keep generated catalogs under `docs/`, freshness-gate them there, and publish them through the manifest.
 
 ## Add or update a manifest entry
 
