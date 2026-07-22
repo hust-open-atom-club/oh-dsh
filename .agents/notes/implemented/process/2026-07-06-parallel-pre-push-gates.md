@@ -10,7 +10,7 @@ Aggregate jobs such as documentation synchronization hide long sequential chains
 
 ## Decision
 
-[scripts/run-gates.ts](../../../../scripts/run-gates.ts) owns the bounded scheduler used by CI and `doc-sync`. It expands named modes into leaf gates, respects artifact dependencies, buffers attributable output, and accepts `DSH_GATE_CONCURRENCY` when a caller needs a different worker bound.
+[scripts/run-gates.ts](../../../../scripts/run-gates.ts) owns the bounded scheduler used by CI, `doc-sync`, and the opt-in `check:all` command. It expands named modes into leaf gates, respects artifact dependencies, buffers attributable output, and accepts `DSH_GATE_CONCURRENCY` when a caller needs a different worker bound.
 
 [scripts/publint-all.ts](../../../../scripts/publint-all.ts) discovers packages from `packages/<group>/<pkg>` and runs `publint` with a worker pool sized from `availableParallelism()`. `DSH_PUBLINT_CONCURRENCY` can cap or raise the worker count for local machines and CI runners with different resource profiles. Results are buffered per package and printed in deterministic package order, so parallel execution does not scramble each package's log block.
 

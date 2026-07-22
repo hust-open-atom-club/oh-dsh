@@ -22,9 +22,10 @@ Status: implemented
 
 - `Config`:`mode`(封闭的 `SandboxMode` 联合,默认 `read-only`)与 `workspaceRoot`(默认进程 cwd,解析为绝对路径)。配置错误在加载时高声失败。
 - per-session 覆盖事件 `sandbox/mode`,连同它的纯折叠(`effectiveSandboxMode(events)`)、写入路径(`setSandboxMode(session, mode)`)与 `SANDBOX_MODES`。该事件是策略状态——被两个家族消费——所以它住在这里,而不在任一能力的 seam 里。它的形状与仅日志(log-only)语义遵循 `approval/*` 的先例。
-- `defaultMode` / `workspaceRoot` 访问器,供执行实现读取其 resolve 回退值与边界。
+- `resolve({ session?, mode? })` 返回完整的单次调用 `SandboxExecutionPolicy`：显式批准的模式 > 会话折叠结果 > `defaultMode`，而会话中不可变的 cwd > 配置的 `workspaceRoot` 回退值。
+- 保留 `defaultMode` / `workspaceRoot` 访问器，作为部署回退值与能力宣告依据。
 
-`dsh-bash-sandbox` 自身不再携带任何沙箱配置——它注入 `sandboxPolicy` 并从中读取默认值;其 `resolve()` 优先级不变(升级授权 > per-call 盖章 > 默认)。`dsh-tool-bash` 与 `dsh-tool-fs` 用 `effectiveSandboxMode` 折叠会话的 `sandbox/mode` 以对每次调用盖章;`dsh-permission` 预设与 ACP bridge 经由迁移后的 setter 写入。拥有 bash 执行的那个 seam 不再依赖 `dsh-session`——会话依赖随折叠一起迁到了策略包。
+`dsh-bash-sandbox` 自身不再携带任何沙箱配置——它注入 `sandboxPolicy`，仅在直接调用时使用其中的部署回退值。`dsh-tool-bash` 与 `dsh-tool-fs` 把当前会话传给 `ctx.sandboxPolicy.resolve()`，因此两者每次调用都会取得相同的生效模式与 cwd 根目录；`dsh-permission` 预设与 ACP bridge 经由迁移后的 setter 写入。拥有 bash 与 fs 执行的 seam 仍不依赖会话——会话依赖归策略包与工具消费方所有。
 
 ### `dsh-fs-sandbox`——在提供方内部执行
 
@@ -34,13 +35,13 @@ Status: implemented
 - `workspace-write` 把规范化后的目标围栏于可写根集合——`dsh-sandbox` 中的 `writableRoots(policy)`:工作区根加上平台临时目录(`/tmp`、`os.tmpdir()`),各自 realpath——与 Seatbelt profile 授予的是同一个集合,所以 fs 围栏是这一个模式含义在 bwrap/Landlock/Seatbelt profile 之外的第四种方言,因此不会出现「write 工具不能写 `/tmp` 而 bash 能」的不对称。规范化路径写法采用词法包含的快速路径；当 Windows 以大小写不同的路径、长文件名或 8.3 短文件名表示同一目录时，系统会逐级遍历祖先目录并比较文件系统身份，而不会把边界弱化为依据文本前缀猜测包含关系。目标在委托前被立即重新规范化(`resolve` 对最深的既有祖先做 realpath),因此自工具解析该目标以来被换出的祖先符号链接会被捕获。
 - `danger-full-access` 不加围栏地委托。
 
-拒绝是结构化的 `FS_SANDBOX_DENIED`,携带生效模式——区别于 `FS_PERMISSION_DENIED`(宿主 EACCES 是世界在拒绝;这里是策略在拒绝)。无文本推断:进程内围栏确切知道它拒绝了什么。per-call 载体是 `writeText`/`editText` 上一个末尾可选的 `sandboxMode`(文件系统侧对应 `BashExecRequest.sandboxMode`);该 seam 保持无会话依赖(由调用方盖章,正如 `resolve` 接收一个 cwd),而裸的本地后端携带并忽略它。`FileSystem.sandboxMode` 是能力事实(在基类与 `fs-local` 上为 `undefined`,在 `SandboxedFileSystem` 上为默认值),所以工具层按组合真相来宣告升级。
+拒绝是结构化的 `FS_SANDBOX_DENIED`,携带生效模式——区别于 `FS_PERMISSION_DENIED`(宿主 EACCES 是世界在拒绝;这里是策略在拒绝)。无文本推断:进程内围栏确切知道它拒绝了什么。per-call 载体是 `writeText`/`editText` 上一个末尾可选的 `SandboxExecutionPolicy`（文件系统侧对应 `BashExecRequest.sandboxPolicy`）；该 seam 保持无会话依赖，而裸的本地后端会忽略它。`FileSystem.sandboxMode` 是能力事实(在基类与 `fs-local` 上为 `undefined`,在 `SandboxedFileSystem` 上为默认值),所以工具层按组合真相来宣告升级。
 
 威胁模型写在包 README 里:一道位于可信代码中、针对模型可控路径的策略围栏,而非内核边界——操作是 seam 自身的,只有目标路径不可信,所以「先规范化再判包含」是对这个面的完整答案(`code-runtime` 的「containment, not a security boundary」先例)。对不可信代码的内核级隔离仍是 `ctx.bash` 的职责。resolve 到系统调用之间残留的竞态被就地重新规范化收窄,只有平台原语(`openat2` `RESOLVE_BENEATH`)能彻底消除它,而那在此不值其可移植性代价。
 
 ### 工具对等——一个拒绝标记、一条升级流程
 
-`dsh-tool-fs` 把生效模式盖章到每次变更上,并将 `FS_SANDBOX_DENIED` 映射为模型已从 bash 认识的标记:`[sandbox: file access denied under <mode> mode]`。当 `ctx.fs.sandboxMode` 在注册时报告一个受限模式,`write` 与 `edit` 宣告相同的 `sandbox_permissions` + `justification` 字段,教授相同的同回合重试,并在执行前解析相同的 `ctx.approval` 请求——四种结果及其逐字的 fail-closed 文案沿用自[沙箱 RFC](2026-07-06-sandbox.md) § Escalation(严格加宽在执行时针对调用的生效模式检查;授权由发起它的那一次调用消费;无任何新会话事件)。
+`dsh-tool-fs` 把当前会话解析成完整策略，并传给每次变更，同时将 `FS_SANDBOX_DENIED` 映射为模型已从 bash 认识的标记:`[sandbox: file access denied under <mode> mode]`。当 `ctx.fs.sandboxMode` 在注册时报告一个受限模式,`write` 与 `edit` 宣告相同的 `sandbox_permissions` + `justification` 字段,教授相同的同回合重试,并在执行前解析相同的 `ctx.approval` 请求——四种结果及其逐字的 fail-closed 文案沿用自[沙箱 RFC](2026-07-06-sandbox.md) § Escalation（执行时根据调用的生效模式检查是否严格加宽；授权只改变当前调用的模式，并保留其会话根目录；不产生任何新会话事件）。
 
 共享部分住在 `dsh-sandbox`,它拥有模式类型:`WIDER_MODES`、升级目标枚举、参数配对校验、拒绝/提示标记构造器,以及 `approveEscalation`——有序的 fail-closed 编排。`approveEscalation` 接收一个最小的结构化 approver(`EscalationApprover`,对 agent 与 call-id 类型泛型化),而非审批服务类型,所以 `dsh-sandbox` 不获得对 approval 或 agent 包的依赖:每个工具把自己的 `ctx.approval`、agent、call id 与工具名作为原料传入。`dsh-tool-bash` 与 `dsh-tool-fs` 都使用它们;跨文件重复检测门禁确保单一来源不走样。
 
@@ -53,7 +54,8 @@ Status: implemented
 ### 范围之外
 
 - **`ctx.web` 的网络策略**——`SandboxMode` 只声明文件效果;在 bash `curl` 畅通时给一个仅限 web 的网络旋钮会是一道假边界。待某个 bash 后端能执行网络(bwrap `--unshare-net`、Landlock ABI v4+)时再议。
-- **`subagent-acp` 消费者** 与 **per-session 工作区根**——沙箱 RFC 未变的延后阶段;把根集中到 `ctx.sandboxPolicy` 是后者的铺垫,而非其设计。
+- **`subagent-acp` 消费者**——沙箱 RFC 中未变的延后阶段。
+- **单个会话中的额外可写根目录**——解析后的策略携带一个主要 `SessionHeader.cwd`；ACP `additionalDirectories` 仍是独立的 bridge 与策略设计问题。
 - **统一的 per-tool 沙箱运行时**——因沙箱 RFC 中的理由继续否决。
 
 ## Alternatives considered
@@ -66,7 +68,7 @@ Status: implemented
 - **带加载期一致性校验的 per-family 策略配置**——否决:一个事实两个归属,靠一个必须枚举每个未来执行家族的校验来打补丁;策略服务让漂移不可表达,而非被检测到。
 - **把覆盖事件留在 `dsh-bash` 里作 `bash/sandbox-mode`**——否决:该事件是被两个家族消费的策略状态;保留 bash 命名会迫使 `dsh-fs-sandbox` 依赖 bash 词汇。预发布阶段,该改名是同一变更内的迁移,附带快照重录,无任何 shim。
 - **把升级编排从 approval/agent 包导入 `dsh-sandbox`**——否决:那会倒置分层(一个基础词汇包依赖 UI/agent 包)。结构化 approver 让逻辑单一来源于 `dsh-sandbox`,而依赖留在本就持有它们的工具层。
-- **fs seam 上一个合并的 mutation-options 对象**(per-call 载体最初草拟的形状)——因摩擦被否决:它会搅动每一个 `writeText`/`editText` 调用方,并把 `signal` 拆进变更专用的选项包,而读取仍保持位置参数。一个末尾可选的 `sandboxMode` 匹配 bash 的携带并忽略模式,并使 `signal` 在整个 seam 上保持对称。
+- **fs seam 上一个合并的 mutation-options 对象**(per-call 载体最初草拟的形状)——因摩擦被否决:它会把 `signal` 拆进变更专用的选项包,而读取仍保持位置参数。一个末尾可选的 `SandboxExecutionPolicy` 匹配 bash 的携带并忽略模式,并使 `signal` 在整个 seam 上保持对称。
 - **现在就在 `SandboxPolicy` 上加额外的可写根授权**——照旧延后:`writableRoots()` 如今由模式含义推导;临时授权是沙箱 RFC 留下的升级作用域问题。
 
 ## Consequences
@@ -77,6 +79,7 @@ Status: implemented
 - 在 `workspace-write` 下,变更落在工作区根与临时目录下,其外被拒;包含矩阵——`..` 穿越、指向外部的绝对路径、一个既有的、指向外部的工作区内符号链接目录、在这样一个符号链接下新建的文件,以及根路径的等价别名形式——在真实磁盘上拒绝每一种逃逸,同时允许文件系统认定为同一目录的路径。
 - 一个被拒的 fs 变更,携带 `sandbox_permissions` + `justification` 重试一次,会经组合的审批链提示;一次授权让恰好那一次调用在更宽的模式下运行且写入落盘;rejected/cancelled/unavailable 各自产生其逐字的 fail-closed 文案且不做任何变更。
 - 一次 `permission` 预设切换同时管辖两个家族:会话切换模式后,下一次 bash 调用与下一次 fs 变更都从同一个 `sandbox/mode` 折叠遵循新模式。
+- cwd 根目录不同的并发会话通过同一组服务实例携带不同策略；两个家族都不会缓存某个会话的根目录供下一次调用使用。
 - 一次无 per-call 盖章的直连 `ctx.fs.writeText` 会被围栏于部署默认值。
 - `write`/`edit` 上的升级字段恰好在被挂载的 `ctx.fs` 受限时存在,在 `dsh-fs-local` 下不存在。
 - `agent-loop` 未被触动——一切都骑在 `ctx.sandboxPolicy`、`ctx.fs` seam、`SessionEventMap` 合并,以及工具执行管线之上。
@@ -90,5 +93,6 @@ Status: implemented
 
 ## Testing
 
-- 单元:`dsh-sandbox` 钉住升级阶梯、标记构造器、参数配对校验,以及 `approveEscalation` 的有序 fail-closed 序列(非加宽、无 approval、无 agent、各结果),外加 `writableRoots`/`canonicalPath`。`dsh-sandbox-policy` 钉住默认访问器、折叠/setter、加载期模式拒绝,以及 HMR 安全。`dsh-fs-sandbox` 在真实文件系统上钉住 per-mode 围栏与包含矩阵(内部、临时目录、绝对路径-外部、`..`、指向外部的符号链接目录、其下的新建文件、路径等于根、文件系统根、等价别名形式),外加 per-call 覆盖与 HMR 安全。`dsh-tool-fs` 钉住宣告门控、模式盖章、折叠、拒绝标记映射,以及完整的升级矩阵(授权、拒绝、无服务、无 agent、配对、非受限守卫)。`dsh-tool-bash`、`dsh-bash-sandbox` 与 `dsh-permission` 迁移到迁移后的策略/工具集。
+- 单元:`dsh-sandbox` 钉住升级阶梯、标记构造器、参数配对校验,以及 `approveEscalation` 的有序 fail-closed 序列(非加宽、无 approval、无 agent、各结果),外加 `writableRoots`/`canonicalPath`。`dsh-sandbox-policy` 钉住部署回退、会话模式/根目录解析、显式模式优先级、折叠/setter、加载期模式拒绝,以及 HMR 安全。`dsh-fs-sandbox` 在真实文件系统上钉住按策略执行的围栏与包含矩阵(内部、临时目录、绝对路径-外部、`..`、指向外部的符号链接目录、其下的新建文件、路径等于根、文件系统根、以分隔符结尾的根、等价别名形式),外加 per-call 覆盖与 HMR 安全。`dsh-tool-fs` 钉住宣告门控、完整策略解析、拒绝标记映射,以及完整的升级矩阵(授权、拒绝、无服务、无 agent、配对、非受限守卫)。`dsh-tool-bash`、`dsh-bash-sandbox` 与 `dsh-permission` 使用同一套策略工具集。
+- 无密钥 e2e：一个真实 Cordis 上下文创建两个 agent，其会话的 cwd 根目录各不相同；系统并发运行正式发布的 bash 与 fs 工具，再通过外部可观察结果验证各自在所属项目中的写入成功，而两次跨项目写入都被拒绝。
 - 快照:acp-agent 示例组合 `dsh-sandbox-policy` + `dsh-fs-sandbox`;被钉住的 header 携带 fs 升级字段与 `sandbox/mode` 事件名,一次性重录。
