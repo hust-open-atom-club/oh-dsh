@@ -18,6 +18,8 @@ A snapshot test boots the real ACP example, drives its stdio protocol from a det
 
 Each scenario's `session.jsonl` is harvested from a real run. `assistant/chunk` events reproduce the model streams; tool, message, and boundary events capture the harness behavior. One ordinary session artifact therefore serves as both replay source and behavioral expected output.
 
+When a scenario pins an alternative physical storage layout, its fixture is mechanically derived from a real unpacked counterpart. The scenario test requires every intended storage-row kind and exact event-for-event equality after decoding before the ordinary replay and log comparison proves that the assembled process consumes and reproduces that layout.
+
 ### Replay derives the model script from the log
 
 `llm-replay` short-circuits the provider-agnostic `llm/stream` waterfall. `deriveReplayScript()` groups recorded chunks by `(turn, step)` and serves one group per model call. The loop makes one stream call per step, so the grouping is exact and includes error finish chunks without special handling.
