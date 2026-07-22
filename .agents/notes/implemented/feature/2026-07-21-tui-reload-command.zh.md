@@ -10,7 +10,7 @@ HMR 的文件监听器只对其配置根目录（示例中即配置叶子所在�
 
 ## Decision
 
-`dsh-tui` 增加一个**实验性、仅供开发**的 `/reload` 斜杠命令：遍历 `ctx.loader.entries()`，对每个文件后端的子树（`Include`）调用 `refresh()`——即 HMR 监听器配置变更分支所走的同一条代码路径，改为手动触发、不依赖监听器。未变化的文件是无操作（`Include.read` 做内容比较）。
+`dsh-tui` 增加一个**实验性、仅供开发**的 `/reload` 斜杠命令：遍历 `ctx.loader.entries()`，对每个文件后端的子树（`Include`）调用 `refresh()`——即 HMR 监听器配置变更分支所走的同一条代码路径，改为手动触发、不依赖监听器。未变化的文件是无操作（`Include.read` 做内容比较）；无效文件记录警告并保留运行中的树（热重载韧性契约）；include 的 `patches`——包括 dsh CLI 的个人 overlay——在每次重读时重新应用。
 
 TUI 以**结构方式**访问 Loader（通过局部类型访问 `ctx.loader`，而非 `inject`）：测试和嵌入方在没有 Loader 的情况下运行 TUI，此时 `/reload` 退化为一条警告通知而不是挂载失败。模块源码热重载仍由监听器负责；`/reload` 只刷新配置。
 
@@ -28,8 +28,8 @@ TUI 以**结构方式**访问 Loader（通过局部类型访问 `ctx.loader`，�
 - 命令以 transcript 通知报告树数量与完成；单文件失败只出现在 loader 日志里，TUI 不显示——对仅供开发的表面可以接受，完成消息中已注明。
 - 重入保护串行化重载：前一次进行中时 `/reload` 会被拒绝并提示警告，使 loader 无互斥的树更新过程保持单写者；保护在完成或失败时释放。
 - `/reload` 只在 agent 空闲时运行：重载可能卸载并重新挂载配置项，在活跃轮次下这会把工具或适配器从进行中的调用脚下抽掉。检查是建议性的（检查后仍可能有 send 竞争进来），但消除了常见的坑。
-- 任一 `refresh()` 若 reject，命令会报告失败而不是留下未处理的 rejection。
+- 若 `refresh()` 的永不 reject 契约将来改变，命令会报告失败而不是留下未处理的 rejection。
 
 ## Testing
 
-`packages/ui/tui/tests/tui.spec.ts` 固定：`/reload` 刷新每个文件后端子树并跳过普通配置项（结构化的假 Loader）、报告完成、在门控的刷新进行中拒绝重入并在释放后可再次运行、失败分支同样释放保护、拒绝运行中的 agent 并在空闲后可再次运行、报告 reject 的 refresh、无 Loader 时退化为警告——包括作为真实插件 fiber 挂载的情形，在那里会抛出的服务查找会泄露出去。已在 tmux 中对真实配置树实机验证：探针编辑后 reload 成功生效。
+`packages/ui/tui/tests/tui.spec.ts` 固定：`/reload` 刷新每个文件后端子树并跳过普通配置项（结构化的假 Loader）、报告完成、在门控的刷新进行中拒绝重入并在释放后可再次运行、失败分支同样释放保护、拒绝运行中的 agent 并在空闲后可再次运行、报告 reject 的 refresh、无 Loader 时退化为警告——包括作为真实插件 fiber 挂载的情形，在那里会抛出的服务查找会泄露出去。已在 tmux 中对真实配置树实机验证：探针编辑 → reload 生效；无效编辑 → reload 保留运行中的树。

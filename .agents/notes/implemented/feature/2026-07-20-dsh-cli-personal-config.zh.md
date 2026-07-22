@@ -22,6 +22,8 @@ Status: implemented
 
 PTY 冒烟测试的启动器把 `$DSH_HOME` 隔离到每个测试自己的目录，与它已有的 `DSH_AGENTS_HOME` 隔离方式完全一致，开发者真实的个人 overlay 不可能泄漏进 fixture；只有 dsh CLI 读取个人配置，因此其他测试启动器无需改动。
 
+与热重载的交互：include 在每次配置重读时重新应用其 `patches`（见[配置热重载韧性 Agent Note](../bug-fix/2026-07-20-config-hot-reload-resilience.md)），因此运行中编辑 `cordis.yml` 后个人 overlay 仍保持生效。
+
 ## Alternatives considered
 
 **独立的 `bin/dsh` 包装脚本占有 `dsh` 这个名字。** 读过 PR #443 后否决：该 PR 把 `apps/cli` 确立为带子命令分发（`web`、`-p`）的 `dsh` CLI，并且默认位空缺。两个互相竞争的 `dsh` 入口会在 `$PATH` 和产品身份上冲突；在同一包形态内认领默认位，把最终的合并冲突限制在小小的分发链上。
