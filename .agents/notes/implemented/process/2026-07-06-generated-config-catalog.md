@@ -32,7 +32,7 @@ The package README `## Config` sections stay. The overlap is accepted deliberate
 
 ## Consequences
 
-- The catalog cannot drift: a source change the committed file does not reflect fails `verify-config-catalog` in pre-push and CI. An undocumented config field, an unresolvable referenced type name, or a schema key missing from the config type fails the generator outright.
+- The catalog cannot drift: a source change the committed file does not reflect fails `verify-config-catalog` in `doc-sync` and CI. An undocumented config field, an unresolvable referenced type name, or a schema key missing from the config type fails the generator outright.
 - Config prose now has a forcing function at the declaration: writing a new config field means writing its JSDoc, which becomes the catalog entry verbatim.
 - The generator hard-errors on shapes it cannot walk statically — an aliased package-local config import, a schema built by anything other than `object`/`intersect` composition, an unlisted global type name. Introducing such a shape includes teaching the generator (or the shape stays out of the repo), which is the point: the catalog stays the whole truth.
 - `gen-cordis-catalog.ts` exports its JSDoc/pointer helpers and `LINK_MAP` for reuse, so the two catalogs cross-link types identically and a link-map addition serves both.

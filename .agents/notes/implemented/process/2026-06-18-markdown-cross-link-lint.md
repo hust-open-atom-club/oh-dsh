@@ -16,7 +16,7 @@ A fourth `doc-sync` gate, `verify-md-links` (`scripts/verify-md-links.ts`), mirr
 - Check a target only when it is a **relative path**. Skip scheme-qualified URLs (`https:`, `mailto:`, …), protocol-relative (`//host`), root-absolute (`/path` — no stable base in a checkout), and pure in-page anchors (`#section`). Strip any `#fragment`/`?query`, resolve the path against the linking file's directory, and assert it exists on disk.
 - Report and never rewrite; exit non-zero on the first broken link found.
 
-Scope matches the other gates plus the AGENTS.md pair and the repo-authored agent-skill Markdown under `.agents/skills/` (those skill files cross-link into the docs tree, so this reorg rewrote links in them too): `README.md`, `docs/**/*.md`, `packages/*/README.md`, `AGENTS.md`, `packages/AGENTS.md`, `.agents/skills/**/*.md`, deduped by real path (the `CLAUDE.md` symlinks resolve onto the AGENTS.md files). It is wired into the `doc-sync` script that the lefthook pre-push hook and CI both run, so a broken link fails locally before a push — consistent with [mechanical quality gates](2026-06-11-quality-gates.md).
+Scope matches the other gates plus the AGENTS.md pair and the repo-authored agent-skill Markdown under `.agents/skills/` (those skill files cross-link into the docs tree, so this reorg rewrote links in them too): `README.md`, `docs/**/*.md`, `packages/*/README.md`, `AGENTS.md`, `packages/AGENTS.md`, `.agents/skills/**/*.md`, deduped by real path (the `CLAUDE.md` symlinks resolve onto the AGENTS.md files). It is wired into `doc-sync`, so relevant documentation changes and CI exercise the same broken-link check.
 
 This gate checks *existence*, not anchor validity: a link to a real file with a `#wrong-heading` fragment still passes (the file resolves; the fragment is stripped).
 
@@ -26,6 +26,6 @@ This gate checks *existence*, not anchor validity: a link to a real file with a 
 
 ## Consequences
 
-- Renames and moves that orphan a cross-link now fail the pre-push hook and CI instead of waiting for a reader to click a dead link. This made the Agent Note reorganization that introduced the gate self-verifying: the same PR that rewrote forty links also added the check that proves none dangle.
+- Renames and moves that orphan a cross-link fail `doc-sync` and CI instead of waiting for a reader to click a dead link. This made the Agent Note reorganization that introduced the gate self-verifying: the same PR that rewrote forty links also added the check that proves none dangle.
 - One more fast tsx script in the `doc-sync` chain; no new dependency (the mdast/GFM stack is already in devDependencies for `verify-md-wrap`).
 - The convention this enforces — cross-reference docs by machine-checkable relative link, never by bare prose or a number — is documented in [docs/AGENTS.md](../../../../docs/AGENTS.md) so authors know the gate exists and why.

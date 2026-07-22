@@ -8,7 +8,7 @@ The repository had no single reference for the names, descriptions, and JSON Sch
 
 ## Decision
 
-Generate the catalog by **booting each tool plugin and reading its registered schemas**, not by parsing source. `scripts/gen-tool-catalog.ts` mounts each shipped tool package on a fresh cordis `Context` (with `SystemPrompt` + `ToolRegistry` and the injected seams the plugin's `apply` reads), calls `ctx.tools.schemas()` — exactly the `ToolSchema[]` the model is sent — disposes the context, and renders one `## <package>` section per package with a ` ```json ` `parameters` block per tool. It mirrors the `gen-cordis-catalog` / `gen-module-graph` CLI shape: default `--write` regenerates, `--check` fails if the committed copy is stale, output is deterministic (manifest-ordered, tools sorted by name). `verify-tool-catalog` (the `--check`) runs inside `doc-sync`, so the freshness gate fires in the same lefthook pre-push and CI paths as every other doc gate.
+Generate the catalog by **booting each tool plugin and reading its registered schemas**, not by parsing source. `scripts/gen-tool-catalog.ts` mounts each shipped tool package on a fresh cordis `Context` (with `SystemPrompt` + `ToolRegistry` and the injected seams the plugin's `apply` reads), calls `ctx.tools.schemas()` — exactly the `ToolSchema[]` the model is sent — disposes the context, and renders one `## <package>` section per package with a ` ```json ` `parameters` block per tool. It mirrors the `gen-cordis-catalog` / `gen-module-graph` CLI shape: default `--write` regenerates, `--check` fails if the committed copy is stale, output is deterministic (manifest-ordered, tools sorted by name). `verify-tool-catalog` (the `--check`) runs inside `doc-sync`, so relevant documentation changes and CI exercise the same freshness check.
 
 ### Why boot, not parse (the crux)
 
@@ -47,7 +47,7 @@ Schema blocks use ` ```json `, not a bespoke `ts`-family fence. `doc-typecheck` 
 
 ## Consequences
 
-- The catalog cannot drift: a tool schema change the committed file doesn't reflect fails `verify-tool-catalog` in the pre-push hook and CI. A new `tool-*` package not added to the manifest fails the completeness guard outright.
+- The catalog cannot drift: a tool schema change the committed file doesn't reflect fails `verify-tool-catalog` in `doc-sync` and CI. A new `tool-*` package not added to the manifest fails the completeness guard outright.
 - Tool description prose has a single home — the `defineTool` `description` at the source — and the generated entry is only as good as it, the same forcing function the cordis catalog applies to event JSDoc.
 - The generator imports and executes workspace packages (the first repo script to do so; the others only read text). It runs under `tsx` via the root `tsconfig` `paths` map, the same unbuilt-source path the demos and tests use, so it needs no build step.
 - A new capability seam behind a future tool means a new manifest recipe entry (which seams to mount). This is the deliberate hand-written cost called out above; it changes only when a tool package is added.
