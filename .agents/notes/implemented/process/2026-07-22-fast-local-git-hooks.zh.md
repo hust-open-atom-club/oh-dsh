@@ -14,7 +14,7 @@ agent（智能体）已经会运行能够覆盖自身改动的测试和检查，
 
 [lefthook.yml](../../../../lefthook.yml) 将两个钩子都保留为有界的本地检查点。Pre-commit 按顺序运行：ESLint 修复改动过的 JavaScript 和 TypeScript 文件并重新暂存，`git diff --cached --check` 拒绝暂存 diff 中的空白错误，vendor manifest（元数据清单）守卫检查 vendor 源码元数据。Pre-push 直接调用仓库内的 TypeScript 二进制，并启用增量构建模式。
 
-两个钩子都不运行测试、快照、文档检查、构建、`hygiene` 或门禁调度器。`check:pre-push` 包脚本与调度器的 `pre-push` 模式不存在；[scripts/run-gates.ts](../../../../scripts/run-gates.ts) 继续负责 CI 和 `doc-sync` 调度。
+两个钩子都不运行测试、快照、文档检查、构建、`hygiene` 或门禁调度器。可选运行的 `check:all` 包脚本独立于这些钩子，从 [scripts/run-gates.ts](../../../../scripts/run-gates.ts) 中选择 `check-all` 调度器清单；它是贡献者命令，而非对 agent 的指令。
 
 agent 检查待推送的 diff，并仅运行一次能够覆盖其行为的最小范围测试和检查。CI 负责全量覆盖率门禁、构建产物检查与平台矩阵。只有在明确要求、诊断 CI，或涉及全仓库的改动无法由范围更窄的证据得到可信验证时，才完整运行一遍本地检查矩阵。
 
@@ -31,6 +31,6 @@ agent 检查待推送的 diff，并仅运行一次能够覆盖其行为的最小
 
 ## 结果
 
-普通提交的关键路径是暂存文件 lint，缓存已预热时推送的关键路径是增量类型检查。钩子耗时只作为开发观察数据和 PR（Pull Request）证据记录，不设置会受主机负载与缓存状态影响的计时测试。
+普通提交的关键路径是暂存文件 lint，缓存已预热时推送的关键路径是增量类型检查。贡献者仍可选择用一条命令完整演练，且不会扩展钩子关键路径或 agent 必须运行的验证集合。钩子耗时只作为开发观察数据和 PR（Pull Request）证据记录，不设置会受主机负载与缓存状态影响的计时测试。
 
 从本地推送成功不再能证明仓库完整矩阵已通过。agent 必须选择相关的行为证据，评审人必须判断该选择是否与 diff 相符，CI 则对每个推送版本提供一次全面信号。
