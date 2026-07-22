@@ -36,7 +36,7 @@ Status: implemented
 
 ### 进入时已中止会在物化后短路
 
-注册表先创建调用 token，并对参数进行无损快照和冻结。即使调用方信号已经中止，参数物化失败仍优先返回。物化成功后，进入时已中止的信号会跳过 `tools/pre-execute`、审批、`tools/execute`、`tools/post-execute` 和工具主体，然后发布且只发布一次冻结的权威 `tools/result`，其代码为 `ABORTED_BEFORE_DISPATCH`。
+注册表先创建调用 token，对可见工具定义的可选 `finalizeContent` callback 做快照，并对参数进行无损快照和冻结。即使调用方信号已经中止，参数物化失败仍优先返回。在最终内容处理之前，注册表还会对候选结果进行无损快照，并把结果快照失败转换为普通错误，从而使该 callback 仍能保证其内容不变量成立。参数物化成功后，进入时已中止的信号会跳过 `tools/pre-execute`、审批、`tools/execute`、`tools/post-execute` 和工具主体，然后先由该仅处理内容的 callback 处理 `ABORTED_BEFORE_DISPATCH`，再发布且只发布一次冻结的权威 `tools/result`。
 
 ### 已启动工作仍必须完全停稳
 

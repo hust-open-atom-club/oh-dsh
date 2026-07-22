@@ -36,7 +36,7 @@ An around-dispatch wrapper may replace `exec.signal` for its delegated lifetime 
 
 ### Pre-aborted entry short-circuits after materialization
 
-The registry first creates the call token and losslessly snapshots and freezes the arguments. A materialization failure wins even when the caller signal is already aborted. After successful materialization, a pre-aborted signal skips `tools/pre-execute`, approval, `tools/execute`, `tools/post-execute`, and the tool body, then publishes exactly one frozen authoritative `tools/result` with `ABORTED_BEFORE_DISPATCH`.
+The registry first creates the call token, snapshots the visible definition's optional final-content callback, and losslessly snapshots and freezes the arguments. An argument-materialization failure wins even when the caller signal is already aborted. Before final content, the registry also losslessly snapshots the candidate result and converts a result-snapshot failure into an ordinary error, so the callback can still enforce its content invariant. After successful argument materialization, a pre-aborted signal skips `tools/pre-execute`, approval, `tools/execute`, `tools/post-execute`, and the tool body, then passes `ABORTED_BEFORE_DISPATCH` through that content-only callback before publishing exactly one frozen authoritative `tools/result`.
 
 ### Started work still reaches quiescence
 
