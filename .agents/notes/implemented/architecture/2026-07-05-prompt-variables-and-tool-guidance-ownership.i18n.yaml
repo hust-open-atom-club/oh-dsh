@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-07-05-prompt-variables-and-tool-guidance-ownership.md: 94f5fa409e7b539b48750d12576c7a342a30c9ba
-2026-07-05-prompt-variables-and-tool-guidance-ownership.zh.md: 2342b89ab666a7987f78cfeabe6fa90ce9dd0cad
+2026-07-05-prompt-variables-and-tool-guidance-ownership.zh.md: 572a95c34381f6d73d1f6e053e565f30704026d3

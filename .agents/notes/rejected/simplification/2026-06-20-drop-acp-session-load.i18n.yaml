@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-20-drop-acp-session-load.md: 2b6edf173506929f2d64e910b47aa70fb4f1d854
-2026-06-20-drop-acp-session-load.zh.md: 8e7a4ed6d7d1ccc89da3340907c11d1cf35505bd
+2026-06-20-drop-acp-session-load.zh.md: c63ac09903ecfa1aaad44d41e70e452bdcb17bf3

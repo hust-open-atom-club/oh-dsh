@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-06-generated-config-catalog.zh.md)
+
 ## Problem
 
 The repository had no source-backed reference for plugin configuration. Package READMEs documented fields inconsistently, did not enumerate which packages are loadable, and did not verify that runtime schemas agree with declared config types.

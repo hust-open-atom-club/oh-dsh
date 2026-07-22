@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-07-08-interactive-side-sessions.md: dfd325babe215782c9c1cbec3fd9f874783af7ab
-2026-07-08-interactive-side-sessions.zh.md: d545f65a821c6057b062300f31c415a2d7f63860
+2026-07-08-interactive-side-sessions.zh.md: 6a1d11c0566a36fcbf882daad0b26590460e1534

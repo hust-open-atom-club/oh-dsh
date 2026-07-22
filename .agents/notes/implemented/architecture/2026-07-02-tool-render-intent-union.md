@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-02-tool-render-intent-union.zh.md)
+
 ## Problem
 
 A tool declares how its calls render in a UI (an editor's tool-call card) through two callbacks, `presentCall`/`presentResult` on `ToolDefinition`, returning `ToolCallPresentation` / `ToolResultPresentation` with an optional `ToolTerminal` sub-shape. These grew incrementally into a **bag of optional fields**: `title`, `kind`, `rawInput`, `content`, `locations`, `terminal` on the call; `title`, `content`, `terminal` on the result; `cwd`/`output`/`exitCode`/`signal` on `ToolTerminal`. The split of responsibility is muddy:

@@ -1,6 +1,6 @@
 # Agent Note: 将工作流收缩至已使用的前台核心
 
-Status: rejected — Workflow progress is an intentional observation surface; make it useful through a consumer instead of deleting it.
+Status: rejected — 工作流进度是有意设计的观测接口面；应通过消费方使其发挥作用，而非删除它。
 
 [English](2026-07-12-collapse-workflow-to-foreground-core.md) | 中文
 

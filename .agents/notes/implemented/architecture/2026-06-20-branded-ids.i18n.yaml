@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-20-branded-ids.md: 93bab1d47c793cc4dd1f1d19fa3af22d1721be29
-2026-06-20-branded-ids.zh.md: f45f39cc3a49f7abf116e77f1ace2db74fc3de67
+2026-06-20-branded-ids.zh.md: edf5cade38b579346f34a7ed2ee0a876af7a4c8b

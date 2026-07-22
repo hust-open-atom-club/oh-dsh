@@ -32,11 +32,11 @@ harness 已有一个具体的 `bash` 能力 seam（`dsh-bash` / `dsh-bash-local`
 
 第一个后端有意仅限本地：`dsh-fs-local` 基于宿主文件系统实现 `ctx.fs`。未来的兄弟后端可在同一接口之后提供沙箱、远程、虚拟或项目作用域的文件系统。
 
-第一个消费方有意仅限文本文件：`dsh-tool-fs` 暴露面向模型的 `read`、`write` 和 `edit` 工具，处理 UTF-8 文本文件。未来的消费方可以添加目录列表、搜索/glob、二进制安全操作、文件监视或更高层的项目操作，只要 `ctx.fs` 上存在所需能力，就无需改动本地后端包。直接目录列表后来由 [Add direct directory listing to the filesystem seam](2026-07-03-filesystem-directory-listing-seam.md) 添加。
+第一个消费方有意仅限文本文件：`dsh-tool-fs` 暴露面向模型的 `read`、`write` 和 `edit` 工具，处理 UTF-8 文本文件。未来的消费方可以添加目录列表、搜索/glob、二进制安全操作、文件监视或更高层的项目操作，只要 `ctx.fs` 上存在所需能力，就无需改动本地后端包。直接目录列表后来由[为文件系统 seam 添加直接目录列举能力](2026-07-03-filesystem-directory-listing-seam.md)添加。
 
 文件系统权限和沙箱并非此拆分所隐含。本地后端从其配置的基目录解析相对路径，但隔离策略是独立的决策：要么由更严格的 `ctx.fs` 实现强制执行，要么由权限/沙箱插件包装 `tools/execute` 并在调用到达消费方之前否决。
 
-读后写/编辑与观测状态属于 `dsh-fs-policy`，而非 `ctx.fs`。通过 `fs/*` 事件门控，策略按不透明 actor 记录版本，并提供可选的变更期望；提供方原子性地强制新鲜度。`dsh-tool-fs` 发出事件但不依赖策略。见 [split-seam](../simplification/2026-06-26-fsspec-style-fs-seam.md) 和 [event-gate](2026-06-26-file-context-as-event-gate.md) Agent Note。
+读后写/编辑与观测状态属于 `dsh-fs-policy`，而非 `ctx.fs`。通过 `fs/*` 事件门控，策略按不透明 actor 记录版本，并提供可选的变更期望；提供方原子性地强制新鲜度。`dsh-tool-fs` 发出事件但不依赖策略。见[拆分文件系统 seam](../simplification/2026-06-26-fsspec-style-fs-seam.md)和[事件门控插件](2026-06-26-file-context-as-event-gate.md) Agent Note。
 
 ## 包拓扑
 
@@ -95,7 +95,7 @@ harness 已有一个具体的 `bash` 能力 seam（`dsh-bash` / `dsh-bash-local`
 
 策略插件（而非 `ctx.fs`）对先前观测进行门控：`edit` 要求 owner 有先前观测（否则报 `FS_NOT_OBSERVED`），记录的版本作为 CAS 基础传给 `editText`。在策略插件缺席时，`ctx.fs` 本身是一个完整的无约束 seam（无条件写入/编辑）；工具从不与策略方法耦合。
 
-文件系统契约失败以 `FsError extends HarnessError` 抛出，工具注册表将其转换为带结构化 `{ name, code }` 元数据的 `isError` 工具结果。`dsh-fs` 拥有此词汇，而非由每个工具各自发明消息。错误码包括 `FS_NOT_FOUND`、`FS_NOT_TEXT`、`FS_STALE_VERSION`、`FS_NOT_OBSERVED`、`FS_NOT_REGULAR_FILE`、`FS_AMBIGUOUS_EDIT`、`FS_EDIT_NOT_FOUND` 和 `FS_ABORTED`。（早期草案包含 `FS_PARTIAL_OBSERVATION`；基于新鲜度的授权没有 partial/full 区分，因此已删除。目录列表相关的错误码后来由 [Add direct directory listing to the filesystem seam](2026-07-03-filesystem-directory-listing-seam.md) 添加。）
+文件系统契约失败以 `FsError extends HarnessError` 抛出，工具注册表将其转换为带结构化 `{ name, code }` 元数据的 `isError` 工具结果。`dsh-fs` 拥有此词汇，而非由每个工具各自发明消息。错误码包括 `FS_NOT_FOUND`、`FS_NOT_TEXT`、`FS_STALE_VERSION`、`FS_NOT_OBSERVED`、`FS_NOT_REGULAR_FILE`、`FS_AMBIGUOUS_EDIT`、`FS_EDIT_NOT_FOUND` 和 `FS_ABORTED`。（早期草案包含 `FS_PARTIAL_OBSERVATION`；基于新鲜度的授权没有 partial/full 区分，因此已删除。目录列表相关的错误码后来由[为文件系统 seam 添加直接目录列举能力](2026-07-03-filesystem-directory-listing-seam.md)添加。）
 
 ## 工具消费方行为
 

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-remove-agent-steering-mirror.zh.md)
+
 ## Problem
 
 `agent/steering` was the last remaining transient mirror of a durable session event. The loop's steering drain appends the durable `steering/message { turn, content, source }` and, on the very next line, emitted `agent/steering(agent, turn, content, source)` — the identical fact as a fire-and-forget event (`packages/core/agent-loop/src/loop.ts`, `drainSteering`). It had zero production listeners: the only subscriber anywhere was a loop regression test asserting the emit carried `source` — the same fact the durable event already records one line above.

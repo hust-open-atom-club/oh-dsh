@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-02-fs-per-session-cwd.zh.md)
+
 ## Problem
 
 The ACP bridge gives every session its own workspace: `session/new` records the editor's project directory as `SessionHeader.cwd`, and `dsh-tool-bash` defaults each bash call's `workdir` to the calling agent's `session.header.cwd` (see [the per-session cwd Agent Note work in `packages/ui/acp`](../../../../packages/ui/acp) and `resolveWorkdir` in `dsh-tool-bash`). So a bash command in session A runs in A's project, and in session B runs in B's — one server process, N workspaces.

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-08-shared-acp-snapshot-package.zh.md)
+
 ## Problem
 
 The ACP snapshot tier ([snapshot Agent Note](2026-06-19-acp-snapshot-tests.md)) was built from three modules living inside one example's test directory: `snapshot-harness.ts` (boot the real bin subprocess, drive it over ACP JSON-RPC, harvest the persisted logs), `snapshot-normalize.ts` (the pure expected-output normalizers), and the ~150-line scenario body plus fixture guards in `acp.snapshot.ts` (record/replay modes, the stdout expected-output and log comparisons, the pinned-header uniformity guard, the orphan/required-file/single-pin meta-tests).

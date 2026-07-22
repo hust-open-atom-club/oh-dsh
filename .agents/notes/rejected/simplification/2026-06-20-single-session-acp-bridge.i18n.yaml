@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-20-single-session-acp-bridge.md: e99de76854390a0979d1b66866d1d48aacbc0036
-2026-06-20-single-session-acp-bridge.zh.md: 1db5484c014178dfedceab20221a3d317877c35f
+2026-06-20-single-session-acp-bridge.zh.md: e4c9a4c9371749f02a4a7c4f55d724ba4641e2c0

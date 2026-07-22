@@ -2,6 +2,8 @@
 
 Status: rejected — a centralized generated list is merge-prone and adds little discovery value
 
+English | [中文](2026-07-04-generate-agent-note-index-tables.zh.md)
+
 ## Problem
 
 Per-lifecycle/per-class tables would list facts that are fully derivable: an Agent Note's path encodes lifecycle and class, its filename encodes the first-proposed date, and its H1 carries the title. A hand-maintained copy of those facts would also be a high-contention docs hotspot because concurrent Agent Note branches append rows to the same few lines. [The classification Agent Note](../../implemented/process/2026-06-20-agent-note-classification.md) makes the tree itself authoritative.

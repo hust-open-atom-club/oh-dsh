@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[tagged render-intent union](2026-07-02-tool-render-intent-union.md) 为 `dsh-tool-fs` 的 write/edit 在调用时刻提供了 `card:'diff'`，纯粹从工具参数推导：write ⇒ `{oldText:null, newText:content}`（整个新文件），edit ⇒ `{oldText:old_string, newText:new_string}`（裸替换片段）。编辑器将其渲染为行内 diff，但这是一个**无上下文**的 diff：裸的 `old_string`→`new_string` 没有周围行，而一次触及五个分散位置的 `replace_all` 仍然渲染为一对片段。
+[带标签的 render-intent 联合类型](2026-07-02-tool-render-intent-union.md)为 `dsh-tool-fs` 的 write/edit 在调用时刻提供了 `card:'diff'`，纯粹从工具参数推导：write ⇒ `{oldText:null, newText:content}`（整个新文件），edit ⇒ `{oldText:old_string, newText:new_string}`（裸替换片段）。编辑器将其渲染为行内 diff，但这是一个**无上下文**的 diff：裸的 `old_string`→`new_string` 没有周围行，而一次触及五个分散位置的 `replace_all` 仍然渲染为一对片段。
 
 在对接 `claude-agent-acp` 自身的 ACP（Agent Client Protocol） bridge 时可以看到完整编辑器 diff 的样子：变更应用后，它发出第二个 `tool_call_update`，其 diff 是**带 ±3 行上下文的 applied hunk**（`replace_all` 的每个变更位置各一个 hunk），由工具的 `structuredPatch` 重建。这个结果时刻的 hunk 正是让 Zed 在文件中*原位*显示变更（而非浮动片段）的关键。我们的工具止步于调用时刻的片段；完成后的结果只携带纯文本「updated successfully」，没有 diff。
 
@@ -56,6 +56,6 @@ type ToolExecuteReturn = ContentBlock[] | { content: ContentBlock[]; meta?: unkn
 
 ## 相关
 
-- 补全了 [Tagged render-intent union](2026-07-02-tool-render-intent-union.md) 中作为非目标列出的最后一项表示差异——该 Agent Note 的「非目标」一节已更新，记录 applied-hunk diff 在此处交付。
+- 补全了[带标签的 render-intent 联合类型](2026-07-02-tool-render-intent-union.md)中作为非目标列出的最后一项表示差异——该 Agent Note 的「非目标」一节已更新，记录 applied-hunk diff 在此处交付。
 - 基于[文件系统 capability seam](2026-06-17-filesystem-capability-seam.md)（before/after 是后端返回的存储事实）和[事件溯源会话](2026-06-11-event-sourced-sessions.md)（`meta` 载荷持久化在 `tool/result` 事件上，因此回放可复现卡片）。
 - `meta` 通道有意设计为通用的：未来的工具（结构化搜索、数据表结果）可以附加自己的持久化结果展示而无需再改 core。

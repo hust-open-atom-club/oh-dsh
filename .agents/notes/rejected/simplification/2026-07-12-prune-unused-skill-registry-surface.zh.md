@@ -1,6 +1,6 @@
 # Agent Note: 裁剪 skill 注册表中未使用的接口
 
-Status: rejected — Direct runtime skill registration is an intentional extension path for third-party plugins.
+Status: rejected — 直接在运行时注册 skill 是为第三方插件保留的有意扩展路径。
 
 [English](2026-07-12-prune-unused-skill-registry-surface.md) | 中文
 

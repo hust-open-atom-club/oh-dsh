@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-22-subagent-snapshot-replay.zh.md)
+
 ## Problem
 
 The snapshot tier (`pnpm run test:snapshot`) boots the real `acp-agent` subprocess, replays a recorded session through [`dsh-llm-replay`](../../../../packages/support/llm-replay), and diffs the normalized stdout transcript + re-persisted session log against committed expected outputs. It is the only tier that exercises the full editor-facing transcript end to end.

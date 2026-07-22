@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-16-typed-event-schemas.md: 97a7d0c3787eb5556696e25a6c8b1bb75642aba9
-2026-06-16-typed-event-schemas.zh.md: f79a607eaa723c00b00e984e1a6983d24d99c127
+2026-06-16-typed-event-schemas.zh.md: a02ff8ed54a1d8ea02690c4b6ceaeef4338d3123

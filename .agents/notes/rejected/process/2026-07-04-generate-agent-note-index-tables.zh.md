@@ -1,6 +1,6 @@
 # Agent Note: 生成 Agent Note 索引表
 
-Status: rejected — a centralized generated list is merge-prone and adds little discovery value
+Status: rejected — 集中生成的列表容易产生合并冲突，且几乎不增加发现价值
 
 [English](2026-07-04-generate-agent-note-index-tables.md) | 中文
 

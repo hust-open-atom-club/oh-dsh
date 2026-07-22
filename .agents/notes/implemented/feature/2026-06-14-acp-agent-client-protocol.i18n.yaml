@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-14-acp-agent-client-protocol.md: c6976ed28a254684fca62e2d309cdde7ea90340d
-2026-06-14-acp-agent-client-protocol.zh.md: 711e8c2a7f7146494fa208942523e2ebfa1808a5
+2026-06-14-acp-agent-client-protocol.zh.md: 2bc6f71a8d370d65ccc3624724528a99f452bd9f

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-12-prune-unused-web-seam-fields.zh.md)
+
 ## Problem
 
 The web capability carries request/result/status values that every shipped implementation populates but no production consumer reads. `WebSearchResult.providerId` and `query` and `WebFetchResult.providerId` are result echoes; `tool-web` formats only content/sources/truncation or final URL/status/body/truncation, and no other runtime reads them. Search providers return `WebProviderStatus.reason`, but resolution checks only `available` and intentionally emits a generic unavailable diagnostic.

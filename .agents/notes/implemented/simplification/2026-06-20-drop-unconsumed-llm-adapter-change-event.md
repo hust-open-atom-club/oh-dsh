@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-drop-unconsumed-llm-adapter-change-event.zh.md)
+
 ## Problem
 
 `LlmService.registerAdapter()` emits `llm/adapter-change` on registration and disposal ([packages/llm/llm/src/index.ts](../../../../packages/llm/llm/src/index.ts)). Grepping `llm/adapter-change` across `packages/*/src` and `examples/*/src` finds only the declaration, emit sites, docs, and tests; no production listener subscribes to it.

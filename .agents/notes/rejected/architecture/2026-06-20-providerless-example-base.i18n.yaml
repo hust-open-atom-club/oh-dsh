@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-20-providerless-example-base.md: 2f41476a487775e6f9da2f113efe566e44786ff3
-2026-06-20-providerless-example-base.zh.md: 61d9f819b530fa9a15e8ed5b9d3f13f945e10b82
+2026-06-20-providerless-example-base.zh.md: ebe97db5a6cf194131239271e2713a1b0d14fc2a

@@ -1,6 +1,6 @@
 # Agent Note: 加载时截断被中断的最终轮次
 
-Status: rejected — a single turn can contain substantial real work, including many steps and large tool output. Preserving interrupted turns is preferable to silently dropping that tail on load.
+Status: rejected — 单个 turn 可以包含大量真实工作，包括多个 steps 和大量工具输出。保留被中断的 turns，优于在加载时静默丢弃这段尾部。
 
 [English](2026-06-20-truncate-interrupted-turns.md) | 中文
 

@@ -1,6 +1,6 @@
 # Agent Note: 移除未使用的会话血缘元数据
 
-Status: rejected — `parentSession` is part of the documented fork/sub-agent seam and is already preserved by the agent/session resume path. The field is future-facing, but it is not accidental dead state.
+Status: rejected — `parentSession` 是已记录的 fork/subagent seam 的一部分，并已由 agent/session 恢复路径保留。该字段面向未来，但并非意外遗留的死状态。
 
 [English](2026-06-20-drop-unused-session-lineage.md) | 中文
 

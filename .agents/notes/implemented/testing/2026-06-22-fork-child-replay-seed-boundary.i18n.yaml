@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-22-fork-child-replay-seed-boundary.md: d3cbbb1dae1d64a10973bd5895ccc47d877eba28
-2026-06-22-fork-child-replay-seed-boundary.zh.md: 7137256f0e1f34a2da928b966d170d054f18ddde
+2026-06-22-fork-child-replay-seed-boundary.zh.md: 8af1ba869ba5484442a6575f78556f47abe99d22

@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-ACP（Agent Client Protocol）桥接层允许每个工具通过 `presentCall`/`presentResult` 自行控制调用渲染（见 [tool-call UI presentation](2026-06-14-acp-agent-client-protocol.md) 与 `packages/core/tools`）。对于 `bash`，我们将确切命令作为 `tool_call` 标题呈现，模型的 `description` 作为一个内容文本块，`kind: 'execute'`，完成后的输出包裹在 ` ```console ` 围栏文本块中。
+ACP（Agent Client Protocol）桥接层允许每个工具通过 `presentCall`/`presentResult` 自行控制调用渲染（见[工具调用 UI 呈现](2026-06-14-acp-agent-client-protocol.md)与 `packages/core/tools`）。对于 `bash`，我们将确切命令作为 `tool_call` 标题呈现，模型的 `description` 作为一个内容文本块，`kind: 'execute'`，完成后的输出包裹在 ` ```console ` 围栏文本块中。
 
 参考编辑器将终端元数据渲染为一张专用卡片，包含 cwd、命令、实时风格的输出和退出状态；纯文本则丢失了这些结构。命令之所以作为标题，是因为执行卡片隐藏原始输入，而人类可读的描述保留为卡片上方的独立块。
 

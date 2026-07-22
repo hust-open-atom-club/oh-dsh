@@ -2,6 +2,8 @@
 
 Status: rejected — tool-owned presentation should wait for more real tools before being generalized or deleted. Bash and ACP currently need the existing richer presentation path.
 
+English | [中文](2026-06-20-generic-tool-rendering.zh.md)
+
 ## Problem
 
 Tools can define `presentCall()` and `presentResult()` callbacks that return `ToolCallPresentation`, `ToolResultPresentation`, and optional `ToolTerminal` fields. The code itself flags the design as muddy: title, kind, raw input, content, terminal cwd, terminal output, exit code, and signal grew incrementally into a bag of optional fields. ACP then maintains pending call state to pair a result with the original args, creates replay-only presenters on `session/load`, and maps terminal subfields into Zed-specific `_meta`. `dsh-tool-bash` even parses exit status back out of rendered text because the pure replay-safe presenter no longer has the structured `BashRunResult`.

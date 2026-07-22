@@ -1,6 +1,6 @@
 # Agent Note: 将持久化接口合并进 dsh-session
 
-Status: rejected — the separate persistence interface package is the intended modular capability seam for durable backends. Folding it into `dsh-session` would reduce package count at the cost of a cleaner backend boundary.
+Status: rejected — 独立的持久化接口包是为持久后端设计的模块化能力 seam。将其折叠进 `dsh-session` 虽能减少包数量，却会牺牲更清晰的后端边界。
 
 [English](2026-06-20-fold-session-persistence-interface.md) | 中文
 

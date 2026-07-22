@@ -24,7 +24,7 @@ harness 最初仅通过 readline 循环暴露 agent。该接口能传输文本�
 
 工具调用的展示仍由工具自身负责。工具的 `presentCall` 和 `presentResult` 返回 `generic`、`terminal` 或 `diff` 渲染意图变体；桥接层对该联合类型做 switch 并映射到 ACP。没有 presenter 的工具获得通用回退。Bash 终端卡片使用 Zed 的能力门控约定 `_meta.terminal_info`、`_meta.terminal_output` 和 `_meta.terminal_exit`；harness 仍通过 `ctx.bash` 执行命令，保留沙箱、环境清洗、所有权和 cwd。不支持该扩展的客户端收到普通文本内容。文件系统工具提供 diff 卡片和文件位置，桥接层中无需硬编码工具名分支。
 
-权限处理是 [user-approval seam](2026-07-06-approval-seam.md) 上的一个 answerer，而非 ACP 中的「每次工具调用都询问」策略。对桥接层所属 agent 且带有 call id 的 `approval/request`，会变为该 agent 编辑器会话上的 `session/request_permission`，提供一次性允许/拒绝选项。外部请求或无 call id 的请求委托给下游；缺失或失败的 answerer 保持 fail-closed。发起询问的插件（如预执行策略或 bash 升级）拥有「是否询问」的决策权。
+权限处理是[用户审批 seam](2026-07-06-approval-seam.md)上的一个 answerer，而非 ACP 中的「每次工具调用都询问」策略。对桥接层所属 agent 且带有 call id 的 `approval/request`，会变为该 agent 编辑器会话上的 `session/request_permission`，提供一次性允许/拒绝选项。外部请求或无 call id 的请求委托给下游；缺失或失败的 answerer 保持 fail-closed。发起询问的插件（如预执行策略或 bash 升级）拥有「是否询问」的决策权。
 
 当 `ctx.permission` 被组合时，桥接层从部署的预设表中暴露一个 `permission` select。已发布的 `workspace-write` 和 `danger-full-access` 预设各自捆绑一个沙箱模式与一条审批策略；无法匹配的有效旋钮组合产生只能切走的 `custom` 状态。`session/set_config_option` 通过 `PermissionService.set()` 校验并写入两个所属旋钮事件。在开放轮次中的切换立即追加；空闲时的切换叠加在响应中，并在下一次 `agent/prompt-submit` 时锚定到开放轮次之前的请求组装阶段。在此之前它仅存于内存，因此崩溃后恢复的是持久化的折叠结果。ACP session mode 不被建模，因为 config option 是面向未来的协议表面；`AcpConfig.model` 保持连接级别。
 

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-14-session-persistence.zh.md)
+
 ## Problem
 
 Sessions lived only in memory. The example `session-jsonl.ts` plugin (duplicated byte-for-byte in both examples) was write-only telemetry: it buffered `session/event` and appended JSON lines, with no read/replay path, no crash-safety (no fsync, no atomic write, a fire-and-forget dispose drain), no listing, and no format versioning. Nothing could rehydrate a past session from disk into a live agent, so durable resume ("continue yesterday's task"), durable forking, and the ACP `session/load` method ([ACP support](../feature/2026-06-14-acp-agent-client-protocol.md)) were all impossible.

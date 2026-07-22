@@ -1,6 +1,6 @@
 # Agent Note: 深度只读的公开接口
 
-Status: rejected — the pervasive `DeepReadonly<T>` type flip is replaced by source-owned runtime immutability in `Session` plus relational development assertions. See [source-owned session immutability and dev-mode invariants](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.md).
+Status: rejected — 普遍采用 `DeepReadonly<T>` 的类型翻转已由 `Session` 中归属源的运行时不可变性与关系型开发断言取代。见[归属源的会话不可变性与开发模式不变式](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.md)。
 
 [English](2026-06-11-immutable-public-surfaces.md) | 中文
 

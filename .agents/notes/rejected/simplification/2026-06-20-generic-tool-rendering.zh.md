@@ -1,6 +1,6 @@
 # Agent Note: 收拢工具自有的 UI 展示逻辑
 
-Status: rejected — tool-owned presentation should wait for more real tools before being generalized or deleted. Bash and ACP currently need the existing richer presentation path.
+Status: rejected — 工具拥有的呈现机制应等到出现更多真实工具后再进行泛化或删除。Bash 与 ACP 目前仍需要现有的丰富呈现路径。
 
 [English](2026-06-20-generic-tool-rendering.md) | 中文
 

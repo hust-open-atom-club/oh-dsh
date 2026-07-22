@@ -12,7 +12,7 @@ harness 的扩展面是其类型化的拦截 seam（见[拦截 seam Agent Note](
 
 ## 决策
 
-`packages/hooks/` 组下两个独立插件，各为 function/namespace 插件（`name`/`inject`/`Config`/`apply`，无 default export——见 [postmortem 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)），仅注入 `bash`：
+`packages/hooks/` 组下两个独立插件，各为 function/namespace 插件（`name`/`inject`/`Config`/`apply`，无 default export——见[事后复盘 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)），仅注入 `bash`：
 
 - **`dsh-hooks-claude`**——CC 方言。Claude Code 当前七个钩子点中的七个：`SessionStart`、`UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop`、`SubagentStart` 和 `SubagentStop`。拥有 CC 形态的每事件 stdin payload（基础字段 `session_id`/`transcript_path`/`cwd`/`hook_event_name` 加每事件字段）、`CLAUDE_PROJECT_DIR` 环境变量加 `${CLAUDE_PLUGIN_ROOT}`/`${CLAUDE_PROJECT_DIR}` 替换，以及字面量或正则的匹配模式。`transcript_path` 是持久化定位器结果或 `''`；stdin 带有**尾部换行**。
 - **`dsh-hooks-codex`**——Codex 当前五个钩子点中的五个：`PreToolUse`、`PostToolUse`、`SessionStart`、`UserPromptSubmit` 和 `Stop`。使用始终为正则的匹配模式、Codex 形态的 snake_case payload（含 `turn_id`/`model`/`permission_mode` 额外字段），写入时不带尾部换行，不注入 Codex 插件环境变量，不做配置时占位符替换，也没有 pre-tool 审批或重写路径。`transcript_path` 是同一定位器结果或 `null`；工具 payload 在精简后的 `tool_input: { command }` 形态中携带真实的 `tool_name`。
@@ -23,7 +23,7 @@ harness 的扩展面是其类型化的拦截 seam（见[拦截 seam Agent Note](
 
 | Seam | CC | Codex |
 |---|---|---|
-| `agent/session-start`（emit） | additionalContext → `agent.inject()` | plain-stdout output → additionalContext → `agent.inject()` |
+| `agent/session-start`（emit） | additionalContext → `agent.inject()` | 纯 stdout 输出 → additionalContext → `agent.inject()` |
 | `agent/prompt-submit` | `deny`→`block`；仅上下文→delegate+fold | `block`→`block`；仅上下文→delegate+fold |
 | `tools/pre-execute` | `deny`→`deny`；`ask`→`ask` | `block`→`deny`（无 allow/ask） |
 | `tools/post-execute` | `deny`→`block`+feedback；仅上下文→delegate+fold | 同上 |

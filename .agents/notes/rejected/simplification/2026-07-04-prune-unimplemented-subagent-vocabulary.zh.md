@@ -1,6 +1,6 @@
 # Agent Note: 裁剪未实现的 subagent seam 词汇
 
-Status: rejected — the deferred capability vocabulary (`outputSchema`/`structured`, `toolFilter`, `sendMessage`/`resume`) is intentionally reserved surface: the seam advertises the full intended contract ahead of its implementations by design, so providers and consumers grow into a stable shape rather than re-negotiating it per capability. The consumer-evidence analysis below records the decision-time state.
+Status: rejected — 延后的能力词汇（`outputSchema`/`structured`、`toolFilter`、`sendMessage`/`resume`）是有意保留的接口面：该接缝按设计先于实现声明完整的预期契约，使提供方与消费方沿稳定形状演进，而非针对每项能力重新协商。下方的消费方证据分析记录了决策时的状态。
 
 [English](2026-07-04-prune-unimplemented-subagent-vocabulary.md) | 中文
 
@@ -19,7 +19,7 @@ Status: rejected — the deferred capability vocabulary (`outputSchema`/`structu
 
 **保留** `depthLimit`/`maxDepth` 与能力检查。进程内后端已强制执行该限制，尽管当前发布的工具尚未设置它。递归是已知的 seam 风险，因此恰当的后续工作是提供一个工具默认值，而非删除正在工作的强制逻辑。
 
-审视过但有意不动的相邻接口面：`SubagentService.getProvider()`/`list()` 仅有测试 harness 消费方，但 [prune-dead-seam-methods 实现说明](../../implemented/simplification/2026-06-20-prune-dead-seam-methods.md) 恰好记录了这种形态从 bash executor 中被移除后又被回退的经过——对于一个基于已跟踪 map 的单行访问器而言，测试 harness 就是消费方。`SubagentRunEndInfo.lastAssistantMessage` 是一个已记录的保留项（[subagent-observe-enrich Agent Note](../../implemented/feature/2026-06-30-subagent-observe-enrich.md) 的评审删除了 `agentType` 但有意保留了它，因为它是进程外子 agent（智能体）唯一的最终消息通道）；它当前未接通的桥接转发是一个待补的缺口或待记录的消费方，不是本 Agent Note 要裁剪的接口面。
+审视过但有意不动的相邻接口面：`SubagentService.getProvider()`/`list()` 仅有测试 harness 消费方，但 [prune-dead-seam-methods 实现说明](../../implemented/simplification/2026-06-20-prune-dead-seam-methods.md)恰好记录了这种形态从 bash executor 中被移除后又被回退的经过——对于一个基于已跟踪 map 的单行访问器而言，测试 harness 就是消费方。`SubagentRunEndInfo.lastAssistantMessage` 是一个已记录的保留项（[subagent 观测/丰富化 Agent Note](../../implemented/feature/2026-06-30-subagent-observe-enrich.md)的评审删除了 `agentType` 但有意保留了它，因为它是进程外子 agent（智能体）唯一的最终消息通道）；它当前未接通的桥接转发是一个待补的缺口或待记录的消费方，不是本 Agent Note 要裁剪的接口面。
 
 这是[从持久化 seam 裁剪死方法](../../implemented/simplification/2026-06-20-prune-dead-seam-methods.md)在 seam 词汇层面的回响：每个实现都必须为无人声明的成员，甚至更弱，因为这里连一个实现都没有。
 

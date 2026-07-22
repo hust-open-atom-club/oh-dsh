@@ -1,6 +1,6 @@
 # Agent Note: 移除 ACP session/load，直到恢复具备产品形态
 
-Status: rejected — Zed is the current target ACP client, advertises and exercises load-capable sessions, and keeps pending-load state for concurrent `session/load`. The bridge should keep `session/load` and make the resume contract solid.
+Status: rejected — Zed 是当前目标 ACP 客户端，它声明并实际使用支持加载的会话，还为并发的 `session/load` 保留待加载状态。桥接层应保留 `session/load` 并巩固恢复契约。
 
 [English](2026-06-20-drop-acp-session-load.md) | 中文
 

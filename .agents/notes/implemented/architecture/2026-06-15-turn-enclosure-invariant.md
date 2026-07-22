@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-15-turn-enclosure-invariant.zh.md)
+
 ## Problem
 
 A durable session-persistence backend (added in a companion change) uses the **turn** as its crash-recovery boundary: a crash can leave an unclosed final turn, which `load` closes with a synthetic `turn/end {kind:'interrupted'}` while preserving the turn's real events (see [session persistence](2026-06-14-session-persistence.md)). This recovery is only well-defined if nothing *legitimately* durable sits OUTSIDE a turn — between the last `turn/end` and the next `turn/start` — since such an event would be swept into the next turn's interrupted close.

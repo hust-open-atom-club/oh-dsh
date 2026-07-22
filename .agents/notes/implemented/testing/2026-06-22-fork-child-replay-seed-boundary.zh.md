@@ -35,7 +35,7 @@ subagent 脚本由 [`deriveReplayScript`](../../../../packages/support/llm-repla
 
 `dsh-llm-replay` 的 `parseSessionHeader` 现在也读取 `seedLength`（缺失则为 0），`loadSessionScripts` 从 `parseSessionLog(text).slice(seedLength)` 推导子会话条目——即边界及之后的事件，也就是子会话自身的模型调用。对 spawn 子会话而言 `seedLength` 为 0，此操作是空操作，spawn 场景逐字节不变。
 
-这关闭了路由正确性的缺口，两个已录制的 fork 场景对其进行端到端验证——见 [Record fork and mixed spawn+fork snapshot scenarios](2026-06-22-fork-snapshot-scenarios.md)。
+这关闭了路由正确性的缺口，两个已录制的 fork 场景对其进行端到端验证——见[记录 fork 与混合 spawn+fork 快照场景](2026-06-22-fork-snapshot-scenarios.md)。
 
 ## 曾考虑的替代方案
 

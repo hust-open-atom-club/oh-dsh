@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-06-pin-request-header-content-in-one-scenario.zh.md)
+
 ## Problem
 
 An ACP snapshot suite needs to prove the exact composed system prompt and tool-schema list sent in each `request/header`, but duplicating that content inside every `session.jsonl` makes a prompt or schema edit rewrite dozens of giant one-line JSON records. Keeping one raw header avoids the duplication but still makes prompt review poor: prose is JSON-escaped onto one line and mixed with thousands of characters of tool schemas.

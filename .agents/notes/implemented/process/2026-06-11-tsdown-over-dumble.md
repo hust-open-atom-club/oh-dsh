@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-11-tsdown-over-dumble.zh.md)
+
 ## Problem
 
 The initial build used **dumble**, the cordiverse zero-config esbuild wrapper that upstream Cordis itself builds with — maximum alignment with the vendored packages' conventions (it reads each package.json and infers entries/formats from the `exports` field). But dumble is a liability as a load-bearing tool in this repo: v0.2.x, ~530 npm downloads/week, effectively one maintainer, and we were invoking it through a custom orchestration script (`scripts/build.ts`) because it has no workspace mode.

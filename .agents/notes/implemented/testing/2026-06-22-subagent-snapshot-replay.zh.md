@@ -54,5 +54,5 @@ Status: implemented
 
 - `TODO(subagent-snapshots)` 延期项已解决：嵌套 agent 的 transcript 现在是快照层的一等形态。
 - `GenerateOptions.sessionId` 是一个小而诚实的 core-seam 新增，在回放之外同样有用（遥测、请求路由）。
-- `subagent` 工具绑定到单一提供方，因此 `subagent-multi` 中的两个子 agent 都是 spawn（全新创建）。键控按会话路由而非按后端路由，因此对 fork 同样正确。但脚本*派生*逻辑此前不正确：fork 子会话的日志以种子化的父前缀（父会话的 `assistant/chunk` 事件）开头，如果从完整日志派生脚本，就会把父 agent 的响应当作子 agent 的来回放。这一正确性缺口通过持久化种子边界来弥合——见 [Persist the seed boundary so fork-child replay routes correctly](2026-06-22-fork-child-replay-seed-boundary.md)——录制的 fork 与混合 spawn+fork 场景现在通过一份 transcript 同时验证两种传输方式（见 [Record fork and mixed spawn+fork snapshot scenarios](2026-06-22-fork-snapshot-scenarios.md)）。
+- `subagent` 工具绑定到单一提供方，因此 `subagent-multi` 中的两个子 agent 都是 spawn（全新创建）。键控按会话路由而非按后端路由，因此对 fork 同样正确。但脚本*派生*逻辑此前不正确：fork 子会话的日志以种子化的父前缀（父会话的 `assistant/chunk` 事件）开头，如果从完整日志派生脚本，就会把父 agent 的响应当作子 agent 的来回放。这一正确性缺口通过持久化种子边界来弥合——见[持久化种子边界，使 fork 子项重放能够正确路由](2026-06-22-fork-child-replay-seed-boundary.md)——录制的 fork 与混合 spawn+fork 场景现在通过一份 transcript 同时验证两种传输方式（见[记录 fork 与混合 spawn+fork 快照场景](2026-06-22-fork-snapshot-scenarios.md)）。
 - 进程外（ACP（Agent Client Protocol））subagent 是完全不同的回放形态（每个子 agent 是自己的进程、有自己的回放），作为 `TODO(acp-subagent-replay)` 记录在 PR3 计划中。

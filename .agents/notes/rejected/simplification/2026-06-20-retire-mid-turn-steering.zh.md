@@ -1,6 +1,6 @@
 # Agent Note: 移除轮次中途引导
 
-Status: rejected — mid-turn steering is an intentional agent capability for between-step user/plugin input and future goal/loop workflows. It is complexity with a product direction, not an accidental duplicate of `send()`.
+Status: rejected — mid-turn steering 是一项有意设计的 agent 能力，用于接收 between-step 的用户/插件输入以及未来的 goal/loop 工作流。它是面向产品方向的复杂度，而非 `send()` 的意外重复。
 
 [English](2026-06-20-retire-mid-turn-steering.md) | 中文
 

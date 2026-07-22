@@ -143,7 +143,7 @@ MCP 仅保证工具名在[单个服务器内](https://modelcontextprotocol.io/sp
 1. 解析 `rawName`（执行器闭包持有它），以配置的超时时间调用 `client.callTool({ name: rawName, arguments }, { signal: exec.signal })`——公开名称永远不发送给服务器。
 2. 映射结果：
    - 多个 `text` 内容块 → 以 `'\n'` 连接为单个 `TextBlock`（必要原因：`flattenText` 使用 `join('')` 无分隔符，多块会丢失块间边界）。
-   - `image` 内容块 → 丢弃并 `ctx.logger.warn`（harness 没有图片内容块类型；[drop-image Agent Note](../simplification/2026-07-04-drop-image-content-block.md)）。
+   - `image` 内容块 → 丢弃并 `ctx.logger.warn`（harness 没有图片内容块类型；[删除图片 Agent Note](../simplification/2026-07-04-drop-image-content-block.md)）。
    - `isError: true` → 映射到 harness 的 `isError` 结果路径（`{ content: [...], isError: true }`）。
 3. 取消：`exec.signal`（来自 agent loop（智能体循环）的取消）透传给 MCP SDK 的 `callTool`，后者向服务器发送 `$/cancelRequest`。
 

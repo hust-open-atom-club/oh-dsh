@@ -51,7 +51,7 @@ Status: implemented
 
 ## 相关
 
-- 取代 [Make the shared example base providerless](../../rejected/architecture/2026-06-20-providerless-example-base.md)：一旦主干移入 `dsh-agent-spine-demo` 且 `base*.yml` 文件被删除，将 `base.yml` 重命名为无 provider 核心便不再有意义。
-- 基于 [capability-seams](2026-06-13-capability-seams.md) 的接口/实现/消费方拆分——后端和展示层保持为叶子选择；主干是共享 bundle。
-- 与 [Reorganize packages into a modular hierarchy](2026-06-20-package-hierarchy.md) 互补：新的 app/core 包按该层级结构归入既有分组（`core` 放可复用的主干 bundle，`ui` 放应用特有的前门）。
+- 取代[使共享示例基础配置与提供方无关](../../rejected/architecture/2026-06-20-providerless-example-base.md)：一旦主干移入 `dsh-agent-spine-demo` 且 `base*.yml` 文件被删除，将 `base.yml` 重命名为无 provider 核心便不再有意义。
+- 基于[能力 seam](2026-06-13-capability-seams.md)的接口/实现/消费方拆分——后端和展示层保持为叶子选择；主干是共享 bundle。
+- 与[将包重组为模块化层级结构](2026-06-20-package-hierarchy.md)互补：新的 app/core 包按该层级结构归入既有分组（`core` 放可复用的主干 bundle，`ui` 放应用特有的前门）。
 - 后续的[冗余 agent 移除](../simplification/2026-07-20-remove-stdio-and-echo-agents.md)拥有最终的 TUI/Headless 拆分，并移除行式与仅 mock 的叶子。

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-18-agent-lifecycle-and-ownership-seams.zh.md)
+
 ## Problem
 
 Several ACP and tool-bash limitations were symptoms of the same missing seam: plugins could create or resume agents through `ctx.agents`, but they could not own and dispose one agent independently, and long-running bash tasks carried no stable owner in the executor itself. ACP aborted and awaited agents on disconnect but could not unregister just that session's agent; `session/cancel` could not cancel queued-but-not-yet-started work; and `tool-bash` kept task ownership in a plugin-local `Map`, so an HMR reload could make an old task look unowned.

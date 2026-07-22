@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-20-drop-acp-terminal-meta.md: 79da387ac1a7a0e6767e3bf24baa6039e39ef90d
-2026-06-20-drop-acp-terminal-meta.zh.md: 5aa455959c403d7e03b36be0d4336fdc5389c52e
+2026-06-20-drop-acp-terminal-meta.zh.md: e34cd0690beed5d3a1715db6bc3e8413e6227440

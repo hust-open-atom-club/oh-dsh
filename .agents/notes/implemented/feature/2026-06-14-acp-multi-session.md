@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-14-acp-multi-session.zh.md)
+
 ## Problem
 
 An ACP editor can keep several conversations alive over one agent subprocess. A single-active-session bridge would force extra processes and would not match Zed's client model, which tracks multiple session ids and concurrent loads. Multiplexing introduces isolation risks: events, prompt completion, cancellation, permission prompts, config selections, and predictable background-task ids must never cross session boundaries.

@@ -12,7 +12,7 @@ Status: implemented
 - 哪些组合是*合法的*没有文档说明：一个设置了 `content` 的 `terminal` 调用意味着「卡片上方的描述」；一个设置了 `terminal` 的 generic 调用毫无意义但类型上可表达。类型允许无意义的状态存在。
 - 无法表达编辑器最需要的文件工具能力：**diff 卡片**（`{path, oldText, newText}`，Zed 将其渲染为内联 diff / 新文件预览）。`ToolCallPresentation.content` 使用的是 *LLM（大语言模型）* 的 `ContentBlock[]` 词汇（text/image），工具根本无法请求 diff 展示。
 
-`packages/core/tools/src/index.ts` 中已有的 `FIXME(tool-presentation)` 指出了修复方向：「重新设计类型，让工具一次性声明其渲染意图（例如按卡片种类的带标签联合类型），而非一堆由 bridge 拼接的可选字段。」被否决的 Agent Note [Collapse tool-owned UI presentation](../../rejected/simplification/2026-06-20-generic-tool-rendering.md) 明确推迟了此事：富渲染「应当在至少有两个真实工具和两个真实消费方验证词汇之后，以带标签 render-intent 联合类型的形式回归。」该条件现已满足：两个生产者族（`dsh-tool-bash`、`dsh-tool-fs`）和两个消费方（ACP bridge 实时路径 + snapshot 回放路径）。
+`packages/core/tools/src/index.ts` 中已有的 `FIXME(tool-presentation)` 指出了修复方向：「重新设计类型，让工具一次性声明其渲染意图（例如按卡片种类的带标签联合类型），而非一堆由 bridge 拼接的可选字段。」被否决的 Agent Note [折叠工具拥有的 UI 呈现](../../rejected/simplification/2026-06-20-generic-tool-rendering.md)明确推迟了此事：富渲染「应当在至少有两个真实工具和两个真实消费方验证词汇之后，以带标签 render-intent 联合类型的形式回归。」该条件现已满足：两个生产者族（`dsh-tool-bash`、`dsh-tool-fs`）和两个消费方（ACP bridge 实时路径 + snapshot 回放路径）。
 
 ## 决策
 
@@ -76,7 +76,7 @@ interface TerminalResultView { card: 'terminal'; title?: string; output?: string
 
 ## 相关
 
-- 取代 [Collapse tool-owned UI presentation](../../rejected/simplification/2026-06-20-generic-tool-rendering.md)（已否决——「等两个真实工具和两个真实消费方，然后做带标签 render-intent 联合类型」）中的推迟决定。该条件现已满足；本 Agent Note 即为那个联合类型。
-- 被 [Result-time applied-hunk diffs](2026-07-02-result-time-applied-hunk-diffs.md) 扩展：后者添加了一个持久化的 `meta` 通道，使 write/edit 在结果时输出 `DiffResultView`（应用后的变更：带上下文行的 contextual hunk / 每个 `replace_all` 位点一个，或创建时的整文件 diff），叠加在本联合类型的调用时 diff 卡片之上。
-- 将 `ToolTerminal` 折入 [ACP terminal and tool-call rendering](../feature/2026-06-18-acp-terminal-and-tool-rendering.md) 所描述的 `terminal` view（`_meta` terminal 卡片约定和能力门控不变；仅 harness 侧的展示类型改变）。
+- 取代[折叠工具拥有的 UI 呈现](../../rejected/simplification/2026-06-20-generic-tool-rendering.md)（已否决——「等两个真实工具和两个真实消费方，然后做带标签 render-intent 联合类型」）中的推迟决定。该条件现已满足；本 Agent Note 即为那个联合类型。
+- 被[结果时已应用 hunk 差异](2026-07-02-result-time-applied-hunk-diffs.md)扩展：后者添加了一个持久化的 `meta` 通道，使 write/edit 在结果时输出 `DiffResultView`（应用后的变更：带上下文行的 contextual hunk / 每个 `replace_all` 位点一个，或创建时的整文件 diff），叠加在本联合类型的调用时 diff 卡片之上。
+- 将 `ToolTerminal` 折入 [ACP terminal 与工具调用渲染](../feature/2026-06-18-acp-terminal-and-tool-rendering.md)所描述的 `terminal` view（`_meta` terminal 卡片约定和能力门控不变；仅 harness 侧的展示类型改变）。
 - ACP SDK 的 `Diff` / `ToolCallContent` 类型支撑新的 `diff` 卡片。

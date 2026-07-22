@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-07-04-generate-agent-note-index-tables.md: 6e5221f018942a0629f30b6e6f22cedfb9f4145e
-2026-07-04-generate-agent-note-index-tables.zh.md: f299fc5c2df25064a2712fa177fdbe5b73ffc7ca
+2026-07-04-generate-agent-note-index-tables.zh.md: 572b6c743b661075f37e8602a81e0ceb800921a5

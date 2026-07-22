@@ -2,6 +2,8 @@
 
 Status: rejected — Direct runtime skill registration is an intentional extension path for third-party plugins.
 
+English | [中文](2026-07-12-prune-unused-skill-registry-surface.zh.md)
+
 ## Problem
 
 The skill service's embedded-runtime subsystem has zero production caller of `ctx.skills.register()`. It adds a reserved `runtime` provider name, a runtime map/rank/source, duplicate policy, a second revision in cache keys, normalization, disposers, and tests alongside the provider seam every shipped skill already uses. `SkillSummary.whenToUse` and candidate/definition `path` are parsed and copied but never read by a production consumer: the model catalog renders name/description, resource loading uses `resourceBase`, and providers own their locator. The deliberately open `metadata` extension point stays.

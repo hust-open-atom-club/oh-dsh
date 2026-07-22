@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-remove-agent-boundary-mirror-events.zh.md)
+
 <!-- Shipped in AMENDED, narrowed form: the four turn/step BOUNDARY mirrors are
      removed; `agent/steering` and `agent/stream-chunk` were RETAINED here (they
      are not durable-boundary mirrors — see "Scope: what is and isn't removed").

@@ -2,6 +2,8 @@
 
 Status: proposed
 
+English | [中文](2026-07-13-stream-workflow-progress-through-tool-calls.zh.md)
+
 ## Problem
 
 The workflow engine intentionally emits balanced `workflow/*` observation events for run, phase, narration, and child-agent progress, but no production consumer presents them. Editors therefore show one pending workflow tool card until the final result even while the engine already reports which phase is active, what the script logged, and which children started or settled. The [dynamic-workflows decision](../../implemented/feature/2026-07-05-dynamic-workflows.md) explicitly reserves ACP progress UI for this event stream.

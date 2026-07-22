@@ -40,7 +40,7 @@ Status: implemented
 
 ### Subagent 对话历史描述符
 
-`SubagentProvider.inheritsParentContext` 描述的是对话种子，而非作用域、服务、工具或权限。spawn 和 ACP 将其设为 `false`；fork 设为 `true`。`dsh-tool-subagent` 根据该标志派生工具和 prompt 参数的描述，包括 fork 继承已完成轮次但不继承进行中轮次这一点。provider 生命周期事件使该措辞与响应式 provider 注册保持同步；其设计动机见 [provider-lifecycle-events Agent Note](2026-07-05-subagent-provider-lifecycle-events.md)。
+`SubagentProvider.inheritsParentContext` 描述的是对话种子，而非作用域、服务、工具或权限。spawn 和 ACP 将其设为 `false`；fork 设为 `true`。`dsh-tool-subagent` 根据该标志派生工具和 prompt 参数的描述，包括 fork 继承已完成轮次但不继承进行中轮次这一点。provider 生命周期事件使该措辞与响应式 provider 注册保持同步；其设计动机见[提供方生命周期事件 Agent Note](2026-07-05-subagent-provider-lifecycle-events.md)。
 
 ## 曾考虑的替代方案
 
@@ -49,7 +49,7 @@ Status: implemented
 - **在每个 persona 中手写模型名称**：与上方一行的 `model:` 键重复，配置修改后静默失实；正是本 Agent Note 要治愈的病症。
 - **宽松插值（未知引用保留原样或替换为空）**：一个拼写错误 `{{modle}}`（或一个空洞）会被发送给模型，直到 transcript（文本记录）审查时才会被发现。
 - **在配置中为每个 subagent 实例编写措辞**：面向模型的行文回到每个部署 × 实例中，重蹈 P2 病症。**根据 provider 名称选择措辞**：`providerName` 本身是配置，重命名 provider 后会静默获得错误的措辞。
-- **在 `apply` 时解析 provider（加载顺序要求）** 与 **仅用 section 承载 subagent 措辞（在 assemble 时惰性解析）**：provider 生命周期事件的替代方案；两者均在 [provider-lifecycle-events Agent Note](2026-07-05-subagent-provider-lifecycle-events.md)中被否决。
+- **在 `apply` 时解析 provider（加载顺序要求）** 与 **仅用 section 承载 subagent 措辞（在 assemble 时惰性解析）**：provider 生命周期事件的替代方案；两者均在[提供方生命周期事件 Agent Note](2026-07-05-subagent-provider-lifecycle-events.md)中被否决。
 
 ## 不在范围内
 

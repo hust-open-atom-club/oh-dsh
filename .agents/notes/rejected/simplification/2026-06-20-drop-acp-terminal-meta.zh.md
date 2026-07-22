@@ -1,6 +1,6 @@
 # Agent Note: 移除 ACP 终端 `_meta` 渲染
 
-Status: rejected — Zed is the current target client, and the terminal `_meta` convention is intentional Zed UX with a plain ACP fallback for other clients.
+Status: rejected — Zed 是当前目标客户端，terminal `_meta` 约定是有意设计的 Zed UX，同时为其他客户端保留普通 ACP 回退。
 
 [English](2026-06-20-drop-acp-terminal-meta.md) | 中文
 

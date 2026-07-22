@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-04-prune-write-only-fs-surface.zh.md)
+
 ## Problem
 
 The [fs seam split](2026-06-26-fsspec-style-fs-seam.md) moved read routing and policy out of the backend into `dsh-tool-fs` and `dsh-fs-policy`. Four pieces of surface kept the pre-split shape — populated on every call, read by nobody:

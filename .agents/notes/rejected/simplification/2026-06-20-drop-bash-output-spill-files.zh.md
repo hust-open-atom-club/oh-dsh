@@ -1,6 +1,6 @@
 # Agent Note: 移除 bash 完整输出溢出文件
 
-Status: rejected — full-output recovery is a real bash behavior. A future artifact/blob service may generalize it, but dropping spill files before that replacement would lose useful command output.
+Status: rejected — 完整输出恢复是真实的 bash 行为。未来的 artifact/blob 服务或许能将其泛化，但在替代方案就位前删除溢出文件会丢失有用的命令输出。
 
 [English](2026-06-20-drop-bash-output-spill-files.md) | 中文
 

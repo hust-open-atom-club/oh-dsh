@@ -1,6 +1,6 @@
 # Agent Note: 使共享示例基础配置与提供方无关
 
-Status: rejected — superseded by [Extract example apps into packages](../../implemented/architecture/2026-06-20-extract-example-app-packages.md), which moves the spine into a `dsh-agent-spine-demo` bundle and deletes the `base*.yml` files, so there is no shared base YAML left to rename.
+Status: rejected — 已由[将示例应用提取到 packages 中](../../implemented/architecture/2026-06-20-extract-example-app-packages.md)取代；后者把 spine 移入 `dsh-agent-spine-demo` bundle 并删除 `base*.yml` 文件，因此已不存在可重命名的共享基础 YAML。
 
 [English](2026-06-20-providerless-example-base.md) | 中文
 

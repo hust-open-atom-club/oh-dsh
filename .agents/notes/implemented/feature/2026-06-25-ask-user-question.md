@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-25-ask-user-question.zh.md)
+
 ## Problem
 
 The agent sometimes cannot proceed safely from model inference alone: it needs the human to choose a path, confirm a risky/default action, or provide missing information. Before this change, the only way to get that answer was for the model to ask in assistant text and then stop, which broke the normal tool-call loop: the agent had no structured way to pause, no option metadata for UIs, no abort/error taxonomy, and no way for non-stdio front doors to present the question consistently.

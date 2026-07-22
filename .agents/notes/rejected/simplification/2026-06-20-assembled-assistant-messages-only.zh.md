@@ -1,6 +1,6 @@
 # Agent Note: 仅持久化组装后的 assistant 消息，不存储流式分片
 
-Status: rejected — high-fidelity chunk replay, partial failed streams, and snapshot replay currently depend on persisted `assistant/chunk` events. Dropping chunks is only viable with a no-information-loss replay/artifact replacement.
+Status: rejected — 高保真 chunk 重放、部分失败流与快照重放目前依赖持久化的 `assistant/chunk` 事件。只有具备不丢失信息的重放/artifact 替代方案后，才能删除 chunk。
 
 [English](2026-06-20-assembled-assistant-messages-only.md) | 中文
 

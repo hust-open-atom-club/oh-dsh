@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write
 2026-06-20-drop-durable-step-boundaries.md: c5c4f269a378e334c4dc509d1288146d77d9a520
-2026-06-20-drop-durable-step-boundaries.zh.md: 7724a8f6c2c51650eb9ea0a6675ece7c24a211d8
+2026-06-20-drop-durable-step-boundaries.zh.md: e98f5e479cdef43bf134e3e2d240ce0f3be7ce0e
