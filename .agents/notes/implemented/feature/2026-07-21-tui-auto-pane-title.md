@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-07-21-tui-auto-pane-title.zh.md)
 
+> **Superseded** for the default and the resume behavior by the [auto-title default-on Agent Note](2026-07-21-tui-auto-title-default-on.md): `autoTitle` now defaults on, and a resumed session re-derives its title from the stored first message instead of keeping the static one. The OSC 0 path, the one-shot latch, the model-summary shape, the fire-and-forget call, and every failure fallback below stand.
+
 ## Problem
 
 The TUI's terminal title is a single static string (`title`, default `DeepSeek Harness`) shared by every session. A user who runs one agent per tmux pane or terminal tab sees the same label on all of them, so panes are indistinguishable at a glance and the tab bar carries no signal about what each session is doing.

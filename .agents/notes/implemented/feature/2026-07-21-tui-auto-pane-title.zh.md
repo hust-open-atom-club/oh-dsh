@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-07-21-tui-auto-pane-title.md) | 中文
 
+> **已被取代**（就默认值与恢复行为而言），见[自动标题默认开启 Agent Note](2026-07-21-tui-auto-title-default-on.md)：`autoTitle` 现默认开启，恢复会话会从已存储的首条消息重新推导标题，而非保留静态标题。下文的 OSC 0 路径、一次性门闩、模型概括形态、发出后不等待其返回的调用，以及每一条失败兜底，均仍然成立。
+
 ## Problem
 
 TUI 的终端标题是一个所有会话共用的静态字符串（`title`，默认 `DeepSeek Harness`）。在 tmux 每个窗格或每个终端标签页各跑一个 agent（智能体）的用户看来，它们的标签全都一样，因此窗格一眼看去无从区分，标签栏也不携带任何关于各会话正在做什么的信号。
