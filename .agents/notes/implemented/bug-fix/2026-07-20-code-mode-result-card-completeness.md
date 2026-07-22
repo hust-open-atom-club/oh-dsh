@@ -14,13 +14,13 @@ Nested Code calls never owned cards, so producing metadata for the outer call so
 
 The canonical tool registry pipeline owns the final model-facing outer content. On success, the `run_code` output renderer renders captured logs followed by the return value or the explicit no-output marker. Runtime failures and pre-execution policy denials are normalized into error content by `ToolRegistry` without invoking that renderer. A post-execute block runs after successful rendering and replaces the result with error content; other post-execute policy and spill decisions may replace content before persistence.
 
-`run_code.presentResult` now forwards the final `result.content` into one generic result card. It deliberately omits the title so the pending card retains the program text. The redundant logs-only `presentationMeta` projection is removed: `tool/result.content` is the durable, replayable, post-policy projection and the card's only result-content source.
+`run_code` omits `presentResult`. The established generic result fallback keeps the pending program title and renders the raw final `tool/result.content`; that durable, replayable, post-policy projection is the card's only result-content source. The host API proxy therefore omits a separate result view instead of serializing the same content in both `event.data.content` and `view.view.content`. The redundant logs-only `presentationMeta` projection remains removed.
 
 Nested dispatch remains unchanged. Calls marked by `exec.parent` emit bounded `tool/code-dispatch` diagnostics but no `tool/call` or `tool/result` surface cards, so one outer `run_code` invocation still produces exactly one card.
 
 ## Testing
 
-Presenter unit coverage pins logs-only, result-only, logs-plus-result, no-output, and spilled-result content. A separate integration-shaped unit drives a real runtime failure through the canonical registry result before presenting it. The successful cases prove stale metadata cannot replace final content; the failure case guards complete forwarding without claiming it reproduced the original metadata-triggered defect.
+Tool unit coverage drives logs-only, result-only, logs-plus-result, no-output, spilled-result, and failure outcomes through the canonical registry, then pins the durable content and absence of a result presenter. A host-mux regression uses a call-only presenter to prove the result frame carries raw content exactly once and no view. These cases prove stale metadata cannot replace final content without making the host duplicate that content.
 
 The keyless ACP and TUI Code Mode snapshots execute one outer program that performs two nested bash calls, logs `captured output`, and returns `CODE_ONE+CODE_TWO`. Both surfaces show one completed outer card containing both lines and no nested cards.
 
@@ -30,8 +30,10 @@ The keyless ACP and TUI Code Mode snapshots execute one outer program that perfo
 
 **Merge presenter metadata with `result.content`.** Rejected because the rendered content already contains the logs; merging would duplicate them and require brittle deduplication.
 
+**Forward `result.content` through a generic result presenter.** Rejected because the durable event already carries that content and ACP/TUI already have a generic raw-content fallback. The host mux serializes a tool-owned result view beside the event, so forwarding would duplicate an unspilled result of up to 64 MiB in one frame merely to recreate the fallback.
+
 **Create one card per nested dispatch.** Rejected because intermediate values are intentionally execution-local and never model-facing. Multiple cards would expose an implementation trace instead of the single Code Mode operation the model and user invoked.
 
 ## Consequences
 
-ACP and TUI now display the same complete content the model receives and replay persists, including post-policy spill previews. New `run_code` results no longer carry the optional logs metadata, but this requires no session-format bump: existing records remain valid because the presenter ignores that field and reads their durable rendered content.
+ACP and TUI display the same complete content the model receives and replay persists, including post-policy spill previews, through their generic result fallback. The host API retains the pending program title without duplicating the raw result in a separate view payload. New `run_code` results no longer carry the optional logs metadata, but this requires no session-format bump: existing records remain valid because presentation reads their durable rendered content.
