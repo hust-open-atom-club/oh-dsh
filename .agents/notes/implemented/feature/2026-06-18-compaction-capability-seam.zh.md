@@ -18,7 +18,7 @@ Status: implemented
 
 遵循[能力 seam Agent Note（agent 决策记录）](../architecture/2026-06-13-capability-seams.md)，压缩以独立包（package）发布，使契约、算法和（后续的）消费方 surface 各自独立演进：
 
-1. **接口** — `@deepseek-ai/dsh-compact`：抽象 `CompactService`，拥有 `ctx.compact` 键、`CompactionResult` 词汇以及 `compact/*` 会话事件。它将 `compactIfNeeded()` 和 `compactRegion()` 声明为**抽象方法**——契约说明压缩*做什么*，而非*怎么做*。
+1. **接口** — `@deepseek-ai/dsh-compact`：抽象 `CompactService`，拥有 `ctx.compact` 键、`CompactionResult` 词汇、`compact/*` 会话事件以及规范的检查点消息来源。它将 `compactIfNeeded()` 和 `compactRegion()` 声明为**抽象方法**——契约说明压缩*做什么*，而非*怎么做*。
 2. **实现** — `@deepseek-ai/dsh-compact-basic`：具体的 `BasicCompactService`，消费 `ctx.tokenMeter`，并拥有尾→头保留遍历、通过 `ctx.llm.stream()` 生成摘要、surface 替换、锁、步骤后压力处理和规范的上下文溢出恢复。`summarize()` 是其唯一的子类钩子；计价与回放仍归 meter 所有。
 3. **无模型配套服务** — `@deepseek-ai/dsh-compact-tool-result-prune`：一个具体的可选服务，在后端选择摘要范围之前，重写当前过大的 `tool/result` 节点。它不是第二种压缩实现，也不实现 `CompactService`。
 4. **消费方** — 推迟。一个 `/compact` 工具和斜杠命令将 `inject: ['compact']` 并调用契约；它们被有意排除在本 Agent Note 范围之外，以便 seam 先稳定下来。
@@ -71,13 +71,14 @@ retry → next numbered step/start      ⟵ derives from the replacement surface
 
 ### Surface 替换：`compact/*` 事件仅存在于日志；一条 `user/message` 承载摘要
 
-由于 `SurfaceEventType` 是封闭的，摘要不能搭载在 `compact/*` 事件上。后端改为追加一条**单独的 `user/message`**，带有 `surfaceOp: { op: 'replace', start, end }`，其 `content` 是（带框架的）摘要，`sourceEventSeqs` 覆盖被遮蔽的条目*和*簿记事件。`compact/*` 事件是纯日志记录（锁 + 溯源信息）。surface 变更位于锁**内部**，`compact/end` 是最后追加的事件：
+由于 `SurfaceEventType` 是封闭的，摘要不能搭载在 `compact/*` 事件上。后端改为追加一条**单独的 `user/message`**，带有 `source: COMPACT_CHECKPOINT_SOURCE` 和 `surfaceOp: { op: 'replace', start, end }`；其 `content` 是（带框架的）摘要，`sourceEventSeqs` 覆盖被遮蔽的条目*和*簿记事件。接口导出该来源和 `isCompactCheckpointSource()`，使消费方无需依赖后端包身份，即可识别持久化或克隆得到的检查点。`compact/*` 事件是纯日志记录（锁 + 溯源信息）。surface 变更位于锁**内部**，`compact/end` 是最后追加的事件：
 
 ```
 compact/start    → log-only. Acquires the lock.
 [summarize older range via the backend]
 compact/summary  → log-only. Provenance: raw summary, range, shadowed seqs, token count.
-user/message     → surfaceOp { op:'replace', start, end }. THE surface mutation (framed summary).
+user/message     → canonical checkpoint source + surfaceOp { op:'replace', start, end }.
+                   THE surface mutation (framed summary).
                    deriveMessages() renders it as a user-role message.
 compact/end      → log-only. Releases the lock (carries `error` on a recoverable failure).
 ```
@@ -86,7 +87,7 @@ compact/end      → log-only. Releases the lock (carries `error` on a recoverab
 
 ### 检查点框架 + 增量合并（后端私有）
 
-基础后端将摘要包装为已建立的检查点上下文，并标记以便下一轮增量合并。原始摘要保留在 `compact/summary` 上。框架是后端策略；seam 仅承诺一条替换 user 消息承载可能带框架的摘要。
+基础后端将摘要包装为已建立的检查点上下文，并标记以便下一轮增量合并。原始摘要保留在 `compact/summary` 上。框架是后端策略；seam 承诺由一条替换 user 消息承载可能带框架的摘要，并使用规范的检查点来源。
 
 ### 通过日志记录的锁实现阻塞，加上崩溃/可恢复失败的分类
 
@@ -119,7 +120,7 @@ compact/end      → log-only. Releases the lock (carries `error` on a recoverab
 - **包**：`packages/compact/compact` 提供接口，`compact-basic` 提供后端，`compact-tool-result-prune` 提供可选的确定性重写。`packages/llm/token-meter` 独立拥有回放感知的测量。消费方层推迟。
 - **自动 seam**：`agent/post-step`（`@mode serial`）处理成功调用的压力，`agent/request-error`（`@mode waterfall`）处理失败步骤关闭后的最终请求失败。通用 `agent/pre-step` 保持为四参数检查点，不携带压缩专属的提示词/前缀 payload。
 - **`SessionEventMap`** 通过声明合并（merge-extensible）获得 `compact/start` / `compact/summary` / `compact/end`；`SurfaceEventType` **未被**触及。这些是会话事件，不是 cordis `Events`，因此事件分类门禁无需新增条目。
-- **`dsh-compact`** 拥有 `toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`；这些带缓存的 surface 边缘检查由 `compactRegion` 和 `compactIfNeeded` 用来避免拆分工具调用/结果对。缓存按 seq 校验当前成员关系，并从每个切割点的一条平衡序列回答两侧边缘；陈旧或缺失的 seq 以及孤立结果都会被拒绝。
+- **`dsh-compact`** 拥有 `COMPACT_CHECKPOINT_SOURCE`、`isCompactCheckpointSource(source)`、`toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`。该标记用于跨后端实现识别替换摘要。带缓存的 surface 边缘检查会防止 `compactRegion` 和 `compactIfNeeded` 拆分工具调用/结果对，按 seq 校验当前成员关系，从每个切割点的一条平衡序列回答两侧边缘，并拒绝陈旧或缺失的 seq 与孤立结果。
 - **`dsh-session`** 通过唯一的 surface 管理器校验位置替换、完整溯源信息和仅内容的单节点 `tool/result` 重写。其不变式配套插件将新追加的工具结果视为执行，要求存在已打开的步骤与待处理调用；已校验的替换仍是位于轮次内的重写。
 - **接线**：`examples/tui-agent/cordis.yml` 依次加载零配置的 `dsh-token-meter`、`dsh-compact-tool-result-prune` 和 `dsh-compact-basic`；服务级默认值使组合无需重复数值策略即可使用。
 
