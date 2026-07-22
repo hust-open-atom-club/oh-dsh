@@ -19,24 +19,24 @@ GUI 栈需要考虑多种应用形态，同应用形态内的不同运行环境�
 | 层 | 被测物 | 关键手段 | 文件落点 |
 |---|---|---|---|
 | 1 协议同构层 | `AbstractApiClient` + `toFetchHandler`（双向数据/rpcId/ZOD类型/SSE 流/合批/超时） | **同构点全链**：`InProcessApiClient(toFetchHandler(脚本化 impl))` 不过网络但真跑 wire 序列化——零浏览器、纯 node env | `packages/host/apiproxy/tests/client-handler.spec.ts` |
-| 2 对象层编排 | `Session`/`SessionManager`/`ConnectionController`（状态机与时序：缝合/去重/翻页/乐观清稿/pendingBuffers/重连/退避） | **「事件序列进→快照出」黄金路径**：可编程假体 + deferred 控时序 + fake timers 控退避 | `packages/client/web-runtime/tests/{session,manager,connection,…}.spec.ts` |
-| 3 浏览器 smoke | 构建产物 × 真浏览器（页面起得来、一轮对话跑得通） | playwright 裸库（chromium headless，无 @playwright/test 框架）最简跑通；fixture 级 + 真 host 级（无 key self-skip） | `apps/web/tests/smoke-{fixture,real}.e2e.ts` |
+| 2 对象层编排 | `Session`/`SessionManager`/`ConnectionController`（状态机与时序：缝合/去重/翻页/乐观清稿/pendingBuffers/重连/退避） | **「事件序列进→快照出」黄金路径**：可编程假体 + deferred 控时序 + fake timers 控退避 | `packages/client/{runtime,connection}/tests/` |
+| 3 组装呈现层 | 构建产物 × 真实 client loader 与插件组合 | 归应用所有的语义快照会在 jsdom 下启动全部 8 个已构建的 client 插件，以固定确定性的跨插件状态变化；独立使用 Playwright 裸库的冒烟测试负责验证真实浏览器/承载层边界，真 host 用例在无密钥时自行跳过 | `apps/web/tests/*.snapshot.ts`、`apps/web/tests/smoke-{fixture,real}.e2e.ts` |
 
-层间纪律：**下层各测各的，上层不重测下层**——smoke 只证接线活着（fixture 级断零 `/api` 请求、零 pageerror），交互细节归 verify 脚本（见车道地图），wire 语义归 1 层，数据语义归 2 层。纯函数层（lineage/partial/notifier/fold-adapter）随 2 层同包 tests/ 零假体直测。
+层间纪律：**下层各测各的，上层不重测下层**：应用语义快照只固定组装后插件边界上的用户可见投影，Playwright 冒烟测试负责验证浏览器与承载层是否存活；wire 语义归 1 层，数据语义归 2 层。纯函数层（lineage/partial/notifier/fold-adapter）随 2 层同包 tests/ 零假体直测。
 
-- **host 侧**（apiproxy/runtime/webserver）：进全仓 `test:coverage` 门禁，per-file 100%。
-- **client 侧**：web-runtime **已进 per-file 100% 门禁**（12 处防御性不可达臂带理由 `/* v8 ignore */` 注释）；`vitest.config.ts` coverage.exclude 只剩 `packages/client/web-ui/src/**`（暂时——组件重做后随组件 specs 铺满逐步解除），测试照跑，只是不拉 web-ui src 进阈值。web-ui 走 **jsdom 路线（已落地）**：jsdom + @testing-library/react 入 root devDeps（dev-only），首个 spec `web-ui/tests/utils.spec.tsx`（utils 纯函数 + 组件 RTL render + hook uSES 探针）；环境用 per-file `// @vitest-environment jsdom` pragma，node env 的其他包零影响。
-- 排除是**显式注释的裁决**不是静默豁免；解除路径=删 exclude 行 + 补 justified 排除或补测。
+- **host 与 client 源码**均纳入全仓 per-file 100% 覆盖率门禁，仅排除 `vitest.config.ts` 中带注释的少量浏览器级例外；组件套件通过逐文件 jsdom pragma 和 Testing Library 运行，不会改变 Node 套件。
+- **归应用所有的语义快照**读取已构建的 client bundle，通过真实 loader 执行它们，并且只驱动确定性的 fixture 钩子。它们负责固定侧边栏标签、面包屑和 `document.title` 等稳定可见状态，而不固定 CSS 像素或下层状态机细节。
 
 ## 车道地图
 
 | 场景 | 命令 | 内容 | 何时跑 |
 |---|---|---|---|
 | 基础 | `pnpm run test:gui` | 1+2 层 vitest（`packages/client packages/host`），秒级、无浏览器无 server | 改 GUI 任意源码后随手跑 |
+| 语义快照 | `DSH_EXAMPLE_MODE=lib pnpm run test:snapshot` | 无需密钥的组装应用语义，以及仓库按传输形态划分的预期输出 | 用户可见的 GUI 变更后；交付前 |
 | 浏览器端到端 | `pnpm run test:web` | 先重建前端 dist，再跑 3 层双级 smoke（fixture 级 + 真 host 级 self-skip） | 改构建面/boot/承载后；交付前 |
 | 门禁 | `pnpm run test:coverage` | 全仓 gate（host 侧 GUI 包在内，client 侧 excluded） | PR 窗口 |
 
-**verify 脚本与 vitest 的分工**：verify 管浏览器黑盒回归（顺序步骤=用户操作剧本，共享一次浏览器会话，PASS/FAIL 流式输出供 agent 定位断点），vitest 管数据层语义一等断言（引用稳定性 `toBe`、状态机时序、wire 形）。两车道互补不收编——脚本不迁 vitest（拆散有序剧本是负收益），转正时包一层 spawn 壳挂 e2e 车道即可，脚本本体不改写。
+**浏览器脚本与 vitest 的分工**：Playwright 负责浏览器/承载层黑盒回归和较长的连续用户操作流程；普通 vitest 负责引用稳定性、时序和 wire 结构等数据层语义；快照 vitest 通过构建后的组合负责稳定的应用层语义输出。这些车道彼此互补，而不重复断言。
 
 ## 防回归纪律
 
@@ -46,7 +46,7 @@ GUI 栈需要考虑多种应用形态，同应用形态内的不同运行环境�
 
 ## Consequences
 
-各车道各测各层：改任意 GUI 源码有秒级 `test:gui` 反馈，wire/对象层语义在 node env 毫秒级断言，浏览器只承担接线存活冒烟。门禁面上 host 侧全量进 per-file 100%；client 侧 web-runtime 已进门，web-ui 暂留显式注释的 exclude 之后。接受的代价：层间纪律（上层不重测下层）靠 review 而非机器门禁维持；web-ui 的覆盖缺口持续到组件重做后组件 specs 铺满为止。
+各车道各测各层：改动任意 GUI 源码后都能获得秒级 `test:gui` 反馈，wire/对象层语义在 Node 环境中进行毫秒级断言，基于构建后组合的快照固定确定性的用户可见投影，浏览器负责接线与承载层验收。接受的代价是层间纪律由评审而非机器门禁维持，而且每个新的应用快照都必须避开不稳定的布局或时钟输出。
 
 ## Alternatives considered
 
