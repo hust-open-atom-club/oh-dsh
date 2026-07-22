@@ -19,24 +19,24 @@ Cut along the architecture's natural test seams into three tiers, bottom-up:
 | Tier | Under test | Key technique | File location |
 |---|---|---|---|
 | 1 Protocol isomorphism | `AbstractApiClient` + `toFetchHandler` (bidirectional data / rpcId / zod types / SSE streams / batching / timeouts) | **The full chain at the isomorphic point**: `InProcessApiClient(toFetchHandler(脚本化 impl))` skips the network but genuinely runs the wire serialization — zero browser, pure node env | `packages/host/apiproxy/tests/client-handler.spec.ts` |
-| 2 Object-layer orchestration | `Session`/`SessionManager`/`ConnectionController` (state machines and timing: stitching / dedup / paging / optimistic draft clearing / pendingBuffers / reconnect / backoff) | **The "event sequence in → snapshot out" golden path**: programmable fakes + deferreds controlling timing + fake timers controlling backoff | `packages/client/web-runtime/tests/{session,manager,connection,…}.spec.ts` |
-| 3 Browser smoke | Build artifacts × a real browser (the page boots, one conversation round-trips) | Bare playwright library (chromium headless, no @playwright/test framework), minimal pass-through; fixture level + real-host level (self-skips without a key) | `apps/web/tests/smoke-{fixture,real}.e2e.ts` |
+| 2 Object-layer orchestration | `Session`/`SessionManager`/`ConnectionController` (state machines and timing: stitching / dedup / paging / optimistic draft clearing / pendingBuffers / reconnect / backoff) | **The "event sequence in → snapshot out" golden path**: programmable fakes + deferreds controlling timing + fake timers controlling backoff | `packages/client/{runtime,connection}/tests/` |
+| 3 Assembled presentation | Built artifacts × the real client loader and plugin composition | App-owned semantic snapshots boot all eight built client plugins under jsdom for deterministic cross-plugin state changes; bare Playwright smoke separately proves the real browser/carrier boundary, with real-host cases self-skipping without a key | `apps/web/tests/*.snapshot.ts`, `apps/web/tests/smoke-{fixture,real}.e2e.ts` |
 
-Inter-tier discipline: **each tier tests its own layer, upper tiers never re-test lower ones** — smoke only proves the wiring is alive (the fixture level asserts zero `/api` requests and zero pageerror), interaction detail belongs to the verify scripts (see the lane map), wire semantics to tier 1, data semantics to tier 2. Pure-function layers (lineage/partial/notifier/fold-adapter) are tested directly with zero fakes in the same package's tests/ alongside tier 2.
+Inter-tier discipline: **each tier tests its own layer, upper tiers never re-test lower ones** — an app semantic snapshot pins only user-visible projection across the assembled plugin boundary, while Playwright smoke proves browser and carrier liveness; wire semantics belong to tier 1 and data semantics to tier 2. Pure-function layers (lineage/partial/notifier/fold-adapter) are tested directly with zero fakes in the same package's tests/ alongside tier 2.
 
-- **Host side** (apiproxy/runtime/webserver): under the repo-wide `test:coverage` gate, per-file 100%.
-- **Client side**: web-runtime **is already under the per-file 100% gate** (12 defensive unreachable arms carry reasoned `/* v8 ignore */` comments); the `vitest.config.ts` coverage.exclude is down to `packages/client/web-ui/src/**` (temporary — lifted progressively as component specs fill in after the component redo); tests still run, the exclusion only keeps web-ui src out of the thresholds. web-ui takes the **jsdom route (landed)**: jsdom + @testing-library/react entered root devDependencies (dev-only), first spec `web-ui/tests/utils.spec.tsx` (utils pure functions + component RTL render + hook uSES probe); the environment uses the per-file `// @vitest-environment jsdom` pragma, zero impact on the other node-env packages.
-- The exclusion is an **explicitly annotated ruling**, not a silent waiver; the lift path = delete the exclude line + add a justified exclusion or the missing tests.
+- **Host and client source** are under the repo-wide per-file 100% coverage gate except the narrow browser-grade exclusions annotated in `vitest.config.ts`; component suites use per-file jsdom pragmas and Testing Library without changing Node suites.
+- **App-owned semantic snapshots** read built client bundles, execute them through the real loader, and drive only deterministic fixture hooks. They own stable visible state such as sidebar labels, breadcrumbs, and `document.title`, not CSS pixels or lower-layer state-machine details.
 
 ## Lane map
 
 | Scenario | Command | Content | When to run |
 |---|---|---|---|
 | Baseline | `pnpm run test:gui` | Tier 1+2 vitest (`packages/client packages/host`), seconds-fast, no browser, no server | Casually, after touching any GUI source |
+| Semantic snapshot | `DSH_EXAMPLE_MODE=lib pnpm run test:snapshot` | Keyless assembled-application semantics plus the repo's transport-specific expected outputs | After a human-visible GUI change; before delivery |
 | Browser end-to-end | `pnpm run test:web` | Rebuilds the front-end dist first, then runs the tier-3 two-level smoke (fixture level + real-host level self-skip) | After touching the build surface/boot/carriage; before delivery |
 | Gate | `pnpm run test:coverage` | The repo-wide gate (host-side GUI packages included, client side excluded) | The PR window |
 
-**Division of labor between the verify scripts and vitest**: verify owns browser black-box regression (sequential steps = a user-operation script, one shared browser session, streaming PASS/FAIL output for the agent to locate the break), vitest owns first-class data-layer semantic assertions (reference stability `toBe`, state-machine timing, wire shapes). The two lanes complement each other, neither absorbs the other — scripts do not migrate to vitest (tearing apart an ordered script is a net loss); promoting one means wrapping a spawn shell hooked into the e2e lane, never rewriting the script body.
+**Division of labor between the browser scripts and vitest**: Playwright owns browser/carrier black-box regression and long sequential user journeys; ordinary vitest owns data-layer semantics such as reference stability, timing, and wire shapes; snapshot vitest owns stable app-level semantic output through the built composition. These lanes complement each other rather than duplicating assertions.
 
 ## Anti-regression discipline
 
@@ -46,7 +46,7 @@ Inter-tier discipline: **each tier tests its own layer, upper tiers never re-tes
 
 ## Consequences
 
-Each lane tests its own tier: touching any GUI source gets seconds-fast `test:gui` feedback, wire/object-layer semantics assert in milliseconds in node env, and the browser carries only wiring-liveness smoke. On the gate surface, the host side is fully under per-file 100%; on the client side web-runtime is under the gate while web-ui waits behind the explicitly annotated exclude. The accepted cost: the inter-tier discipline (upper tiers never re-test lower ones) is upheld by review rather than a machine gate, and web-ui's coverage gap persists until component specs fill in after the component redo.
+Each lane tests its own tier: touching any GUI source gets seconds-fast `test:gui` feedback, wire/object-layer semantics assert in milliseconds in Node, built-composition snapshots pin deterministic user-visible projection, and the browser carries wiring and carrier acceptance. The accepted cost is that inter-tier discipline is upheld by review rather than a machine gate and every new app snapshot must avoid unstable layout or clock output.
 
 ## Alternatives considered
 
