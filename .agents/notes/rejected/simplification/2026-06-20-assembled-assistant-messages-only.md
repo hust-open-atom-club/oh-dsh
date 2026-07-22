@@ -2,8 +2,6 @@
 
 Status: rejected — high-fidelity chunk replay, partial failed streams, and snapshot replay currently depend on persisted `assistant/chunk` events. Dropping chunks is only viable with a no-information-loss replay/artifact replacement.
 
-English | [中文](2026-06-20-assembled-assistant-messages-only.zh.md)
-
 ## Problem
 
 The canonical session log currently persists every `assistant/chunk` exactly as streamed by the model. The [session persistence Agent Note](../../implemented/architecture/2026-06-14-session-persistence.md) chose this for token-level replay fidelity and contiguous `seq`, but the cost has grown: JSONL fixtures are dominated by tiny delta records, snapshot scenarios replay the model by grouping chunk events, ACP load reconstructs prior assistant output from chunks, and any future log reader must distinguish durable message history from token-level trace.

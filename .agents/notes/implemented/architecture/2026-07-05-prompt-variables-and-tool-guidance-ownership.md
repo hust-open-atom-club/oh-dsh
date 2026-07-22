@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-05-prompt-variables-and-tool-guidance-ownership.zh.md)
-
 ## Problem
 
 The assembled system prompt had four defects, all of one family: facts the harness already knows were restated by hand somewhere else, and drifted.

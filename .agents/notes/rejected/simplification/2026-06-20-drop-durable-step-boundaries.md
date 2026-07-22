@@ -2,8 +2,6 @@
 
 Status: rejected — `step/end` is the durable indication that a model step finished, and keeping the symmetric `step/start` / `step/end` pair makes crash repair, invariants, and transcript inspection clearer than inferring completion from adjacent step-scoped events.
 
-English | [中文](2026-06-20-drop-durable-step-boundaries.zh.md)
-
 ## Problem
 
 The session log stores `step/start` and `step/end` events even though every step-scoped event already carries `{ turn, step }`: assistant chunks, assistant messages, tool calls, tool results, usage, and errors. `deriveMessages()` ignores step boundaries, ACP ignores them for UI, and the main consumers are invariants, tests, snapshot expected outputs, and crash repair.

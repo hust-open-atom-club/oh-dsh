@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-19-drop-mutable-session-summary.zh.md)
-
 ## Problem
 
 The [session-persistence seam](../architecture/2026-06-14-session-persistence.md) split a session's out-of-log metadata into two types owned by `dsh-session`: an immutable `SessionHeader` (`version`, `id`, `createdAt`, `cwd?`, `parentSession?`) written once at creation, and a mutable `SessionSummary` (`updatedAt`, `title?`, `firstPrompt?`) "updateable without touching the append-only log". Their union was `SessionMeta = SessionHeader & SessionSummary`, and the abstract `SessionPersistence` service carried a seventh method — `update(id, summary)` — for rewriting the summary. Each backend implemented the mutable store its own way: JSONL wrote a separate atomic `.summary.json` **sidecar** beside the log (temp-write + rename, best-effort), SQLite kept `updated_at`/`title`/`first_prompt` **columns** bumped inside the append transaction.

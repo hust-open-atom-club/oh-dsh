@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-10-readme-known-limitations-gate.zh.md)
-
 ## Problem
 
 The [documentation standard](../../../../docs/AGENTS.md) assigns limitations to package READMEs. Without a shared shape, an omitted section cannot distinguish an audited absence from forgotten documentation, and variant headings prevent a repository-wide search.

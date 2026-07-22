@@ -2,8 +2,6 @@
 
 Status: rejected — full-output recovery is a real bash behavior. A future artifact/blob service may generalize it, but dropping spill files before that replacement would lose useful command output.
 
-English | [中文](2026-06-20-drop-bash-output-spill-files.zh.md)
-
 ## Problem
 
 `dsh-bash-local` keeps bounded in-memory output and spills large stdout/stderr streams into private temp files. That requires a private directory, random owner-only file creation, close-failure handling, byte-offset incremental reads, lossy read reporting, path rendering in model-facing text, and cleanup discipline. The tool then tells the model to read a local spill path when output was truncated.

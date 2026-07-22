@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-22-fork-child-replay-seed-boundary.zh.md)
-
 ## Problem
 
 The [per-session snapshot replay Agent Note](2026-06-22-subagent-snapshot-replay.md) made the snapshot tier express a nested-agent shape: a parent plus one recorded log per in-process subagent, each replayed as its own script keyed by calling session. It noted (§ Scope, final bullet) that a fork snapshot was "a trivial future addition, not a gap in the keying." That was wrong about a fork child specifically — not the keying, but the *script derivation*.

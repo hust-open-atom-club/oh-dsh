@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-05-reconstructable-requests.zh.md)
-
 ## Problem
 
 The request pipeline did not guarantee prefix stability for provider caching, and the session log could not reconstruct what the model saw. It omitted model, system prompt, and tool schemas while allowing per-call request rewrites. Cache behavior and replay equivalence therefore depended on whichever plugins happened to be loaded.

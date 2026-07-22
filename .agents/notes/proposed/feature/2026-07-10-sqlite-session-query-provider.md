@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-07-10-sqlite-session-query-provider.zh.md)
-
 ## Problem
 
 The exact-read `ctx.sessionQuery` service deliberately has no derived index. Large persisted histories need full-text search without scanning every event on every query, while current live sessions need an overlay newer than the last durability checkpoint. Search also needs concrete ranking, snippets, pagination, cancellation, and rebuild behavior.
