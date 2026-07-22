@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-24-web-capability-seam.zh.md)
-
 ## Problem
 
 The harness needs model-facing web tools without binding the model contract to one vendor's API shape. Search is the immediate pressure point: supporting both Exa search and Perplexity search from the start — two deliberately different provider shapes (Exa returns a flat `results[]` of `{title, url, highlights, publishedDate}`; Perplexity returns a generated answer plus citations) — is what proves the normalized seam does not just mirror one vendor. Fetch is a separate capability: an anonymous public HTTP(S) fetch backend has transport, security, redirect, decoding, and size-limit concerns that are not the same as provider-backed search.
@@ -77,8 +75,6 @@ Provider packages depend only on `dsh-web` and Cordis. They own credentials, end
 `ctx.web` is a provider registry plus a provider-selecting execution surface. The registry half stays close to `LlmService`: a `Map<id, provider>` per capability kind, `registerSearchProvider` / `registerFetchProvider` methods that return disposers, duplicate ids that throw `WebError`, and execution-time resolution that throws when the selected provider is absent or unusable. The authoritative signatures live in `packages/web/web/src/types.ts`; the seam's shape:
 
 ```ts
-import type { WebFetchRequest, WebFetchResult, WebSearchRequest, WebSearchResult } from '@deepseek-ai/dsh-web'
-
 interface WebSearchProvider {
   readonly id: string
   available(): boolean
@@ -210,18 +206,18 @@ The seam request deliberately does not include a per-call timeout, `format`, `pr
 HTTP status is part of the fetched resource state, not automatically a tool failure. A successful network fetch of a `404` or `500` response returns `WebFetchResult` with the status code and a bounded decoded body when the content type is supported. `WebError` is for failures to safely retrieve or represent the resource: invalid or blocked URL, redirect policy violation, timeout, abort, response too large, unsupported content type, provider failure, or network failure.
 
 ```ts
-export interface WebFetchRequest {
+interface WebFetchRequest {
   readonly url: string
 }
 
-export interface WebFetchResult {
+interface WebFetchResult {
   readonly url: string
   readonly statusCode: number
   readonly body: WebFetchBody
   readonly truncated: boolean
 }
 
-export type WebFetchBody =
+type WebFetchBody =
   | { readonly kind: 'html'; readonly content: string }
   | { readonly kind: 'text'; readonly content: string }
 ```

@@ -2,8 +2,6 @@
 
 Status: rejected — a single turn can contain substantial real work, including many steps and large tool output. Preserving interrupted turns is preferable to silently dropping that tail on load.
 
-English | [中文](2026-06-20-truncate-interrupted-turns.zh.md)
-
 ## Problem
 
 The current persistence contract preserves a final turn that was durably written but never closed. On load, `interruptedTurnClosers()` scans the tail, synthesizes error `tool/result` events for unanswered tool calls, appends a `step/end` when a step is open, appends `turn/end { kind: 'interrupted' }`, and asks the backend to durably commit that repair. The coordinator, JSONL backend, SQLite backend, session event vocabulary, invariants, docs, and tests all model this synthetic close path.

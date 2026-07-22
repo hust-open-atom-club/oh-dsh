@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-30-session-store-fork-api.zh.md)
-
 ## Problem
 
 The event-sourced session log already has the primitive a fork needs: create a new session with a seed event prefix, then derive model history from that seeded log exactly as replay does. That primitive is intentionally low-level: `ctx.sessions.create(id, { seed, meta })` accepts any valid seed, but ordinary live-session branching needs policy around which prefix can be copied, which metadata is stamped on the child, and how errors are classified.

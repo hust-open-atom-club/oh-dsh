@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-06-timeout-deadline-library.zh.md)
-
 ## Problem
 
 Timeout handling was drifting apart across the tool-bearing capabilities, and the divergence was not superficial — it was the same logic re-implemented three ways, each with its own subtle correctness burden.

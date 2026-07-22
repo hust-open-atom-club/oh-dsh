@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-11-structured-error-taxonomy.zh.md)
-
 ## Problem
 
 Failures crossed seams as bare strings. A tool error flattened to a text block — name, code, and stack lost — so a future sandbox/retry plugin couldn't tell ENOENT from EACCES, and the model got less actionable feedback than it could. A non-Error throw degraded further: the loop wrapped it in `new Error(String(x))`, dropping any code. And `LlmError` was the only typed error in the system, with no shared base, so there was nothing for a consumer to `instanceof` against generically.

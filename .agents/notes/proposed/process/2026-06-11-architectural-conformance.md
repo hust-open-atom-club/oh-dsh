@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-06-11-architectural-conformance.zh.md)
-
 ## Problem
 
 Two architectural guarantees currently live only in prose: (1) nothing depends on the concrete loop package ([the microkernel promise](../../implemented/architecture/2026-06-11-microkernel-event-taxonomy.md)), and (2) every LlmAdapter speaks the chunk protocol correctly. Both should be mechanical ([the quality-gates principle](../../implemented/process/2026-06-11-quality-gates.md)).

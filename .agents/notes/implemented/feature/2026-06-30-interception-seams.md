@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-30-interception-seams.zh.md)
-
 ## Problem
 
 The harness needs a hooks subsystem: users extend or gate the agent at lifecycle points the way Claude Code (CC) and Codex do. The key reframe driving this design is that **"native hooks" are not a package** — a native hook is just an ordinary Cordis plugin subscribing to the canonical lifecycle events. So the real product is a *powerful, well-typed canonical event surface*; the CC/Codex bridges (the `dsh-hooks-claude` / `dsh-hooks-codex` packages) are merely translators that map an external shell-hook protocol onto that same surface. Anything a bridge can do, a plain plugin can do directly — more powerfully (no serialization boundary, full `ctx`, typed returns).
@@ -26,11 +24,11 @@ Every call follows `tools/pre-execute` → guards → `tools/execute` → dispat
 
 - **`tools/pre-execute`** is the extensible waterfall gate. Its `PreToolDecision` allows, denies, or asks. Deny skips `tools/execute` and core dispatch. Ask resolves through the optional approval seam: only `allowed-once` continues through guards and dispatch; rejection, cancellation, an unavailable channel, a missing approval service, or an agent-less call becomes a normalized denial. Every outcome still reaches post-policy and final observers.
 - **`ctx.tools.guard()`** installs synchronous scope-aware policy after the whole pre-execute waterfall. A guard may deny or abstain, never force-allow, so listener ordering cannot resurrect an operation that a final invariant forbids.
-- **`tools/execute`** is the around-dispatch waterfall for timeout, retry, and metrics plugins. A wrapper delegates to core dispatch with `next()`, may replace and restore the required `exec.signal` before doing so but cannot remove it, and receives the already-normalized result of a thrown or unknown tool; returning its own valid result short-circuits dispatch.
-- **`tools/post-execute`** is the inspect/transform waterfall. Its `PostToolDecision` accepts, blocks with feedback, optionally replaces content, or attaches `additionalContexts`. The returned decision is the supported transform channel; after the waterfall, the registry materializes the complete outcome once before final observation.
+- **`tools/execute`** is the around-dispatch waterfall for timeout, retry, and metrics plugins. A wrapper delegates to core dispatch with `next()`, may replace and restore the required `exec.signal` before doing so but cannot remove it, and receives the already-normalized canonical success/failure result of a thrown or unknown tool; a wrapper-authored success short-circuits dispatch and is re-normalized through the resolved output declaration.
+- **`tools/post-execute`** is the inspect/transform waterfall. Its `PostToolDecision` accepts, blocks with feedback, replaces either presentation content or canonical value, or attaches `additionalContexts`. Value replacement revalidates and recomputes presentation; content replacement preserves programmatic value and is not a confidentiality boundary. The returned decision is the supported transform channel; after the waterfall, the registry materializes the complete outcome once before final observation.
 - **`tools/result`** is the synchronous contained notification after every transform, lossless-JSON materialization, and the outer error boundary. It receives the same frozen execution identity and an immutable snapshot of the authoritative result; observer failures are contained per listener and cannot change or reject `ToolRegistry.execute()`'s returned outcome.
 
-Core dispatch and the tool body sit inside normalization boundaries, so tool, listener, malformed-result, non-JSON result, and identity-shape failures resolve as JSON-safe `isError` results rather than escaping the turn. A post-execute listener can therefore inspect a thrown tool, and a final observer sees exactly what the caller receives and the session log can persist.
+Core dispatch and the tool body sit inside normalization boundaries, so tool, listener, invalid canonical value, renderer/projector, non-JSON presentation, and identity-shape failures resolve as JSON-safe `isError` results rather than escaping the turn. A post-execute listener can therefore inspect a thrown tool, and a final observer sees the execution-local canonical value beside exactly the presentation fields the session log can persist. The [canonical tool-output contract](../architecture/2026-07-20-canonical-tool-output-contract.md) owns the value/projection and durability rules.
 
 **`TurnEndReason.rejected`** (`dsh-session`): a zero-step turn whose claimed prompt was blocked by `prompt-submit`.
 

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-26-file-context-as-event-gate.zh.md)
-
 ## Problem
 
 [The split-fs-seam Agent Note](../simplification/2026-06-26-fsspec-style-fs-seam.md) put `ctx.fileContext` between the model-facing tools and the `ctx.fs` provider: `dsh-tool-fs` injects `fileContext` and routes every `read`/`write`/`edit` through its methods. That makes `fileContext` **in-path and mandatory**. The tool cannot reach `ctx.fs` without it, the policy layer owns the fs I/O and the read windowing, and a deployment that does not want observed-state policy cannot simply drop the package — `dsh-tool-fs` would fail to resolve `ctx.fileContext`.

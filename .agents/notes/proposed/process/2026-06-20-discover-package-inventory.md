@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-06-20-discover-package-inventory.zh.md)
-
 ## Problem
 
 Package and gate inventories are repeated across TypeScript project references, package docs, CI prose, and Knip overrides. Most restate package layout, manifest data, or aggregate command contents. Each new package therefore creates avoidable synchronization points.

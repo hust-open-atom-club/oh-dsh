@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-20-unify-agent-and-session-id.zh.md)
-
 ## Problem
 
 A live agent/session pair needs one identity for registry routing, event sourcing, and persistence. Giving the factory independent `agentId` and `sessionId` inputs would permit pairings no production path can use, while forcing every consumer to choose or translate between two names for the same lifecycle.
