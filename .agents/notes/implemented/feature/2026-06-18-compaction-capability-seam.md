@@ -93,6 +93,8 @@ The `compact/start … compact/end` bracket is justified, in order of what now d
 1. **Crash-detectable orphan + provenance** (primary). Summarization is a slow model call persisted *after* `compact/start`. A crash mid-summarization leaves a `compact/start` with no matching `compact/end` — a detectable orphan. Releasing the lock last (rather than first) converts the crash window from *silent corruption* into that detectable orphan.
 2. **Prevents concurrent compaction.** `compactRegion` refuses to start if the current turn holds an unmatched `compact/start`. (The loop is single-threaded across either awaited automatic seam, so this is also a re-entry tripwire — a thrown "already in progress" signals a real bug.)
 
+The lock excludes another compaction, not unrelated log-only facts. The basic backend snapshots the token meter's surface nodes after `compact/start` and compares them again after asynchronous summarization; any surface mutation rejects before replacement, while a title or other log-only append leaves the selected span valid.
+
 Two failure paths, both documented:
 
 - **Crash** (the loop dies mid-summarization): a dangling `compact/start`, no closer. Because `compact/*` are **log-only**, the orphan is **inert** — no summary replacement lands. The derived surface remains the durable surface present at `compact/start`: full history when pruning made no replacement, or the already-pruned history when it did. Generic turn-repair (`interruptedTurnClosers`) closes the turn with a synthetic `turn/end`; the orphan sits *before* that `turn/end`, so the turn-scoped in-progress check never sees it and a crash cannot wedge future compaction.
