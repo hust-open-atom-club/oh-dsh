@@ -9,7 +9,7 @@ The [subagent seam](../../implemented/feature/2026-06-21-subagent-capability-sea
 - **`outputSchema`/`structured` and `toolFilter`** (`SubagentCapabilities`, `SubagentStartRequest`, `SubagentResult` in `packages/subagent/subagent/src/types.ts`): at the decision point, every real provider declared `outputSchema: false, toolFilter: false` (`packages/subagent/subagent-spawn/src/index.ts`, `packages/subagent/subagent-fork/src/index.ts`, `packages/subagent/subagent-acp/src/index.ts`); the sole production `ctx.subagents.start` caller (`packages/subagent/tool-subagent/src/index.ts`) built `{ prompt, parent, signal?, agentOptions? }` and structurally could not set either; `structured` appeared only in the scripted test fixture. The service's capability check carried two assert rows whose only exercisers were the rejection tests.
 - **`SubagentRun.sendMessage` / `SubagentRun.resume`** (same file): implemented by NO provider — not even the mock; the spawn spec asserts their *absence*.
 
-The only reason `dsh-subagent` depends on `dsh-tools` at all is `outputSchema`'s `SchemaSpec` type. Three subsequent subagent workstreams (per-session snapshot replay, the fork seed boundary, the ACP backend) landed around this surface without growing a single consumer.
+The only reason `dsh-subagent` depended on `dsh-tools` at the decision point was `outputSchema`'s schema type (now `ObjectJsonSchema`). Three subsequent subagent workstreams (per-session snapshot replay, the fork seed boundary, the ACP backend) landed around this surface without growing a single consumer.
 
 ## Proposal
 
