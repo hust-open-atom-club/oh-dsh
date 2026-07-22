@@ -34,7 +34,7 @@ idle 检测属于后端行为，不是第二条公共 seam。远程或容器后�
 
 实现不提供插件加载期 auto-start 会话。`terminal_open` 只在 agent 工具调用期间创建会话，此时所有权和所属的事件溯源会话都已确定。未来的声明式启动功能必须通过尚未发布的 agent setup 组合，而不能创建全局共享终端。
 
-agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出。未发布的后端 setup 同样是受追踪的生命周期操作：owner 或服务 dispose 会中止服务自有的 signal，等待后端结算与回滚完成后才返回。即使后端响应取消而 reject，调用方取消仍原样保留其 `AbortSignal.reason`；若回滚 close 失败，spawn 与正在执行的 lifecycle dispose 都会 reject。后端或工具插件 reload 不会遗留会话：所有权持续存放在 `PtyService` 中，直到 agent 结束，与 [`ctx.tasks`](../../../../packages/tasks/tasks/README.md) 的服务持有记录模式一致。服务会先同步把会话预留给一次活跃发送，再返回该操作；后台发送同样会在 task id 对外可见前完成预留。第二次发送会以 `SEND_ACTIVE` 失败，因此输出与取消无法跨越操作所有权。
+agent scope dispose 时先关闭注册，再等待全部所属 PTY 静默退出。未发布的后端 setup 同样是受追踪的生命周期操作：owner 或服务 dispose 会中止服务自有的 signal，等待后端结算与回滚完成后才返回。即使后端响应取消而 reject，调用方取消仍原样保留其 `AbortSignal.reason`；服务侧回滚 close 失败会使 spawn 与正在执行的 lifecycle dispose 都 reject，而 `PtyBackendCleanupError` 让后端在不替换该调用方原因的前提下，为正在执行的 dispose 保留自身的启动清理失败。后端或工具插件 reload 不会遗留会话：所有权持续存放在 `PtyService` 中，直到 agent 结束，与 [`ctx.tasks`](../../../../packages/tasks/tasks/README.md) 的服务持有记录模式一致。服务会先同步把会话预留给一次活跃发送，再返回该操作；后台发送同样会在 task id 对外可见前完成预留。第二次发送会以 `SEND_ACTIVE` 失败，因此输出与取消无法跨越操作所有权。
 
 ### 安全与进程边界
 
