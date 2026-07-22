@@ -30,7 +30,7 @@ The keyless ACP and TUI Code Mode snapshots execute one outer program that perfo
 
 **Merge presenter metadata with `result.content`.** Rejected because the rendered content already contains the logs; merging would duplicate them and require brittle deduplication.
 
-**Forward `result.content` through a generic result presenter.** Rejected because the durable event already carries that content and ACP/TUI already have a generic raw-content fallback. The host mux serializes a tool-owned result view beside the event, so forwarding would duplicate an unspilled result of up to 64 MiB at the default worker setting in one frame merely to recreate the fallback.
+**Forward `result.content` through a generic result presenter.** Rejected because the durable event already carries that content and ACP/TUI already have a generic raw-content fallback. The host mux serializes a tool-owned result view beside the event, so forwarding would duplicate the rendered content in one frame merely to recreate the fallback; the default worker alone admits a 64 MiB variable-payload budget before rendering.
 
 **Create one card per nested dispatch.** Rejected because intermediate values are intentionally execution-local and never model-facing. Multiple cards would expose an implementation trace instead of the single Code Mode operation the model and user invoked.
 
