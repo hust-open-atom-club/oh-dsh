@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-07-21-tui-no-banner.md) | 中文
 
+> **已被取代**，见[无边框横幅 Agent Note](2026-07-21-tui-borderless-banner.md)：横幅及其扫入动画回归，只是去掉了盒子。本 note 为模型设立的页脚归宿得以保留。
+
 ## Problem
 
 TUI 启动时展示一个带框的产品横幅（"DEEPSEEK HARNESS" + 模型/会话详情），最近一版还带扫入动画（[横幅扫入 Agent Note](2026-07-21-tui-banner-sweep.md)）。用户的裁决：删掉它。每次启动都被重读的产品标题是装饰，盒子在任何内容之前先占掉四行，而它承载的识别信息（模型、会话）有更好的去处。

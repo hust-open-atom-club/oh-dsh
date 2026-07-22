@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-07-21-tui-no-banner.zh.md)
 
+> **Superseded** by the [borderless-banner Agent Note](2026-07-21-tui-borderless-banner.md): the banner and its sweep return without the box. The model's footer home this note added stays.
+
 ## Problem
 
 The TUI opened with a boxed product banner ("DEEPSEEK HARNESS" + model/session detail), most recently with a sweep-in animation ([banner sweep Agent Note](2026-07-21-tui-banner-sweep.md)). The user's verdict: remove it. A product title re-read on every boot is chrome, the box spends four rows before any content, and the identifying facts it carried (model, session) have better homes.
