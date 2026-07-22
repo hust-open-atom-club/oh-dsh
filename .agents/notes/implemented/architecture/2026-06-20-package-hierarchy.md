@@ -53,9 +53,9 @@ packages/
 
 The package list had been enumerated in five places. The uniform depth-2 layout lets most of them be derived instead:
 
-- `tsconfig.base.json` maps every package through a single `@deepseek-ai/dsh-*` `paths` wildcard listing one candidate per group, in place of per-package entries. Root `tsconfig.json` reuses that source map and carries the explicit project references that keep package/vendor typecheck boundaries intact. (One subtlety this introduced: a path candidate contains `/*/`, which a naive regex comment-stripper mistakes for a block comment — `scripts/doc-typecheck.ts` reads the JSONC config through TypeScript's parser rather than stripping comments by hand for exactly this reason.)
+- `tsconfig.base.json` maps every package through a single `@deepseek-ai/dsh-*` `paths` wildcard listing one candidate per group, in place of per-package entries. The aggregate configs (`tsconfig.host.json`, `tsconfig.client.json`) reuse that source map and carry the explicit project references that keep package/vendor typecheck boundaries intact. (One subtlety this introduced: a path candidate contains `/*/`, which a naive regex comment-stripper mistakes for a block comment — `scripts/doc-typecheck.ts` reads the JSONC config through TypeScript's parser rather than stripping comments by hand for exactly this reason.)
 - `scripts/publint-all.ts` derives its list by reading the hierarchy (`packages/<group>/<pkg>`), resolving the `TODO(package-inventory)`.
-- `tsconfig.build.json`'s project `references` stay an explicit list — TypeScript project references have no wildcard form. Generating these from a manifest is left to a follow-up (see [discover package inventories](../../proposed/process/2026-06-20-discover-package-inventory.md)).
+- The aggregates' project `references` stay explicit lists — TypeScript project references have no wildcard form. Generating these from a manifest is left to a follow-up (see [discover package inventories](../../proposed/process/2026-06-20-discover-package-inventory.md)).
 
 ### Guardrails added
 
