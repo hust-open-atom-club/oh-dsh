@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-07-22-fast-local-git-hooks.zh.md)
 
+> **Superseded for pre-push:** [Local primary CI before push](2026-07-23-local-primary-ci-before-push.md) replaces the typecheck-only publication checkpoint with the exact primary CI inventory. The fast pre-commit decision remains in force; the pre-push design below records the policy this repository no longer uses.
+
 ## Problem
 
 An agent already runs the tests and checks that exercise its change, while commit, push, and CI can each repeat increasingly broad subsets of the same work. A full pre-push suite therefore delays every publication, amplifies unrelated local flakes, and gives no new signal when CI immediately runs the exhaustive matrix again.

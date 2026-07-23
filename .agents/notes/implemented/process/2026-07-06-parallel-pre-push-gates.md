@@ -2,7 +2,7 @@
 
 Status: implemented
 
-The local-hook portion of this record is superseded by [Fast local Git hooks](2026-07-22-fast-local-git-hooks.md). The bounded gate scheduler and package-level `publint` parallelism remain in force for CI, `doc-sync`, and explicit local commands.
+[Local primary CI before push](2026-07-23-local-primary-ci-before-push.md) now owns the local-hook contract: pre-push selects the same primary inventory as CI. The bounded gate scheduler and package-level `publint` parallelism remain in force for CI, `doc-sync`, and explicit local commands.
 
 ## Problem
 

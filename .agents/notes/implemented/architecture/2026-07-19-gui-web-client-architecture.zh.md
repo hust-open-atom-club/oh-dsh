@@ -39,7 +39,7 @@ Status: implemented
 
 **双实例禁令**：模块表包若被内联进插件 bundle，会复制运行时身份（两份 React、两套 store 注册表——一次真实白屏 P0 的根因）。tsdown client 预设在构建期把守纯度：模块表包的裸名 import 必须解析为 external（适用时改写为其 `/client` 形态），其余任何非 inline 安全 wire/类型层的 workspace 泄漏都令构建大声失败（`packages/client/tsdown.client.ts`，由 `scripts/client-bundle-purity.spec.ts` 钉住）。
 
-dev 与 prod 同链：插件在 `tsdown --watch` 下重编译，刷新即重走同一条链；vite 只管壳（`apps/web`）。类型宇宙在聚合层拆分——根 `tsconfig.json` 是 host program，`tsconfig.client.json` 是 client program，因为两侧都在相同键（`sessions`、`loader`）上对 cordis `Context` 做声明合并且服务不同；client 包经纯类型子路径（`@deepseek-ai/dsh-session/types` 等）消费协议词汇，host 侧的声明合并不会搭车进入 client program。
+dev 与 prod 同链：插件在 `tsdown --watch` 下重编译，刷新即重走同一条链；vite 只管壳（`apps/web`）。类型宇宙在聚合层拆分——`tsconfig.host.json` 是 host program、`tsconfig.client.json` 是 client program，二者由 solution 根 `tsconfig.json` 引用，因为两侧都在相同键（`sessions`、`loader`）上对 cordis `Context` 做声明合并且服务不同；client 包经纯类型子路径（`@deepseek-ai/dsh-session/types` 等）消费协议词汇，host 侧的声明合并不会搭车进入 client program。
 
 ## slot 体系：页面怎么拼
 
