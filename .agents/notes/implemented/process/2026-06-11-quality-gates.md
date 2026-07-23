@@ -2,7 +2,7 @@
 
 Status: implemented
 
-[Local primary CI before push](2026-07-23-local-primary-ci-before-push.md) restores hook/CI symmetry for the primary Node inventory. [Fast local Git hooks](2026-07-22-fast-local-git-hooks.md) continues to own the pre-commit design.
+The hook/CI symmetry in this record is superseded by [Fast local Git hooks](2026-07-22-fast-local-git-hooks.md); CI remains the exhaustive enforcement path.
 
 ## Problem
 

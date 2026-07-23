@@ -1,11 +1,11 @@
 ---
 name: dsh-pre-push-checks
-description: Use before pushing, force-pushing, marking ready for review, or claiming checks pass on a deepseek-harness branch to select focused implementation evidence and preserve the mandatory primary-CI pre-push gate.
+description: Use before pushing, force-pushing, marking ready for review, or claiming checks pass on a deepseek-harness branch to select the smallest tests and checks that cover the outgoing diff without reflexively running the full repository suite.
 ---
 
 # DSH Pre-Push Checks
 
-Use this skill to run relevant implementation evidence once and the complete local publication baseline once before a `deepseek-harness` push. Pre-commit fixes staged lint, checks staged whitespace, and guards vendored-source metadata; pre-push invokes `pnpm run check:pre-push`, which selects the same primary Node inventory as `pnpm run check:ci`. Hosted CI still owns platform- and provider-specific evidence.
+Use this skill to run relevant local evidence once before a `deepseek-harness` push. Git hooks are intentionally narrow: pre-commit fixes staged lint, checks staged whitespace, and guards vendored-source metadata; pre-push runs only the incremental repository typecheck. CI owns exhaustive coverage and the platform matrix.
 
 ## Inspect the outgoing change
 
@@ -27,15 +27,15 @@ If the branch has no upstream or that range is not meaningful for the stack, com
 
 ## Select relevant evidence
 
-Every behavior change needs the narrowest available test or purpose-built check that would fail for its regression. Run that evidence while iterating; the hook supplies the universal publication baseline.
+There is no universal local baseline beyond the hooks. Every behavior change needs the narrowest available test or purpose-built check that would fail for its regression; add broader checks only for surfaces the diff actually reaches.
 
-- **Package or script behavior:** run the owning Vitest file or focused test name. Add adjacent package tests when a shared contract changes; leave repository-wide coverage to pre-push unless the change is genuinely cross-cutting or the user requests it earlier.
+- **Package or script behavior:** run the owning Vitest file or focused test name. Add adjacent package tests when a shared contract changes; leave repository-wide coverage to CI unless the change is genuinely cross-cutting or the user requests it.
 - **Documentation, Agent Notes, catalogs, or doc-linked comments:** run `pnpm run doc-sync`; run full lint when the documentation workflow requires it.
 - **Model-, editor-, CLI-, or terminal-visible output:** run the focused keyless snapshot or real runnable-example scenario that owns the output.
 - **Package manifests, public exports, build configuration, worker/bin entries, or built runtime paths:** run `pnpm run build`, the relevant hygiene checks, and the owning built-artifact smoke.
 - **Real provider or agent behavior:** run the relevant `pnpm run test:e2e` target when credentials are available; never print secrets.
 
-Do not manually repeat a passing check merely because commit or push follows. In particular, do not run `check:pre-push` immediately before a normal push and then repeat the same aggregate in the hook.
+Do not manually repeat a passing check merely because commit or push follows. In particular, do not run typecheck immediately before pushing solely to duplicate the pre-push hook.
 
 ### Focus unit coverage on the affected source
 
@@ -60,19 +60,13 @@ pnpm exec vitest related packages/<group>/<package>/src/<changed>.ts \
 
 `vitest related` cannot discover behavior reached only through configuration, dynamic loading, subprocesses, workers, built artifacts, or external providers; select those owning tests explicitly. Do not use `--passWithNoTests`, lower coverage thresholds, or narrow `--coverage.include` merely to hide an uncovered affected file. If a selected package scope fails because one focused test does not cover it, add its other relevant owning tests or narrow the source scope only when the excluded modules cannot be affected by the change.
 
-## Mandatory publication gate
+## Full local rehearsal
 
-The normal push runs the complete keyless primary Node inventory through Lefthook:
-
-```sh
-pnpm run check:pre-push
-```
-
-Invoke the command directly only when the user requests a rehearsal independent of publication or when diagnosing the hook itself. Add the relevant `pnpm run test:e2e` target when credentials are available and behavior depends on a real provider; real-API e2e is not part of the keyless primary inventory.
+Run the complete local approximation only when the user explicitly requests it, while diagnosing a CI failure, or when the change spans the repository so broadly that no narrower set is credible. Use the current workflow and package scripts as the inventory; do not recreate the removed `check:pre-push` aggregate.
 
 ## Handle failures
 
-If a relevant check or the publication gate fails, stop and fix or explain the blocker. Do not push and hope CI differs.
+If a relevant check fails, stop and fix or explain the blocker. Do not push and hope CI differs.
 
 If a failure looks environment-specific, prove it:
 
@@ -83,9 +77,9 @@ If a failure looks environment-specific, prove it:
 
 ## Push procedure
 
-1. Run the selected focused checks once during implementation.
+1. Run the selected relevant checks once.
 2. Commit normally and inspect any files changed by the pre-commit fixer before continuing.
-3. Push normally so the complete primary Node hook runs once.
+3. Push normally so the incremental typecheck hook runs.
 4. Verify the remote ref matches local `HEAD`.
 
 ```sh
