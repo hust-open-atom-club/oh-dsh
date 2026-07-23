@@ -16,7 +16,7 @@ Status: implemented
 
 `LlmAdapter.resolveModelContext(provider, model)` 可以为一条精确路由返回 `LlmModelContext`。`LlmService.resolveModelContext()` 选择已注册的路由所属方，验证 `contextWindow` 为正整数，并返回分离值。该查询独立于 `listModels()`：不在目录中的动态模型也可以拥有容量元数据，而 `undefined` 只表示适配器无法描述容量。
 
-手写 DeepSeek 适配器允许每个已配置模型提供可选 `contextWindow`。两个默认模型项都公开 128,000 token；未提供容量的显式模型项与未列出的透传 id 返回 `undefined`。pi-ai 适配器从同一个目录描述符解析容量，该描述符也用于权威解析请求模型。
+手写 DeepSeek 适配器允许每个已配置模型提供可选 `contextWindow`，并支持适配器级 `defaultContextWindow`。精确模型容量优先；未提供容量的模型项与未列出的透传 id 会继承适配器默认值，若默认值也不存在则返回 `undefined`。两个内置模型项都公开精确的 128,000 token 容量。pi-ai 适配器从同一个目录描述符解析容量，该描述符也用于权威解析请求模型。
 
 ### Token 计量保持模型无关
 
@@ -36,7 +36,7 @@ Compact-basic 拥有消费方策略。顶层字段定义默认值；`modelPolici
 
 ## 测试
 
-服务测试覆盖分离上下文元数据、无效适配器输出、目录独立性与默认缺失行为。适配器测试覆盖 DeepSeek 的配置值、默认值与未列出行为，以及 pi-ai 的精确描述符解析。压缩测试覆盖比例缩放、精确提供方/模型覆盖、加载期拒绝无效合并比例、运行时校验绝对预算、相同模型 id 的提供方切换、目标专用警告抑制与不依赖容量的溢出恢复。Loader fixture 会拒绝已经移除的 token-meter 容量设置，示例则在适配器上配置容量。
+服务测试覆盖分离上下文元数据、无效适配器输出、目录独立性与默认缺失行为。适配器测试覆盖 DeepSeek 的精确容量、默认容量、未列出模型解析及无效容量，以及 pi-ai 的精确描述符解析。压缩测试覆盖比例缩放、精确提供方/模型覆盖、加载期拒绝无效合并比例、运行时校验绝对预算、相同模型 id 的提供方切换、目标专用警告抑制与不依赖容量的溢出恢复。Loader fixture 会拒绝已经移除的 token-meter 容量设置，示例则在适配器上配置容量。
 
 ## 考虑过的替代方案
 
@@ -51,7 +51,7 @@ Compact-basic 拥有消费方策略。顶层字段定义默认值；`modelPolici
 - 容量在提供方 seam 上拥有唯一权威归属方，而压缩策略留在可选消费插件中。
 - 同一个 compact-basic 实例无需查询发现元数据，就能安全处理不同窗口、提供方切换，以及不同提供方下的相同模型 id。
 - 仅 LLM 与仅 meter 的组合仍然有效；加载 compact-basic 不会让适配器产生反向依赖。
-- 使用显式 DeepSeek 模型列表的部署必须为需要主动压力检查的条目提供 `contextWindow`。系统会暴露缺失元数据，而不是静默应用错误的全局回退值。
+- DeepSeek 部署可以设置精确的逐模型容量，也可以让未提供容量的模型项与未列出的透传 id 使用 `defaultContextWindow`。
 - 比例默认值会随模型自然缩放，同时仍可按精确目标使用绝对保留值，以满足部署专用行为。
 
 本记录取代[回放式 token 计量服务 Agent Note](2026-07-15-replay-token-meter-service.md) 中的全局容量与无模型策略部分，单折叠计量决策保持不变。
