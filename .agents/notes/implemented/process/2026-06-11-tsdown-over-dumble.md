@@ -15,7 +15,7 @@ Replace dumble with **tsdown** (rolldown-based, ~2.5M downloads/week, VoidZero-b
 - Root `tsdown.config.ts` with `workspace: ['vendor/*', 'packages/*/*']` (explicit globs keep bundling to vendored Cordis and the TypeScript package tree; `workspace: true` would also discover example manifests and non-bundled workspace members).
 - Shared shape: entry `lib/types/index.js`, `outDir: 'lib'`, ESM, `platform: node`, `target: es2024`, `fixedExtension: false` (keeps `.js` for `"type": "module"` packages), `dts: false` (tsc -b owns declarations), `clean: false` (lib/ also holds TSC's `lib/types` intermediate tree). The entry was originally `src/index.ts`; the [TSC-first build Agent Note](2026-06-17-ts-build-config.md) later moved tsdown to bundling TSC-emitted JS so TypeScript transform behavior comes from one compiler.
 - Two per-package overrides in vendor/ (ours, like the regenerated tsconfigs; logged in vendor/README.md): schemastery (dual `.mjs`/`.cjs` via `outExtensions`), logger-console (two single-entry passes so the shared base class is inlined into each entry instead of a hash-named chunk, matching upstream's published shape).
-- `scripts/build.ts` deleted; `pnpm run build` = `tsc -b tsconfig.build.json && tsdown`.
+- `scripts/build.ts` deleted; `pnpm run build` = `tsc -b && tsdown` (the root solution owns the emit graph).
 
 ## Alternatives considered
 
