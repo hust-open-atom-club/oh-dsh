@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-07-22-fast-local-git-hooks.md) | 中文
 
+> **pre-push 部分已被取代：**[推送前本地运行主 CI](2026-07-23-local-primary-ci-before-push.md)以精确的主 CI 清单取代仅运行类型检查的发布检查点。快速 pre-commit 的决策继续有效；下文的 pre-push 设计记录了本仓库不再采用的策略。
+
 ## 问题
 
 agent（智能体）已经会运行能够覆盖自身改动的测试和检查，而提交、推送与 CI 可能分别重复其中范围越来越广的子集。因此，全量 pre-push 套件会拖慢每次推送，放大与当前改动无关的本地偶发失败，而且 CI 紧接着再次运行完整矩阵时不会提供新信号。
