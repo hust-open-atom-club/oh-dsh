@@ -6,15 +6,15 @@ English | [中文](2026-07-22-collapsed-sidebar-control-rail.zh.md)
 
 ## Problem
 
-The sidebar close action persisted `open: false`, and the layout mapped that preference to a zero-width grid track. The only sidebar toggle and the settings entry both lived inside that clipped track, so closing the sidebar removed every visible recovery control. Reloading preserved the closed preference and reproduced the lockout.
+The sidebar close action persisted a zero width preference, and the layout mapped that preference to a zero-width grid track. The only sidebar toggle and the settings entry both lived inside that clipped track, so closing the sidebar removed every visible recovery control. Reloading preserved the closed preference and reproduced the lockout.
 
 ## Decision
 
-The layout maps a closed sidebar to the fixed `SIDEBAR_COLLAPSED` width of 60px: one 28px icon control between the sidebar's 16px horizontal paddings. The compact rail participates in the concession solver and retains its right border, while the stored expanded width remains untouched.
+The layout maps a closed sidebar (persisted width `0`) to the fixed `SIDEBAR_COLLAPSED` width of 60px: one 28px icon control between the sidebar's 16px horizontal paddings. The compact rail participates in the concession solver and retains its right border, while the stored expanded width remains untouched.
 
-`AppFrame` marks the sidebar collapsed from the persisted `open` preference rather than from a zero resolved width. It keeps the sidebar slot mounted but removes the resize handle while collapsed.
+`AppFrame` marks the sidebar collapsed from the persisted width preference rather than from the resolved track width, removes the resize handle while collapsed, and passes `collapsed` to the sidebar slot as owner props from the render site.
 
-`SidebarRoot` subscribes to the derived open boolean. Its collapsed render removes the brand, creation controls, search, and session tree from the rendered and accessibility trees; the top control changes to `Expand sidebar`, and the bottom `Settings` control remains in the rail.
+`SidebarRoot` reads the owner `collapsed` prop. Its collapsed render removes the brand, creation controls, search, and session tree from the rendered and accessibility trees — the body component unmounts, dropping its sessions subscription; the top control changes to `Expand sidebar`, and the bottom `Settings` control remains in the rail.
 
 ## Alternatives considered
 
