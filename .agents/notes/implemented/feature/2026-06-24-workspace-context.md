@@ -12,7 +12,7 @@ The lifecycle has two distinct classes of content. The initial applicable chain 
 
 ## Decision
 
-The implementation lives in `packages/context/workspace-context` as `@deepseek-ai/dsh-workspace-context`. It is a request-context extension, not a core service or a filesystem backend. `@deepseek-ai/dsh-agent-core` mounts it for both product front doors and forwards its config. The plugin consumes `agent/session-prefix`, `tools/post-execute`, and the optional `ctx.fs` capability.
+The implementation lives in `packages/context/workspace-context` as `@deepseek-ai/dsh-workspace-context`. It is a request-context extension, not a core service or a filesystem backend. The shared demo spine and Host Runtime mount it from an explicit `{ maxBytes } | false` deployment choice; `dsh web` enables a 65,536-byte budget while the Host Runtime's headless consumer disables it. The plugin consumes `agent/session-prefix`, `tools/post-execute`, and the optional `ctx.fs` capability.
 
 The plugin does not statically inject `fs`. Providerless product trees therefore boot normally and the plugin no-ops until a filesystem provider exists. All production reads go through that provider. Candidate probes resolve each path and stat the result, so a final-component symlink is followed to its target: a link to a regular file loads, while a missing path or a non-file target is a confirmed absence. Following repository-owned links across the trust boundary is a deliberate reversal of the original no-follow probe; the [instruction-symlink follow note](2026-07-21-follow-instruction-symlinks.md) owns that decision and its residual risk. The session-prefix signal and dynamic tool execution signal propagate through resolution, metadata probes, and streaming reads, so cancellation does not wait for an unrelated filesystem scan. A resolve or stat exception is classified as unavailable: it skips only that candidate and is never interpreted as the deletion of an already-loaded scope.
 
@@ -76,7 +76,7 @@ There is intentionally no watcher. Detection occurs at the next successful struc
 
 ## Consequences
 
-Workspace guidance is isolated per session and shared by both product front doors and every tool presentation mode. Initial instructions benefit from stable prefix caching, while nested and changed content remains durable and replayable. The generic session/agent context contract carries JSON metadata propagated through prompt-submit and post-tool `additionalContexts` arrays without flattening entries.
+Workspace guidance is isolated per session and shared by the demo front doors, Web Host, and every tool presentation mode. Initial instructions benefit from stable prefix caching, while nested and changed content remains durable and replayable. The generic session/agent context contract carries JSON metadata propagated through prompt-submit and post-tool `additionalContexts` arrays without flattening entries.
 
 Repository text remains untrusted input. Lower-authority user-role framing, explicit precedence language, and delimiter escaping reduce risk but do not eliminate prompt injection. Following a candidate symlink to its target widens that surface to off-tree content, so the permission and sandbox layers that confine `ctx.fs` to trusted roots are the boundary that treats workspace files as data rather than authority (the [instruction-symlink follow note](2026-07-21-follow-instruction-symlinks.md) owns the residual risk).
 
