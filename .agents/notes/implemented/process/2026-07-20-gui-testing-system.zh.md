@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 路径更新（2026-07-22，插件体系重构）：本文三层理念与金路径方法仍为现行；家搬了——对象层 spec 现居 `packages/client/runtime/tests/`（原 web-runtime）、wire spec 现居 `packages/client/connection/tests/`，`web-ui` 覆盖豁免随包消亡（组件 spec 为各 `packages/client/*/tests/` 的 jsdom 套件）。测试体系现行权威：`missions/tasks/20260721-1520-web-plugin-rfc/architecture.md` §18。
+> 路径更新（2026-07-22，插件体系重构）：本文三层理念与金路径方法仍为现行；家搬了——对象层 spec 现居 `packages/client/runtime/tests/`（原 web-runtime）、wire spec 现居 `packages/client/connection/tests/`，`web-ui` 覆盖豁免随包消亡（组件 spec 为各 `packages/client/*/tests/` 的 jsdom 套件）。组件 spec 形态遵循 [slot 体系标准](../architecture/2026-07-22-slot-type-chain-implementation.md)：props 直喂——store 份额来自 `createXXXStore().create()`（真引擎，获认可的零机械路径），框架 hook 用普通桩；无渲染机械、不挂 provider。坑位归属/注册表语义归 2 层地界（`runtime` + `ui-slots` 套件），不归组件 spec。
 
 [English](2026-07-20-gui-testing-system.md) | 中文
 

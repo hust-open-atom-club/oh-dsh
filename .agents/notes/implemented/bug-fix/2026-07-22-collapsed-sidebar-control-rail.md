@@ -10,11 +10,11 @@ The sidebar close action persisted a zero width preference, and the layout mappe
 
 ## Decision
 
-The layout maps a closed sidebar (persisted width `0`) to the fixed `SIDEBAR_COLLAPSED` width of 60px: one 28px icon control between the sidebar's 16px horizontal paddings. The compact rail participates in the concession solver and retains its right border, while the stored expanded width remains untouched.
+The layout maps a closed sidebar (persisted width `0`) to the fixed `SIDEBAR_COLLAPSED` width of 56px: a 24px icon column between the sidebar's 16px horizontal paddings. The compact rail participates in the concession solver and retains its right border, while the stored expanded width remains untouched.
 
-`AppFrame` marks the sidebar collapsed from the persisted width preference rather than from the resolved track width, removes the resize handle while collapsed, and passes `collapsed` to the sidebar slot as owner props from the render site.
+`AppFrame` marks the sidebar collapsed from the persisted width preference rather than from the resolved track width, removes the resize handle while collapsed, and passes `collapsed` to the sidebar slot as owner props from the render site. Collapse and expand animate: the frame transitions `grid-template-columns` (and the remaining handle its `left`) on the deepsuite sider curve — `--ds-ease-in-out` over `--ds-transition-duration-slow`, both supplied by ui-theme's base sheet; transitions pause during drags and under `prefers-reduced-motion`.
 
-`SidebarRoot` reads the owner `collapsed` prop. Its collapsed render removes the brand, creation controls, search, and session tree from the rendered and accessibility trees — the body component unmounts, dropping its sessions subscription; the top control changes to `Expand sidebar`, and the bottom `Settings` control remains in the rail.
+`SidebarRoot` reads the owner `collapsed` prop. Its collapsed render is the rail: expand toggle, new session, search, and new workspace icons (each aligned with its expanded counterpart's behavior — the search icon expands the sidebar and focuses the search box) plus the `Settings` foot. The brand, capsule button, search field, and session tree leave the rendered and accessibility trees — the body component unmounts, dropping its sessions subscription.
 
 ## Alternatives considered
 
@@ -24,6 +24,6 @@ The layout maps a closed sidebar (persisted width `0`) to the fixed `SIDEBAR_COL
 
 ## Consequences
 
-- A collapsed sidebar reserves 60px instead of yielding the entire width to the center column. Expanding restores the persisted width and drag behavior.
+- A collapsed sidebar reserves 56px instead of yielding the entire width to the center column. Expanding restores the persisted width and drag behavior.
 - The settings entry remains visible but retains its existing placeholder behavior; this change does not introduce an account or settings screen.
 - Layout solver tests pin the compact width, sidebar component tests pin the visible controls, and the keyless real-bundle web smoke test pins collapse and recovery through the assembled client.
