@@ -41,6 +41,7 @@ void app.whenReady().then(async () => {
   })
   const startedAt = Date.now()
   let settled = false
+  let lastNavigationError
 
   const settle = error => {
     if (settled) return
@@ -121,28 +122,27 @@ void app.whenReady().then(async () => {
     })()`)
       if (state.ready === true && state.navigation !== null) {
         if (state.navigation.delta > 0.5) {
-          settle(new Error(
+          lastNavigationError = new Error(
             'Plugins and Settings icons are not aligned: '
             + JSON.stringify(state.navigation),
-          ))
-          return
-        }
-        if (state.navigation.artworkDelta > 1) {
-          settle(new Error(
+          )
+        } else if (state.navigation.artworkDelta > 1) {
+          lastNavigationError = new Error(
             'Plugins and Settings icons are not optically sized: '
             + JSON.stringify(state.navigation),
-          ))
+          )
+        } else {
+          settle()
           return
         }
-        settle()
-        return
       }
       if (state.body.includes('Failed to load plugins')) {
         settle(new Error(state.body.trim()))
         return
       }
       if (Date.now() - startedAt >= timeoutMs) {
-        settle(new Error(`DSH Chromium client graph timed out:\n${state.body.trim()}`))
+        settle(lastNavigationError
+          ?? new Error(`DSH Chromium client graph timed out:\n${state.body.trim()}`))
         return
       }
     } catch (error) {
