@@ -52,6 +52,7 @@
     "install:mac": "node scripts/install-mac.mjs",
     "start": "pnpm run build && pnpm run stage:dsh && electron .",
     "check:screenshot": "electron scripts/check-screenshot-corners.cjs assets/oh-dsh-desktop-ui.png",
+    "generate:portable-splash": "electron scripts/generate-portable-splash.cjs --disable-gpu",
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "dist:mac": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-mac.mjs",
@@ -175,7 +176,8 @@
       "perMachine": false
     },
     "portable": {
-      "artifactName": "Oh-DSH-Desktop-${version}-windows-${arch}-portable.${ext}"
+      "artifactName": "Oh-DSH-Desktop-${version}-windows-${arch}-portable.${ext}",
+      "splashImage": "assets/portable-splash.bmp"
     },
     "dmg": {
       "title": "Oh-DSH-Desktop ${version}",

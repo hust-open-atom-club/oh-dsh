@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="background" x1="42" y1="18" x2="598" y2="342" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#69A8FF"/>
+      <stop offset="0.52" stop-color="#3478F0"/>
+      <stop offset="1" stop-color="#1E4AC7"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="205" y1="80" x2="475" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#12398F" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <rect width="640" height="360" fill="url(#background)"/>
+  <circle cx="585" cy="32" r="210" fill="#FFFFFF" opacity="0.055"/>
+  <circle cx="515" cy="332" r="235" fill="url(#glow)"/>
+
+  <g transform="translate(52 92) scale(.205)" filter="url(#shadow)">
+    <path d="M226 544c70-114 177-178 304-178 65 0 128 17 184 49 28-17 55-46 75-85 17 57 9 108-24 152 8 27 12 56 12 86 0 145-120 251-286 251-140 0-250-74-287-187 55 49 126 73 213 73 99 0 171-28 217-84-55 27-117 39-185 36-103-5-181-43-233-113z" fill="#FFFFFF"/>
+    <path d="M297 482c50-95 133-143 249-143-40 22-72 55-97 98-60 2-110 17-152 45z" fill="#DCEAFF"/>
+    <circle cx="646" cy="487" r="17" fill="#2557D6"/>
+    <path d="M747 495c45-7 78-28 100-62-3 59-32 97-86 114z" fill="#FFFFFF"/>
+  </g>
+
+  <g fill="#FFFFFF" font-family="Segoe UI, Microsoft YaHei UI, sans-serif">
+    <text x="248" y="123" font-size="28" font-weight="650" letter-spacing="-.4">Oh-DSH-Desktop</text>
+    <text x="249" y="159" font-size="17" font-weight="600">正在准备应用…</text>
+    <text x="249" y="184" font-size="14" opacity=".9">Preparing the application…</text>
+    <path d="M249 209h300" stroke="#FFFFFF" stroke-opacity=".22"/>
+    <text x="249" y="240" font-size="13" opacity=".92">正在解压，可能需要几分钟，请勿重复运行。</text>
+    <text x="249" y="263" font-size="12" opacity=".72">Extracting files. This may take a few minutes.</text>
+    <text x="249" y="283" font-size="12" opacity=".72">Please do not launch the app again.</text>
+  </g>
+</svg>

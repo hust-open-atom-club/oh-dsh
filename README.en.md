@@ -94,8 +94,11 @@ xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.1-arm64.dmg
 Linux x64 source builds are supported, but the first AppImage / deb release
 has not been published yet. It will appear on the same Releases page.
 
-Windows x64 provides an NSIS installer and a portable EXE. Current test builds
-are not Authenticode-signed, so first launch may show a SmartScreen warning.
+Windows x64 provides an NSIS installer and a portable EXE; the installer is
+recommended for regular use. The portable EXE extracts its bundled runtime on
+every launch and shows a preparation screen while doing so. This can take a few
+minutes; do not launch it again. Current test builds are not Authenticode-signed,
+so first launch may show a SmartScreen warning.
 
 ### Run from source
 

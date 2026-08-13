@@ -94,8 +94,9 @@ Linux 运行数据位于 `~/.config/Oh-DSH-Desktop/dsh`，DeepSeek API key 可�
 
 #### Windows
 
-Windows x64 提供 NSIS 安装器和免安装 portable EXE。当前测试包未进行
-Authenticode 签名，首次启动可能显示 SmartScreen 提示。
+Windows x64 提供 NSIS 安装器和免安装 portable EXE；日常使用推荐安装器。
+portable 每次启动都需要先解压内置运行时，期间会显示准备画面，可能需要几分钟，
+请勿重复运行。当前测试包未进行 Authenticode 签名，首次启动可能显示 SmartScreen 提示。
 
 ### 从源码运行
 
