@@ -11,6 +11,7 @@ import {
   readFileSync,
   readlinkSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -36,9 +37,15 @@ const nodeArch = process.env.DSH_DESKTOP_NODE_ARCH
   ?? { arm64: 'arm64', x64: 'x64' }[process.arch]
   ?? process.arch
 const nodeFolder = `node-v${nodeVersion}-${nodePlatform}-${nodeArch}`
-const nodeArchiveName = `${nodeFolder}.tar.gz`
+const nodeArchiveName = `${nodeFolder}.${nodePlatform === 'win' ? 'zip' : 'tar.gz'}`
 const nodeArchive = join(cache, nodeArchiveName)
 const nodeCache = join(cache, nodeFolder)
+const nodeBinaryRelative = nodePlatform === 'win' ? 'node.exe' : join('bin', 'node')
+const pnpmTarget = nodePlatform === 'win'
+  ? join(nodeRuntime, 'node_modules', 'pnpm')
+  : join(nodeRuntime, 'lib', 'node_modules', 'pnpm')
+const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec ?? 'cmd.exe' : 'pnpm'
+const pnpmArguments = process.platform === 'win32' ? ['/d', '/s', '/c', 'pnpm.cmd'] : []
 
 if (!existsSync(join(dshSource, 'apps', 'web', 'dist', 'index.html'))
   || !existsSync(join(dshSource, 'apps', 'cli', 'lib', 'bin.js'))) {
@@ -54,12 +61,22 @@ function run(command, args, options = {}) {
 }
 
 function download(url, target) {
-  const temporary = `${target}.download-${String(process.pid)}`
-  rmSync(temporary, { force: true })
-  run('curl', ['--fail', '--location', '--silent', '--show-error', url, '--output', temporary])
+  const temporary = `${target}.download`
+  const args = [
+    '--fail', '--location', '--silent', '--show-error',
+    '--retry', '3', '--retry-delay', '2', '--retry-all-errors',
+    url, '--output', temporary,
+  ]
+  try {
+    run('curl', ['--continue-at', '-', ...args])
+  } catch (error) {
+    if (!existsSync(temporary)) throw error
+    console.warn(`Resumable download failed; retrying ${url} from the beginning`)
+    rmSync(temporary, { force: true })
+    run('curl', args)
+  }
   rmSync(target, { force: true })
-  writeFileSync(target, readFileSync(temporary))
-  rmSync(temporary, { force: true })
+  renameSync(temporary, target)
 }
 
 function sha256(path) {
@@ -68,7 +85,9 @@ function sha256(path) {
 
 function ensureNodeRuntime() {
   mkdirSync(cache, { recursive: true })
-  const base = `https://nodejs.org/dist/v${nodeVersion}`
+  const nodeMirror = (process.env.DSH_DESKTOP_NODE_MIRROR ?? 'https://nodejs.org/dist')
+    .replace(/\/$/, '')
+  const base = `${nodeMirror}/v${nodeVersion}`
   const sumsPath = join(cache, `SHASUMS256-v${nodeVersion}.txt`)
   if (!existsSync(nodeArchive)) download(`${base}/${nodeArchiveName}`, nodeArchive)
   if (!existsSync(sumsPath)) download(`${base}/SHASUMS256.txt`, sumsPath)
@@ -80,11 +99,11 @@ function ensureNodeRuntime() {
   if (actual !== expected) {
     throw new Error(`Node archive checksum mismatch: expected ${expected}, received ${actual}`)
   }
-  if (!existsSync(join(nodeCache, 'bin', 'node'))) {
+  if (!existsSync(join(nodeCache, nodeBinaryRelative))) {
     const extraction = join(cache, `.node-extract-${String(process.pid)}`)
     rmSync(extraction, { recursive: true, force: true })
     mkdirSync(extraction, { recursive: true })
-    run('tar', ['-xzf', nodeArchive, '-C', extraction])
+    run('tar', [nodePlatform === 'win' ? '-xf' : '-xzf', nodeArchive, '-C', extraction])
     rmSync(nodeCache, { recursive: true, force: true })
     cpSync(join(extraction, nodeFolder), nodeCache, {
       recursive: true,
@@ -93,13 +112,15 @@ function ensureNodeRuntime() {
     })
     rmSync(extraction, { recursive: true, force: true })
   }
-  for (const [name, target] of [
-    ['npm', '../lib/node_modules/npm/bin/npm-cli.js'],
-    ['npx', '../lib/node_modules/npm/bin/npx-cli.js'],
-  ]) {
-    const launcher = join(nodeCache, 'bin', name)
-    rmSync(launcher, { force: true })
-    symlinkSync(target, launcher)
+  if (nodePlatform !== 'win') {
+    for (const [name, target] of [
+      ['npm', '../lib/node_modules/npm/bin/npm-cli.js'],
+      ['npx', '../lib/node_modules/npm/bin/npx-cli.js'],
+    ]) {
+      const launcher = join(nodeCache, 'bin', name)
+      rmSync(launcher, { force: true })
+      symlinkSync(target, launcher)
+    }
   }
   rmSync(nodeRuntime, { recursive: true, force: true })
   cpSync(nodeCache, nodeRuntime, {
@@ -107,13 +128,12 @@ function ensureNodeRuntime() {
     preserveTimestamps: true,
     verbatimSymlinks: true,
   })
-  chmodSync(join(nodeRuntime, 'bin', 'node'), 0o755)
+  if (nodePlatform !== 'win') chmodSync(join(nodeRuntime, nodeBinaryRelative), 0o755)
 
   const pnpmSource = join(root, 'node_modules', 'pnpm')
   if (!existsSync(join(pnpmSource, 'dist', 'pnpm.mjs'))) {
     throw new Error('pnpm package is missing; run pnpm install before staging')
   }
-  const pnpmTarget = join(nodeRuntime, 'lib', 'node_modules', 'pnpm')
   rmSync(pnpmTarget, { recursive: true, force: true })
   mkdirSync(pnpmTarget, { recursive: true })
   for (const name of ['bin', 'dist']) {
@@ -125,10 +145,20 @@ function ensureNodeRuntime() {
   for (const name of ['LICENSE', 'package.json']) {
     copyFileSync(join(pnpmSource, name), join(pnpmTarget, name))
   }
-  const pnpmBinary = join(nodeRuntime, 'bin', 'pnpm')
-  rmSync(pnpmBinary, { force: true })
-  symlinkSync('../lib/node_modules/pnpm/bin/pnpm.mjs', pnpmBinary)
-  chmodSync(join(pnpmTarget, 'bin', 'pnpm.mjs'), 0o755)
+  if (nodePlatform === 'win') {
+    for (const [name, entry] of [['pnpm', 'pnpm.cjs'], ['pnpx', 'pnpx.cjs']]) {
+      writeFileSync(join(nodeRuntime, `${name}.cmd`), [
+        '@ECHO OFF',
+        `"%~dp0node.exe" "%~dp0node_modules\\pnpm\\bin\\${entry}" %*`,
+        '',
+      ].join('\r\n'))
+    }
+  } else {
+    const pnpmBinary = join(nodeRuntime, 'bin', 'pnpm')
+    rmSync(pnpmBinary, { force: true })
+    symlinkSync('../lib/node_modules/pnpm/bin/pnpm.mjs', pnpmBinary)
+    chmodSync(join(pnpmTarget, 'bin', 'pnpm.mjs'), 0o755)
+  }
 }
 
 function shouldCopyWorkspaceEntry(sourceRoot, source) {
@@ -143,6 +173,7 @@ function shouldCopyWorkspaceEntry(sourceRoot, source) {
 
 const copiedTargets = new Map()
 const deployedPackageTargets = new Map()
+const copiedWindowsWorkspacePackages = new Set()
 let sourcePackages
 
 function isWithin(parent, candidate) {
@@ -316,6 +347,37 @@ function runtimePackageDirectory(name) {
   return join(runtime, 'node_modules', ...name.split('/'))
 }
 
+function stageWindowsWorkspacePackage(name) {
+  if (copiedWindowsWorkspacePackages.has(name)) return runtimePackageDirectory(name)
+  const source = discoverSourcePackages().get(name)
+  if (source === undefined) return undefined
+  copiedWindowsWorkspacePackages.add(name)
+  const target = runtimePackageDirectory(name)
+  rmSync(target, { recursive: true, force: true })
+  mkdirSync(dirname(target), { recursive: true })
+  cpSync(source, target, {
+    recursive: true,
+    preserveTimestamps: true,
+    filter: candidate => shouldCopyWorkspaceEntry(source, candidate),
+  })
+  const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+  for (const dependency of new Set([
+    ...Object.keys(manifest.dependencies ?? {}),
+    ...Object.keys(manifest.optionalDependencies ?? {}),
+    ...Object.keys(manifest.peerDependencies ?? {}),
+  ])) {
+    stageWindowsWorkspacePackage(dependency)
+  }
+  return target
+}
+
+function stageWindowsWorkspaceDependencies() {
+  const manifest = JSON.parse(readFileSync(join(runtime, 'package.json'), 'utf8'))
+  for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+    stageWindowsWorkspacePackage(dependency)
+  }
+}
+
 function resolveDependencyManifest(requireFromPackage, dependency) {
   try {
     return requireFromPackage.resolve(`${dependency}/package.json`)
@@ -380,17 +442,26 @@ function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
 
 function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) {
   const manifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
-  const sourcePackages = discoverSourcePackages()
+  const sourcePackages = process.platform === 'win32' ? undefined : discoverSourcePackages()
   for (const dependency of manifest.ohDsh?.hostDependencies ?? []) {
-    const source = sourcePackages.get(dependency)
-    if (source === undefined) {
+    const source = sourcePackages?.get(dependency)
+    if (process.platform !== 'win32' && source === undefined) {
       throw new Error(`${manifest.name} cannot resolve DSH peer ${dependency}`)
     }
-    const target = stageWorkspaceTarget(source)
+    const target = process.platform === 'win32'
+      ? stageWindowsWorkspacePackage(dependency)
+      : stageWorkspaceTarget(source)
+    if (target === undefined || !existsSync(target)) {
+      throw new Error(`${manifest.name} cannot resolve deployed DSH peer ${dependency}`)
+    }
     const link = join(packageDir, 'node_modules', ...dependency.split('/'))
     mkdirSync(dirname(link), { recursive: true })
     rmSync(link, { recursive: true, force: true })
-    symlinkSync(relative(dirname(link), target), link)
+    if (process.platform === 'win32') {
+      cpSync(target, link, { dereference: true, preserveTimestamps: true, recursive: true })
+    } else {
+      symlinkSync(relative(dirname(link), target), link)
+    }
   }
 }
 
@@ -537,29 +608,43 @@ for (const required of [
   }
 }
 
+const windowsStage = process.platform === 'win32'
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
-run('pnpm', [
+run(pnpmCommand, [...pnpmArguments,
+  ...(windowsStage
+    ? ['--config.node-linker=hoisted', '--config.confirm-modules-purge=false']
+    : []),
   '--ignore-scripts',
   '--filter', '@deepseek-ai/dsh',
   'deploy', '--prod', '--legacy', runtime,
 ], { cwd: dshSource, env: process.env })
 
-rewriteWorkspaceLinks()
-relinkInstallationWorkspacePackages()
+if (windowsStage) {
+  stageWindowsWorkspaceDependencies()
+} else {
+  rewriteWorkspaceLinks()
+  relinkInstallationWorkspacePackages()
+}
 installDesktopPackages()
 copyFileSync(join(dshSource, 'THIRD_PARTY_NOTICES.md'), join(runtime, 'THIRD_PARTY_NOTICES.md'))
-restoreExecutableHelpers()
-assertSelfContained(runtime, 'DSH runtime')
+if (!windowsStage) {
+  restoreExecutableHelpers()
+  assertSelfContained(runtime, 'DSH runtime')
+}
 ensureNodeRuntime()
-assertSelfContained(nodeRuntime, 'Node runtime')
+if (!windowsStage) assertSelfContained(nodeRuntime, 'Node runtime')
 ensureLinuxPtyBuild()
 
-run(join(nodeRuntime, 'bin', 'node'), [join(runtime, 'lib', 'bin.js'), '--version'], {
+const stagedNode = join(nodeRuntime, nodeBinaryRelative)
+run(stagedNode, [join(runtime, 'lib', 'bin.js'), '--version'], {
   cwd: runtime,
   env: { ...process.env, DSH_HOME: join(stage, 'smoke-home') },
 })
-run(join(nodeRuntime, 'bin', 'pnpm'), ['--version'], { cwd: runtime, env: process.env })
+run(stagedNode, [join(pnpmTarget, 'bin', 'pnpm.cjs'), '--version'], {
+  cwd: runtime,
+  env: process.env,
+})
 
 console.log(`Staged DSH runtime: ${runtime}`)
 console.log(`Staged Node ${nodeVersion}: ${nodeRuntime}`)

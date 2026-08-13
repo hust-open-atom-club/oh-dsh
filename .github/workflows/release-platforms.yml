@@ -1,0 +1,116 @@
+name: Native release builds
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-platforms.yml'
+      - 'assets/**'
+      - 'plugins/**'
+      - 'scripts/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'cordis.patch.yml'
+      - 'dsh-source.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - run: pnpm install --frozen-lockfile --config.auto-install-peers=true
+      - run: pnpm run typecheck
+      - run: pnpm test
+
+  native-release:
+    needs: checks
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifacts: |
+              release/*.AppImage
+              release/*.deb
+          - os: windows-latest
+            platform: win
+            artifacts: |
+              release/*-setup.exe
+              release/*-portable.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - uses: actions/cache@v5
+        with:
+          path: |
+            .cache
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: native-${{ runner.os }}-${{ hashFiles('dsh-source.json', 'pnpm-lock.yaml') }}
+      - run: pnpm install --frozen-lockfile --config.auto-install-peers=true
+      - run: pnpm run dist:${{ matrix.platform }}
+      - name: Smoke Linux runtime and packaged app
+        if: matrix.platform == 'linux'
+        run: xvfb-run --auto-servernum pnpm run smoke:app:linux
+      - name: Smoke Windows runtime and packaged app
+        if: matrix.platform == 'win'
+        run: pnpm run smoke:app:win
+      - name: Verify Linux packages
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          test -x release/*.AppImage
+          dpkg-deb --info release/*.deb >/dev/null
+      - name: Verify Windows installer lifecycle
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path 'release/*-setup.exe').Path
+          $installRoot = Join-Path $env:RUNNER_TEMP 'Oh DSH Installed With Spaces'
+          $process = Start-Process -FilePath $installer -ArgumentList '/S', "/D=$installRoot" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "installer exited with $($process.ExitCode)" }
+          $app = Join-Path $installRoot 'Oh-DSH-Desktop.exe'
+          node scripts/smoke-packaged-app.mjs $app
+          $portable = (Resolve-Path 'release/*-portable.exe').Path
+          $env:DSH_DESKTOP_SMOKE_TIMEOUT_MS = '300000'
+          node scripts/smoke-packaged-app.mjs $portable
+          $uninstaller = Join-Path $installRoot 'Uninstall Oh-DSH-Desktop.exe'
+          $process = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "uninstaller exited with $($process.ExitCode)" }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: oh-dsh-desktop-${{ matrix.platform }}-x64
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error

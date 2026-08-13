@@ -109,6 +109,12 @@ function runtimeEnvironment(
     NODE_USE_ENV_PROXY: '1',
     PATH: runtimeSearchPath(paths),
   }
+  environment.NODE_PATH = [
+    join(paths.runtimeRoot, 'node_modules'),
+    process.env.NODE_PATH,
+  ].filter((entry): entry is string => entry !== undefined && entry !== '').join(
+    process.platform === 'win32' ? ';' : ':',
+  )
   if (overrides.preview !== undefined) {
     environment.DSH_DESKTOP_PREVIEW = '1'
     environment.DSH_DESKTOP_PREVIEW_PLUGIN = overrides.preview.pluginId
@@ -335,6 +341,7 @@ async function startRuntime(): Promise<void> {
   const url = await supervisor.start()
   runtimeUrl = url
   runtimeOrigin = url.origin
+  appendLog('desktop', `DSH runtime ready: ${url.href}`)
   if (mainWindow === undefined || mainWindow.isDestroyed()) mainWindow = createWindow()
   await mainWindow.loadURL(url.href)
   flushQueuedPaths()
@@ -678,6 +685,7 @@ function installIpc(): void {
 
 async function bootstrap(): Promise<void> {
   app.setName(PRODUCT_NAME)
+  if (process.platform === 'win32') app.setAppUserModelId('ai.deepseek.oh-dsh-desktop')
   app.setAboutPanelOptions({
     applicationName: PRODUCT_NAME,
     applicationVersion: app.getVersion(),

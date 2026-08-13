@@ -5,6 +5,7 @@
   "description": "An extensible DeepSeek Harness plugin collection and Electron desktop distribution",
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",
+  "packageManager": "pnpm@11.20.0",
   "private": true,
   "type": "module",
   "main": "dist/main.js",
@@ -46,7 +47,8 @@
     "check:plugins": "node scripts/smoke-runtime.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "smoke:app": "node scripts/smoke-runtime.mjs \"release/mac-arm64/Oh-DSH-Desktop.app/Contents/Resources\"",
-    "smoke:app:linux": "node scripts/smoke-runtime.mjs \"release/linux-unpacked/resources\"",
+    "smoke:app:linux": "node scripts/smoke-runtime.mjs \"release/linux-unpacked/resources\" && node scripts/smoke-packaged-app.mjs \"release/linux-unpacked/oh-dsh-desktop\"",
+    "smoke:app:win": "node scripts/smoke-runtime.mjs \"release/win-unpacked/resources\" && node scripts/smoke-packaged-app.mjs \"release/win-unpacked/Oh-DSH-Desktop.exe\"",
     "install:mac": "node scripts/install-mac.mjs",
     "start": "pnpm run build && pnpm run stage:dsh && electron .",
     "check:screenshot": "electron scripts/check-screenshot-corners.cjs assets/oh-dsh-desktop-ui.png",
@@ -55,7 +57,9 @@
     "dist:mac": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-mac.mjs",
     "dist:mac:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-mac.mjs",
     "dist:linux": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-linux.mjs",
-    "dist:linux:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-linux.mjs"
+    "dist:linux:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-linux.mjs",
+    "dist:win": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-windows.mjs",
+    "dist:win:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-windows.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
@@ -147,6 +151,31 @@
           ]
         }
       ]
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "Oh-DSH-Desktop-${version}-windows-${arch}-setup.${ext}",
+      "oneClick": true,
+      "perMachine": false
+    },
+    "portable": {
+      "artifactName": "Oh-DSH-Desktop-${version}-windows-${arch}-portable.${ext}"
     },
     "dmg": {
       "title": "Oh-DSH-Desktop ${version}",

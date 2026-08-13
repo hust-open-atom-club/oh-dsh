@@ -18,6 +18,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Linux x64" src="https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black">
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?logo=windows11&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
   <img alt="DSH 0.1.0-rc.5" src="https://img.shields.io/badge/DSH-0.1.0--rc.5-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
@@ -32,7 +33,7 @@
 
 Oh-DSH-Desktop keeps the DSH React UI and packages a pinned DSH runtime,
 Node.js, Electron, and local capabilities into a desktop application for
-macOS and Linux. Models still run in the cloud. The desktop owns the
+macOS, Linux, and Windows. Models still run in the cloud. The desktop owns the
 terminal, workspaces, Git, browser, window integration, and plugin
 lifecycle.
 
@@ -43,7 +44,7 @@ and ThemeService contracts.
 
 ## Capabilities
 
-- Self-contained Apple Silicon macOS and Linux x64 applications and installers.
+- Self-contained macOS arm64, Linux x64, and Windows x64 applications and installers.
 - Multi-tab PTY Terminal, commit/line Review, Browser, and Files.
 - Review comments attach to the message composer for direct Agent handling.
 - Pinned Summary, expandable Side Panel, and native window controls.
@@ -93,11 +94,14 @@ xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.1-arm64.dmg
 Linux x64 source builds are supported, but the first AppImage / deb release
 has not been published yet. It will appear on the same Releases page.
 
+Windows x64 provides an NSIS installer and a portable EXE. Current test builds
+are not Authenticode-signed, so first launch may show a SmartScreen warning.
+
 ### Run from source
 
-Requirements: macOS 12+ with Apple Silicon, or Linux x64, plus Node.js 24+,
-pnpm 11+. macOS additionally needs Xcode Command Line Tools; Linux needs a
-basic build toolchain (make, g++, python3).
+Requirements: Node.js 24+, pnpm 11+, and Git. Release artifacts must be built
+on the matching host OS. macOS additionally needs Xcode Command Line Tools;
+Linux needs make, g++, and python3.
 
 ```sh
 git submodule update --init --recursive
@@ -130,6 +134,7 @@ Writable runtime state lives at:
 ```text
 macOS  ~/Library/Application Support/Oh-DSH-Desktop/dsh
 Linux  ~/.config/Oh-DSH-Desktop/dsh
+Windows %APPDATA%\Oh-DSH-Desktop\dsh
 ```
 
 Configure the DeepSeek API key in DSH Settings or in the `.env` file under
@@ -271,12 +276,26 @@ release/
 └── linux-unpacked/oh-dsh-desktop
 ```
 
+Windows artifacts:
+
+```text
+release/
+├── Oh-DSH-Desktop-0.1.1-windows-x64-setup.exe
+├── Oh-DSH-Desktop-0.1.1-windows-x64-portable.exe
+└── win-unpacked/Oh-DSH-Desktop.exe
+```
+
 The bundled Node runtime defaults to the build machine's platform. Set
-`DSH_DESKTOP_NODE_PLATFORM` (`linux`/`darwin`) and `DSH_DESKTOP_NODE_ARCH`
+`DSH_DESKTOP_NODE_PLATFORM` (`linux`/`darwin`/`win`) and `DSH_DESKTOP_NODE_ARCH`
 (`x64`/`arm64`) to stage a different target for cross-packaging.
 
-The repository does not currently rely on GitHub Actions for release builds.
-Verify locally before upload:
+The `Native release builds` GitHub Actions workflow builds on native Linux and
+Windows runners, exercises DSH, the plugin graph, Git/Workspace, the PTY
+Terminal, and packaged app startup, and validates Windows install/uninstall
+plus portable startup. It uploads workflow artifacts without publishing a
+GitHub Release.
+
+Verify on the matching host before upload:
 
 ```sh
 pnpm run typecheck
@@ -296,6 +315,19 @@ pnpm test
 pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
+
+On Windows, verify with:
+
+```powershell
+pnpm run typecheck
+pnpm test
+pnpm run dist:win
+pnpm run smoke:app:win
+```
+
+CI creates unsigned Windows test packages by default. For release signing,
+provide `CSC_LINK` and `CSC_KEY_PASSWORD` through CI secrets as required by
+electron-builder; never commit the certificate.
 
 The package metadata, download instructions, and public release now all use
 `v0.1.1`. For the next release, update every workspace package first, then use

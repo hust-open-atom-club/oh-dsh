@@ -18,6 +18,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Linux x64" src="https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black">
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?logo=windows11&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
   <img alt="DSH 0.1.0-rc.5" src="https://img.shields.io/badge/DSH-0.1.0--rc.5-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
@@ -31,7 +32,7 @@
 </p>
 
 Oh-DSH-Desktop 保留 DSH React UI，把固定版本的 DSH runtime、Node.js、
-Electron 和本地能力打包进一个 macOS 应用。模型仍运行在云端，桌面端负责
+Electron 和本地能力打包进 macOS、Linux 与 Windows 应用。模型仍运行在云端，桌面端负责
 终端、Workspace、Git、浏览器、窗口集成和 plugin 生命周期。
 
 它不是另一套 DSH 前端，也不需要额外安装 Web Terminal 或 shell plugin。
@@ -40,7 +41,7 @@ Loader、locale、settings 和 ThemeService 契约。
 
 ## 主要能力
 
-- 自包含的 Apple Silicon macOS 应用与安装包,以及 Linux x64 AppImage / deb。
+- 自包含的 macOS arm64、Linux x64 与 Windows x64 应用及安装包。
 - 多标签 PTY Terminal、逐提交/逐行 Review、Browser 和 Files。
 - Review 评论可汇总进消息输入框，直接交给 Agent 处理。
 - Pinned Summary、可展开 Side Panel 与原生窗口控制。
@@ -91,11 +92,15 @@ Linux x64 已支持从源码构建；首个 AppImage / deb 尚未发布。发布
 Linux 运行数据位于 `~/.config/Oh-DSH-Desktop/dsh`，DeepSeek API key 可以
 在 DSH 设置页配置，也可以写入该目录下的 `.env`。
 
+#### Windows
+
+Windows x64 提供 NSIS 安装器和免安装 portable EXE。当前测试包未进行
+Authenticode 签名，首次启动可能显示 SmartScreen 提示。
+
 ### 从源码运行
 
-macOS 要求 macOS 12+、Apple Silicon、Node.js 24+、pnpm 11+ 和 Xcode
-Command Line Tools。Linux 要求 x64、Node.js 24+、pnpm 11+ 与基础构建
-工具链（make、g++、python3），发行版之间无额外依赖。
+要求 Node.js 24+、pnpm 11+ 和 Git；发行包必须在对应宿主系统上构建。
+macOS 还需要 Xcode Command Line Tools，Linux 需要 make、g++ 和 python3。
 
 ```sh
 git submodule update --init --recursive
@@ -124,6 +129,7 @@ Better Sidebar Host 以固定 Git submodule 跟踪，并通过公开 HTTPS 仓�
 ```text
 macOS  ~/Library/Application Support/Oh-DSH-Desktop/dsh
 Linux  ~/.config/Oh-DSH-Desktop/dsh
+Windows %APPDATA%\Oh-DSH-Desktop\dsh
 ```
 
 DeepSeek API key 可以在 DSH 设置页配置，也可以写入该目录下的 `.env`。
@@ -259,11 +265,25 @@ release/
 └── linux-unpacked/oh-dsh-desktop
 ```
 
+Windows 产物：
+
+```text
+release/
+├── Oh-DSH-Desktop-0.1.1-windows-x64-setup.exe
+├── Oh-DSH-Desktop-0.1.1-windows-x64-portable.exe
+└── win-unpacked/Oh-DSH-Desktop.exe
+```
+
 打包内置的 Node runtime 默认匹配构建机平台；跨平台打包可显式指定
-`DSH_DESKTOP_NODE_PLATFORM`（`linux`/`darwin`）与 `DSH_DESKTOP_NODE_ARCH`
+`DSH_DESKTOP_NODE_PLATFORM`（`linux`/`darwin`/`win`）与 `DSH_DESKTOP_NODE_ARCH`
 （`x64`/`arm64`）。
 
-仓库当前不依赖 GitHub Actions 生成发行包。上传前在本机验证：
+`Native release builds` GitHub Actions 会在 Linux/Windows 原生 runner 上
+生成发行包，执行 DSH、插件图、Git/Workspace、PTY Terminal 和 packaged
+app 冒烟，并验证 Windows 安装/卸载与 portable 启动。产物作为 workflow
+artifacts 上传，不会自动发布 GitHub Release。
+
+上传前在对应宿主验证：
 
 ```sh
 pnpm run typecheck
@@ -283,6 +303,18 @@ pnpm test
 pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
+
+Windows 上对应验证：
+
+```powershell
+pnpm run typecheck
+pnpm test
+pnpm run dist:win
+pnpm run smoke:app:win
+```
+
+CI 默认生成未签名 Windows 测试包。发布签名时按 electron-builder 约定通过
+CI secret 提供 `CSC_LINK` 与 `CSC_KEY_PASSWORD`，证书不可提交到仓库。
 
 当前 package、下载说明和公开 Release 均为 `v0.1.1`。准备下一个版本时，
 先统一更新 workspace package 版本，再使用同一版本创建 tag 与 Release：

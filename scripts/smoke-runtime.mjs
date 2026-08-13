@@ -49,8 +49,13 @@ const runtimeEnvironment = {
   DSH_DESKTOP_PROFILE: 'desktop',
   DSH_DESKTOP_VERSION: 'smoke',
   DSH_HOME: dshHome,
+  NODE_PATH: [
+    join(paths.runtimeRoot, 'node_modules'),
+    process.env.NODE_PATH,
+  ].filter(Boolean).join(process.platform === 'win32' ? ';' : ':'),
   PATH: runtimeSearchPath(paths),
 }
+delete runtimeEnvironment.ELECTRON_RUN_AS_NODE
 
 const pluginRoot = join(smokeRoot, 'smoke-plugin')
 mkdirSync(pluginRoot)
@@ -273,7 +278,9 @@ try {
     }
     socket.addEventListener('open', () => {
       socket.send(JSON.stringify({ type: 'resize', cols: 80, rows: 24 }))
-      socket.send("printf 'OH_DSH_TERMINAL_SMOKE\\n'; exit\r")
+      socket.send(process.platform === 'win32'
+        ? "Write-Output 'OH_DSH_TERMINAL_SMOKE'; exit\r"
+        : "printf 'OH_DSH_TERMINAL_SMOKE\\n'; exit\r")
     })
     socket.addEventListener('message', (event) => {
       output += String(event.data)
