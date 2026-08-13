@@ -272,8 +272,11 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
 
   private placeEntry(): void {
     const settings = settingsButton()
-    if (settings === null || settings.parentElement === null) return
-    const parent = settings.parentElement
+    if (settings === null) return
+    const settingsSeat = settings.parentElement
+    if (settingsSeat === null) return
+    const sidebarRoot = settingsSeat.parentElement
+    if (sidebarRoot === null) return
     if (this.#entry === null) {
       const entry = document.createElement('button')
       entry.type = 'button'
@@ -285,10 +288,10 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     // Mirror the settings trigger's classes so the entry tracks the rail's
     // collapsed/expanded layout state (rc.5 restyles rail buttons in place).
     this.#entry.className = `${settings.className} oh-marketplace-nav`.trim()
-    if (this.#entry.parentElement !== parent || this.#entry.nextElementSibling !== settings) {
-      parent.insertBefore(this.#entry, settings)
+    if (this.#entry.parentElement !== sidebarRoot
+      || this.#entry.nextElementSibling !== settingsSeat) {
+      sidebarRoot.insertBefore(this.#entry, settingsSeat)
     }
-    const sidebarRoot = parent.parentElement
     if (this.#sidebarRoot !== sidebarRoot) {
       this.#sidebarRoot?.removeAttribute('data-oh-dsh-marketplace-sidebar-root')
       this.#sidebarRoot?.style.removeProperty('--oh-marketplace-sidebar-top')

@@ -5,6 +5,9 @@ const runtimeUrl = process.argv[2]
 const timeoutMs = 20_000
 
 if (runtimeUrl === undefined) throw new Error('runtime URL is required')
+if (process.env.DSH_DESKTOP_SMOKE_USER_DATA !== undefined) {
+  app.setPath('userData', process.env.DSH_DESKTOP_SMOKE_USER_DATA)
+}
 
 app.disableHardwareAcceleration()
 // Keep requestAnimationFrame ticking in the hidden smoke window: the plugin
@@ -41,7 +44,6 @@ void app.whenReady().then(async () => {
   })
   const startedAt = Date.now()
   let settled = false
-  let lastNavigationError
 
   const settle = error => {
     if (settled) return
@@ -122,27 +124,28 @@ void app.whenReady().then(async () => {
     })()`)
       if (state.ready === true && state.navigation !== null) {
         if (state.navigation.delta > 0.5) {
-          lastNavigationError = new Error(
+          settle(new Error(
             'Plugins and Settings icons are not aligned: '
             + JSON.stringify(state.navigation),
-          )
-        } else if (state.navigation.artworkDelta > 1) {
-          lastNavigationError = new Error(
-            'Plugins and Settings icons are not optically sized: '
-            + JSON.stringify(state.navigation),
-          )
-        } else {
-          settle()
+          ))
           return
         }
+        if (state.navigation.artworkDelta > 1) {
+          settle(new Error(
+            'Plugins and Settings icons are not optically sized: '
+            + JSON.stringify(state.navigation),
+          ))
+          return
+        }
+        settle()
+        return
       }
       if (state.body.includes('Failed to load plugins')) {
         settle(new Error(state.body.trim()))
         return
       }
       if (Date.now() - startedAt >= timeoutMs) {
-        settle(lastNavigationError
-          ?? new Error(`DSH Chromium client graph timed out:\n${state.body.trim()}`))
+        settle(new Error(`DSH Chromium client graph timed out:\n${state.body.trim()}`))
         return
       }
     } catch (error) {

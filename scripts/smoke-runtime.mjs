@@ -194,7 +194,10 @@ try {
   ], {
     cwd: root,
     encoding: 'utf8',
-    env: runtimeEnvironment,
+    env: {
+      ...runtimeEnvironment,
+      DSH_DESKTOP_SMOKE_USER_DATA: join(smokeRoot, 'electron-user-data'),
+    },
     timeout: 30_000,
   })
   assert.equal(

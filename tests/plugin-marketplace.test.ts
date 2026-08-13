@@ -414,6 +414,8 @@ test('marketplace navigation reserves room for Settings in short windows', () =>
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*gap: 8px;/)
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*padding: 6px 2px 6px 10px;/)
   assert.match(css, /\.oh-marketplace-nav svg \{[\s\S]*width: 16px;[\s\S]*height: 16px;/)
+  assert.match(css, /\.oh-marketplace-nav\[data-collapsed='true'\] svg \{[\s\S]*transform: scale\(1\.56\);/)
+  assert.match(client, /sidebarRoot\.insertBefore\(this\.#entry, settingsSeat\)/)
   assert.match(client, /export const inject = \['locale'\]/)
   assert.match(client, /locale\.register\('oh-dsh\.plugin-marketplace'/)
   assert.match(client, /\['installed', t\('installed'\)\]/)
