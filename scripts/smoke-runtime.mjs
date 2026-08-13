@@ -188,7 +188,6 @@ try {
   }
 
   const client = spawnSync(electronBinary, [
-    ...(process.platform === 'linux' ? ['--no-sandbox'] : []),
     join(root, 'scripts', 'smoke-client.cjs'),
     base.href,
   ], {

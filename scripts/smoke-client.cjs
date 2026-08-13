@@ -10,6 +10,7 @@ if (process.env.DSH_DESKTOP_SMOKE_USER_DATA !== undefined) {
 }
 
 app.disableHardwareAcceleration()
+if (process.platform === 'linux') app.commandLine.appendSwitch('no-sandbox')
 // Keep requestAnimationFrame ticking in the hidden smoke window: the plugin
 // marketplace places its sidebar nav entry from a rAF callback, and hidden
 // renderers are backgrounded by default (no frames, no placement).

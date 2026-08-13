@@ -162,6 +162,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   #style: HTMLStyleElement | null = null
   #root: Root | null = null
   #entry: HTMLButtonElement | null = null
+  #entrySeat: HTMLDivElement | null = null
   #observer: MutationObserver | null = null
   #resizeObserver: ResizeObserver | null = null
   #placementFrame: number | null = null
@@ -245,7 +246,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     if (this.#placementFrame !== null) cancelAnimationFrame(this.#placementFrame)
     this.#observer?.disconnect()
     this.#resizeObserver?.disconnect()
-    this.#entry?.remove()
+    this.#entrySeat?.remove()
     this.#root?.unmount()
     this.#element?.remove()
     this.#style?.remove()
@@ -285,12 +286,18 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
       this.#entry = entry
       this.renderEntryLabel()
     }
+    if (this.#entrySeat === null) {
+      this.#entrySeat = document.createElement('div')
+      this.#entrySeat.dataset.ohDshMarketplaceNavSeat = 'true'
+      this.#entrySeat.append(this.#entry)
+    }
     // Mirror the settings trigger's classes so the entry tracks the rail's
     // collapsed/expanded layout state (rc.5 restyles rail buttons in place).
     this.#entry.className = `${settings.className} oh-marketplace-nav`.trim()
-    if (this.#entry.parentElement !== sidebarRoot
-      || this.#entry.nextElementSibling !== settingsSeat) {
-      sidebarRoot.insertBefore(this.#entry, settingsSeat)
+    this.#entrySeat.className = settingsSeat.className
+    if (this.#entrySeat.parentElement !== sidebarRoot
+      || this.#entrySeat.nextElementSibling !== settingsSeat) {
+      sidebarRoot.insertBefore(this.#entrySeat, settingsSeat)
     }
     if (this.#sidebarRoot !== sidebarRoot) {
       this.#sidebarRoot?.removeAttribute('data-oh-dsh-marketplace-sidebar-root')
