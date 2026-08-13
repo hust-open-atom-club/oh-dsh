@@ -19,6 +19,12 @@ import type {
 } from '../protocol.ts'
 import { MARKETPLACE_MESSAGES, type MarketplaceMessage } from './i18n.ts'
 import marketplaceCss from './marketplace.css'
+import {
+  initialSessionNavigationState,
+  transitionSessionNavigation,
+  type SessionListSnapshot,
+  type SessionNavigationState,
+} from './session-navigation.ts'
 
 interface ClientContext {
   effect(effect: () => (() => void) | void, label?: string): void
@@ -30,6 +36,15 @@ interface ClientContext {
 
 interface MarketplaceViewState {
   open: boolean
+}
+
+interface ObservableSnapshot<T> {
+  getSnapshot(): T
+  subscribe(listener: () => void): () => void
+}
+
+interface SessionsService {
+  list: ObservableSnapshot<SessionListSnapshot>
 }
 
 export interface PluginMarketplaceView {
@@ -45,7 +60,7 @@ declare global {
   }
 }
 
-export const inject = ['locale']
+export const inject = ['locale', 'sessions']
 
 const OPEN_KEY = 'oh-dsh-desktop.plugin-marketplace.open'
 const SIDEBAR_BOTTOM_INSET = 8
@@ -156,6 +171,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   readonly #bridge: DesktopBridge
   readonly #locale: LocaleService
   readonly #t: Translate<MarketplaceMessage>
+  readonly #sessions: SessionsService
   readonly #listeners = new Set<() => void>()
   #state: MarketplaceViewState = { open: readOpen() }
   #element: HTMLDivElement | null = null
@@ -167,6 +183,8 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   #placementFrame: number | null = null
   #sidebarRoot: HTMLElement | null = null
   #unsubscribeLocale: (() => void) | null = null
+  #unsubscribeSessions: (() => void) | null = null
+  #sessionNavigationState: SessionNavigationState = initialSessionNavigationState()
   readonly #handleResize = (): void => { this.schedulePlacement() }
   readonly #handleDocumentClick = (event: MouseEvent): void => {
     if (!this.#state.open || !(event.target instanceof Element)) return
@@ -178,10 +196,12 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     bridge: DesktopBridge,
     locale: LocaleService,
     t: Translate<MarketplaceMessage>,
+    sessions: SessionsService,
   ) {
     this.#bridge = bridge
     this.#locale = locale
     this.#t = t
+    this.#sessions = sessions
   }
 
   getSnapshot = (): MarketplaceViewState => this.#state
@@ -204,6 +224,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   toggle(): void { this.setOpen(!this.#state.open) }
 
   mount(): void {
+    this.#sessionNavigationState = initialSessionNavigationState()
     this.#style = document.createElement('style')
     this.#style.dataset.ohDshPluginMarketplaceStyles = 'true'
     this.#style.textContent = marketplaceCss
@@ -233,6 +254,16 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     this.#unsubscribeLocale = this.#locale.subscribe(() => {
       this.renderEntryLabel()
     })
+    const syncSessionNavigation = (): void => {
+      const transition = transitionSessionNavigation(
+        this.#sessionNavigationState,
+        this.#sessions.list.getSnapshot(),
+      )
+      this.#sessionNavigationState = transition.state
+      if (transition.close) this.setOpen(false)
+    }
+    this.#unsubscribeSessions = this.#sessions.list.subscribe(syncSessionNavigation)
+    syncSessionNavigation()
     this.applyOpenState()
     this.schedulePlacement()
   }
@@ -242,6 +273,8 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     window.removeEventListener('resize', this.#handleResize)
     this.#unsubscribeLocale?.()
     this.#unsubscribeLocale = null
+    this.#unsubscribeSessions?.()
+    this.#unsubscribeSessions = null
     if (this.#placementFrame !== null) cancelAnimationFrame(this.#placementFrame)
     this.#observer?.disconnect()
     this.#resizeObserver?.disconnect()
@@ -874,8 +907,9 @@ export function apply(ctx: ClientContext): void {
   const bridge = window.dshDesktop
   if (bridge === undefined) throw new Error('plugin-marketplace: Electron bridge is unavailable')
   const locale = ctx.get('locale') as LocaleService
+  const sessions = ctx.get('sessions') as SessionsService
   const t: Translate<MarketplaceMessage> = locale.bind('oh-dsh.plugin-marketplace')
-  const view = new PluginMarketplaceViewService(bridge, locale, t)
+  const view = new PluginMarketplaceViewService(bridge, locale, t, sessions)
   ctx.effect(
     () => locale.register('oh-dsh.plugin-marketplace', MARKETPLACE_MESSAGES),
     'oh-dsh-desktop: marketplace dictionaries',

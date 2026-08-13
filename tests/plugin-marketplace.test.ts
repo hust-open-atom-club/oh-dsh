@@ -20,6 +20,10 @@ import {
   type MarketplaceRuntime,
 } from '../plugins/plugin-marketplace/src/host/transaction-manager.ts'
 import { startMarketplaceAgentGateway } from '../plugins/plugin-marketplace/src/host/agent-gateway.ts'
+import {
+  initialSessionNavigationState,
+  transitionSessionNavigation,
+} from '../plugins/plugin-marketplace/src/client/session-navigation.ts'
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567'
 const UPDATED_COMMIT = 'fedcba9876543210fedcba9876543210fedcba98'
@@ -414,7 +418,10 @@ test('marketplace navigation reserves room for Settings in short windows', () =>
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*gap: 8px;/)
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*padding: 6px 2px 6px 10px;/)
   assert.match(css, /\.oh-marketplace-nav svg \{[\s\S]*width: 16px;[\s\S]*height: 16px;/)
-  assert.match(client, /export const inject = \['locale'\]/)
+  assert.match(client, /export const inject = \['locale', 'sessions'\]/)
+  assert.match(client, /ctx\.get\('sessions'\) as SessionsService/)
+  assert.match(client, /this\.#sessions\.list\.subscribe\(syncSessionNavigation\)/)
+  assert.match(client, /this\.#unsubscribeSessions\?\.\(\)/)
   assert.match(client, /locale\.register\('oh-dsh\.plugin-marketplace'/)
   assert.match(client, /\['installed', t\('installed'\)\]/)
   assert.match(client, /\['available', t\('not-installed'\)\]/)
@@ -435,6 +442,46 @@ test('marketplace navigation reserves room for Settings in short windows', () =>
   assert.match(client, /document\.addEventListener\('click', this\.#handleDocumentClick, true\)/)
   assert.match(client, /button === settingsButton\(\)/)
   assert.match(client, /if \(disposed \|\| info\.preview !== null\) return/)
+})
+
+test('marketplace session navigation closes only after a ready session baseline', () => {
+  let state = initialSessionNavigationState()
+  let transition = transitionSessionNavigation(state, { current: undefined, phase: 'pending' })
+  assert.equal(transition.close, false)
+  assert.deepEqual(transition.state, { current: undefined, ready: false })
+
+  state = transition.state
+  transition = transitionSessionNavigation(state, { current: 'session-a', phase: 'ready' })
+  assert.equal(transition.close, false)
+  assert.deepEqual(transition.state, { current: 'session-a', ready: true })
+
+  state = transition.state
+  transition = transitionSessionNavigation(state, { current: 'session-b', phase: 'pending' })
+  assert.equal(transition.close, false)
+  assert.deepEqual(transition.state, { current: 'session-a', ready: true })
+
+  state = transition.state
+  transition = transitionSessionNavigation(state, { current: 'session-b', phase: 'ready' })
+  assert.equal(transition.close, true)
+  assert.deepEqual(transition.state, { current: 'session-b', ready: true })
+
+  state = transition.state
+  transition = transitionSessionNavigation(state, { current: 'session-b', phase: 'ready' })
+  assert.equal(transition.close, false)
+  assert.deepEqual(transition.state, { current: 'session-b', ready: true })
+
+  state = transition.state
+  transition = transitionSessionNavigation(state, { current: undefined, phase: 'ready' })
+  assert.equal(transition.close, false)
+  assert.deepEqual(transition.state, { current: undefined, ready: true })
+})
+
+test('marketplace session navigation closes when an empty baseline activates a session', () => {
+  let state = initialSessionNavigationState()
+  state = transitionSessionNavigation(state, { current: undefined, phase: 'ready' }).state
+  const transition = transitionSessionNavigation(state, { current: 'new-session', phase: 'ready' })
+  assert.equal(transition.close, true)
+  assert.deepEqual(transition.state, { current: 'new-session', ready: true })
 })
 
 test('bundle preview remains isolated until apply and supports undo', async () => {
