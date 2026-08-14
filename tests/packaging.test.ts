@@ -16,3 +16,14 @@ test('Windows portable build shows an NSIS-compatible extraction splash', () => 
   assert.equal(bitmap.readUInt16LE(28), 24)
   assert.equal(bitmap.readUInt32LE(30), 0)
 })
+
+test('Linux runtime smoke disables the Chromium sandbox before Electron starts', () => {
+  const smokeRuntime = readFileSync(
+    new URL('../scripts/smoke-runtime.mjs', import.meta.url),
+    'utf8',
+  )
+  assert.match(
+    smokeRuntime,
+    /spawnSync\(electronBinary, \[\s*\.\.\.\(process\.platform === 'linux' \? \['--no-sandbox'\] : \[\]\),\s*join\(root, 'scripts', 'smoke-client\.cjs'\)/,
+  )
+})
