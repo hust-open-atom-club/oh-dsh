@@ -8,6 +8,8 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  rmdirSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -24,6 +26,10 @@ const SAFE_PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/
 const INTERNAL_PACKAGE_NAME = /^@(oh-dsh|deepseek-ai)\//
 const MAX_PLUGIN_BYTES = 32 * 1024 * 1024
 const MAX_PLUGIN_FILES = 2_000
+const REGISTRY_STATUS_KEY = '__registry__'
+const REGISTRY_LOCK_TIMEOUT_MS = 10_000
+const REGISTRY_LOCK_STALE_MS = 60_000
+const REGISTRY_LOCK_RETRY_MS = 25
 
 type BrowserProfile = 'desktop' | 'web'
 
@@ -134,6 +140,25 @@ function loadJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown
 }
 
+function delay(milliseconds: number): Promise<void> {
+  return new Promise(resolve => { setTimeout(resolve, milliseconds) })
+}
+
+function lockOwnerIsAlive(path: string): boolean {
+  try {
+    const owner = Number.parseInt(readFileSync(join(path, 'owner'), 'utf8').trim(), 10)
+    if (!Number.isInteger(owner) || owner <= 0) return false
+    try {
+      process.kill(owner, 0)
+      return true
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code !== 'ESRCH'
+    }
+  } catch {
+    return false
+  }
+}
+
 function pluginFingerprint(root: string): string {
   const hash = createHash('sha256')
   const files: string[] = [join(root, 'package.json')]
@@ -217,6 +242,7 @@ export class RoutingInjector {
   readonly profileDir: string
   readonly registryPath: string
   readonly ready: Promise<void>
+  private readonly registryLockPath: string
 
   constructor(
     loader: Loader,
@@ -228,12 +254,70 @@ export class RoutingInjector {
     this.profile = resolveProfile(environment)
     this.profileDir = join(home, 'profiles', this.profile)
     this.registryPath = join(home, 'routing-injector', 'registry.json')
-    this.ready = this.restore()
+    this.registryLockPath = `${this.registryPath}.lock`
+    this.ready = this.restore().catch(error => {
+      this.inactive.set(REGISTRY_STATUS_KEY, error instanceof Error ? error.message : String(error))
+    })
   }
 
   private registry(): Registry {
     if (!existsSync(this.registryPath)) return { records: [], version: 1 }
     return validateRegistry(loadJson(this.registryPath))
+  }
+
+  private registryForMutation(): Registry {
+    try {
+      return this.registry()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.inactive.set(REGISTRY_STATUS_KEY, message)
+      const backup = `${this.registryPath}.corrupt-${String(Date.now())}-${String(process.pid)}`
+      try {
+        renameSync(this.registryPath, backup)
+      } catch {
+        // Another process may have already preserved or replaced the file.
+      }
+      return { records: [], version: 1 }
+    }
+  }
+
+  private async withRegistryLock<T>(operation: () => Promise<T>): Promise<T> {
+    const directory = dirname(this.registryLockPath)
+    mkdirSync(directory, { mode: 0o700, recursive: true })
+    const started = Date.now()
+    while (true) {
+      try {
+        mkdirSync(this.registryLockPath, { mode: 0o700 })
+        writeFileSync(join(this.registryLockPath, 'owner'), `${String(process.pid)}\n`, { mode: 0o600 })
+        break
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+        const stale = (() => {
+          try {
+            return !lockOwnerIsAlive(this.registryLockPath)
+              && Date.now() - statSync(this.registryLockPath).mtimeMs > REGISTRY_LOCK_STALE_MS
+          } catch {
+            return false
+          }
+        })()
+        if (stale) {
+          rmSync(this.registryLockPath, { force: true, recursive: true })
+          continue
+        }
+        if (Date.now() - started >= REGISTRY_LOCK_TIMEOUT_MS) {
+          throw new Error('timed out waiting for the routing injector registry lock')
+        }
+        await delay(REGISTRY_LOCK_RETRY_MS)
+      }
+    }
+    try {
+      return await operation()
+    } finally {
+      rmSync(this.registryLockPath, { force: true, recursive: true })
+      if (!existsSync(this.registryPath)) {
+        try { rmdirSync(directory) } catch { /* keep non-empty recovery files */ }
+      }
+    }
   }
 
   private writeRegistry(registry: Registry): void {
@@ -318,130 +402,183 @@ export class RoutingInjector {
   }
 
   async restore(): Promise<void> {
-    const registry = this.registry()
-    for (const record of registry.records) {
-      if (record.profile !== this.profile || record.promoted) continue
+    await this.withRegistryLock(async () => {
+      let registry: Registry
       try {
-        const current = this.packageRecord(record.path, record)
-        if (current.packageName !== record.packageName || current.fingerprint !== record.fingerprint) {
-          this.inactive.set(record.packageName, 'approved package fingerprint changed')
-          continue
-        }
-        const active = await this.load(record)
-        this.active.set(record.packageName, active)
+        registry = this.registry()
       } catch (error) {
-        this.inactive.set(record.packageName, error instanceof Error ? error.message : String(error))
+        this.inactive.set(REGISTRY_STATUS_KEY, error instanceof Error ? error.message : String(error))
+        return
       }
-    }
+      for (const record of registry.records) {
+        if (record.profile !== this.profile || record.promoted) continue
+        try {
+          const current = this.packageRecord(record.path, record)
+          if (current.packageName !== record.packageName || current.fingerprint !== record.fingerprint) {
+            this.inactive.set(record.packageName, 'approved package fingerprint changed')
+            continue
+          }
+          const active = await this.load(record)
+          this.active.set(record.packageName, active)
+        } catch (error) {
+          this.inactive.set(record.packageName, error instanceof Error ? error.message : String(error))
+        }
+      }
+    })
   }
 
   async inject(directory: string): Promise<RegistryEntry> {
     await this.ready
-    const record = this.packageRecord(directory)
-    const active = await this.load(record)
-    try {
-      const registry = this.registry()
-      if (registry.records.some(entry => entry.packageName === record.packageName && entry.profile === this.profile)) {
-        throw new Error(`${record.packageName} already has an injector record`)
+    return await this.withRegistryLock(async () => {
+      const registry = this.registryForMutation()
+      const candidate = this.packageRecord(directory)
+      const previous = registry.records.find(entry => entry.packageName === candidate.packageName
+        && entry.profile === this.profile)
+      if (previous?.promoted === true) {
+        throw new Error(`${previous.packageName} is profile-promoted; remove it through the profile transaction`)
       }
-      this.writeRegistry({ ...registry, records: [...registry.records, active.record] })
-      this.active.set(record.packageName, active)
-      this.inactive.delete(record.packageName)
-      return active.record
-    } catch (error) {
-      await this.unload(active).catch(() => undefined)
-      throw error
-    }
+      const record = previous === undefined ? candidate : this.packageRecord(directory, previous)
+      if (this.active.has(record.packageName)) {
+        throw new Error(`${record.packageName} is already active`)
+      }
+      if (previous !== undefined) this.removeOwnedLink(previous)
+      let active: ActiveEntry | undefined
+      try {
+        active = await this.load(record)
+        this.writeRegistry({
+          ...registry,
+          records: registry.records.filter(entry => entry.packageName !== record.packageName
+            || entry.profile !== this.profile).concat(active.record),
+        })
+        this.active.set(record.packageName, active)
+        this.inactive.delete(record.packageName)
+        this.inactive.delete(REGISTRY_STATUS_KEY)
+        return active.record
+      } catch (error) {
+        if (active !== undefined) await this.unload(active).catch(() => undefined)
+        if (previous?.linkOwned === true && !existsSync(this.profileLink(previous.packageName))) {
+          try { this.ensureLink(previous) } catch { /* preserve the original failure */ }
+        }
+        throw error
+      }
+    })
   }
 
   async reload(packageName: string): Promise<RegistryEntry> {
     await this.ready
-    const active = this.active.get(packageName)
-    if (active === undefined) throw new Error(`${packageName} is not an active injected package`)
-    const updated = this.packageRecord(active.record.path, active.record)
-    await this.loader.remove(active.entryId)
-    this.active.delete(packageName)
-    try {
-      const replacement = await this.load(updated)
-      const registry = this.registry()
-      this.writeRegistry({
-        ...registry,
-        records: registry.records.map(record => record.packageName === packageName
-          && record.profile === this.profile ? replacement.record : record),
-      })
-      this.active.set(packageName, replacement)
-      return replacement.record
-    } catch (error) {
-      this.inactive.set(packageName, 'reload failed; inject again after fixing the package')
-      throw error
-    }
+    return await this.withRegistryLock(async () => {
+      const active = this.active.get(packageName)
+      if (active === undefined) throw new Error(`${packageName} is not an active injected package`)
+      const updated = this.packageRecord(active.record.path, active.record)
+      await this.loader.remove(active.entryId)
+      this.active.delete(packageName)
+      try {
+        const replacement = await this.load(updated)
+        const registry = this.registryForMutation()
+        this.writeRegistry({
+          ...registry,
+          records: registry.records.map(record => record.packageName === packageName
+            && record.profile === this.profile ? replacement.record : record),
+        })
+        this.active.set(packageName, replacement)
+        this.inactive.delete(REGISTRY_STATUS_KEY)
+        return replacement.record
+      } catch (error) {
+        this.inactive.set(packageName, 'reload failed; inject again after fixing the package')
+        throw error
+      }
+    })
   }
 
   async promote(packageName: string): Promise<RegistryEntry> {
     await this.ready
-    const active = this.active.get(packageName)
-    if (active === undefined) throw new Error(`${packageName} is not an active injected package`)
-    const manifestPath = join(this.profileDir, 'package.json')
-    const manifest = loadJson(manifestPath)
-    if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
-      throw new Error('current profile manifest is invalid')
-    }
-    const profile = manifest as Record<string, unknown>
-    const dsh = profile.dsh !== null && typeof profile.dsh === 'object' && !Array.isArray(profile.dsh)
-      ? profile.dsh as Record<string, unknown>
-      : {}
-    const profileConfig = dsh.profile !== null && typeof dsh.profile === 'object' && !Array.isArray(dsh.profile)
-      ? dsh.profile as Record<string, unknown>
-      : {}
-    const bundles = Array.isArray(profileConfig.bundles)
-      ? profileConfig.bundles.filter((value): value is string => typeof value === 'string')
-      : []
-    const dependencies = profile.dependencies !== null && typeof profile.dependencies === 'object'
-      && !Array.isArray(profile.dependencies)
-      ? profile.dependencies as Record<string, unknown>
-      : {}
-    const next = {
-      ...profile,
-      dependencies: { ...dependencies, [packageName]: `file:${active.record.path}` },
-      dsh: {
-        ...dsh,
-        profile: { ...profileConfig, bundles: bundles.includes(packageName) ? bundles : [...bundles, packageName] },
-      },
-    }
-    const temporary = `${manifestPath}.injector-tmp-${String(process.pid)}`
-    writeFileSync(temporary, `${JSON.stringify(next, undefined, 2)}\n`, { mode: 0o600 })
-    renameSync(temporary, manifestPath)
-    const registry = this.registry()
-    const promoted = { ...active.record, promoted: true }
-    this.writeRegistry({
-      ...registry,
-      records: registry.records.map(record => record.packageName === packageName
-        && record.profile === this.profile ? promoted : record),
+    return await this.withRegistryLock(async () => {
+      const active = this.active.get(packageName)
+      if (active === undefined) throw new Error(`${packageName} is not an active injected package`)
+      const manifestPath = join(this.profileDir, 'package.json')
+      const manifest = loadJson(manifestPath)
+      if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
+        throw new Error('current profile manifest is invalid')
+      }
+      const profile = manifest as Record<string, unknown>
+      const dsh = profile.dsh !== null && typeof profile.dsh === 'object' && !Array.isArray(profile.dsh)
+        ? profile.dsh as Record<string, unknown>
+        : {}
+      const profileConfig = dsh.profile !== null && typeof dsh.profile === 'object' && !Array.isArray(dsh.profile)
+        ? dsh.profile as Record<string, unknown>
+        : {}
+      const bundles = Array.isArray(profileConfig.bundles)
+        ? profileConfig.bundles.filter((value): value is string => typeof value === 'string')
+        : []
+      const dependencies = profile.dependencies !== null && typeof profile.dependencies === 'object'
+        && !Array.isArray(profile.dependencies)
+        ? profile.dependencies as Record<string, unknown>
+        : {}
+      const next = {
+        ...profile,
+        dependencies: { ...dependencies, [packageName]: `file:${active.record.path}` },
+        dsh: {
+          ...dsh,
+          profile: { ...profileConfig, bundles: bundles.includes(packageName) ? bundles : [...bundles, packageName] },
+        },
+      }
+      const temporary = `${manifestPath}.injector-tmp-${String(process.pid)}`
+      writeFileSync(temporary, `${JSON.stringify(next, undefined, 2)}\n`, { mode: 0o600 })
+      renameSync(temporary, manifestPath)
+      const registry = this.registryForMutation()
+      const promoted = { ...active.record, promoted: true }
+      this.writeRegistry({
+        ...registry,
+        records: registry.records.map(record => record.packageName === packageName
+          && record.profile === this.profile ? promoted : record),
+      })
+      this.active.set(packageName, { ...active, record: promoted })
+      this.inactive.delete(REGISTRY_STATUS_KEY)
+      return promoted
     })
-    this.active.set(packageName, { ...active, record: promoted })
-    return promoted
   }
 
   async uninject(packageName: string): Promise<void> {
     await this.ready
-    const active = this.active.get(packageName)
-    if (active === undefined) throw new Error(`${packageName} is not an active injected package`)
-    if (active.record.promoted) {
-      throw new Error(`${packageName} is profile-promoted; remove it through the profile transaction`)
-    }
-    const registry = this.registry()
-    const next = {
-      ...registry,
-      records: registry.records.filter(record => record.packageName !== packageName || record.profile !== this.profile),
-    }
-    this.writeRegistry(next)
-    try {
-      await this.unload(active)
-      this.active.delete(packageName)
-    } catch (error) {
-      this.writeRegistry(registry)
-      throw error
-    }
+    await this.withRegistryLock(async () => {
+      const active = this.active.get(packageName)
+      const registry = this.registryForMutation()
+      const record = registry.records.find(entry => entry.packageName === packageName
+        && entry.profile === this.profile)
+      if (active === undefined) {
+        if (record === undefined) throw new Error(`${packageName} is not an injected package`)
+        if (record.promoted) {
+          throw new Error(`${packageName} is profile-promoted; remove it through the profile transaction`)
+        }
+        this.removeOwnedLink(record)
+        this.writeRegistry({
+          ...registry,
+          records: registry.records.filter(entry => entry.packageName !== packageName
+            || entry.profile !== this.profile),
+        })
+        this.inactive.delete(packageName)
+        this.inactive.delete(REGISTRY_STATUS_KEY)
+        return
+      }
+      if (active.record.promoted) {
+        throw new Error(`${packageName} is profile-promoted; remove it through the profile transaction`)
+      }
+      const next = {
+        ...registry,
+        records: registry.records.filter(entry => entry.packageName !== packageName
+          || entry.profile !== this.profile),
+      }
+      this.writeRegistry(next)
+      try {
+        await this.unload(active)
+        this.active.delete(packageName)
+        this.inactive.delete(packageName)
+        this.inactive.delete(REGISTRY_STATUS_KEY)
+      } catch (error) {
+        this.writeRegistry(registry)
+        throw error
+      }
+    })
   }
 
   snapshot(): Record<string, unknown> {

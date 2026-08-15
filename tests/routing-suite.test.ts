@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -163,6 +164,79 @@ test('injector stores canonical approved packages and rejects changed restore ta
     assert.deepEqual(restored.snapshot().inactive, {
       'local-router-plugin': 'approved package fingerprint changed',
     })
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
+test('injector contains registry parse failures and repairs them after approval', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-corrupt-'))
+  try {
+    const home = join(temporary, 'home')
+    const registryDirectory = join(home, 'routing-injector')
+    mkdirSync(registryDirectory, { recursive: true })
+    writeFileSync(join(registryDirectory, 'registry.json'), '{not-json')
+    const injector = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await injector.ready
+    const inactiveState = injector.snapshot().inactive as Record<string, unknown>
+    assert.match(String(inactiveState.__registry__), /JSON|Unexpected token/)
+
+    const record = await injector.inject(packageAt(temporary, 'repairable-plugin'))
+    assert.equal(record.packageName, 'repairable-plugin')
+    assert.equal((injector.snapshot().inactive as Record<string, unknown>).__registry__, undefined)
+    assert.equal((JSON.parse(readFileSync(join(registryDirectory, 'registry.json'), 'utf8')) as { version: number }).version, 1)
+    assert.equal(readdirSync(registryDirectory).some(name => name.startsWith('registry.json.corrupt-')), true)
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
+test('inactive injector records can be replaced or explicitly removed', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-recover-'))
+  try {
+    const plugin = packageAt(temporary, 'recoverable-plugin')
+    const home = join(temporary, 'home')
+    const first = new RoutingInjector(new FakeLoader(), { OH_DSH_HOME: home, OH_DSH_PROFILE: 'desktop' })
+    await first.ready
+    await first.inject(plugin)
+    writeFileSync(join(plugin, 'lib', 'index.js'), 'export function apply() { return 2 }\n')
+
+    const restored = new RoutingInjector(new FakeLoader(), { OH_DSH_HOME: home, OH_DSH_PROFILE: 'desktop' })
+    await restored.ready
+    assert.equal((restored.snapshot().inactive as Record<string, unknown>)['recoverable-plugin'], 'approved package fingerprint changed')
+    await restored.inject(plugin)
+    assert.deepEqual(restored.snapshot().inactive, {})
+
+    writeFileSync(join(plugin, 'lib', 'index.js'), 'export function apply() { return 3 }\n')
+    const inactive = new RoutingInjector(new FakeLoader(), { OH_DSH_HOME: home, OH_DSH_PROFILE: 'desktop' })
+    await inactive.ready
+    await inactive.uninject('recoverable-plugin')
+    assert.deepEqual(JSON.parse(readFileSync(join(home, 'routing-injector', 'registry.json'), 'utf8')).records, [])
+    assert.equal(existsSync(join(home, 'profiles', 'desktop', 'node_modules', 'recoverable-plugin')), false)
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
+test('injector registry writes preserve records from concurrent profiles', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-lock-'))
+  try {
+    const home = join(temporary, 'home')
+    const left = new RoutingInjector(new FakeLoader(), { OH_DSH_HOME: home, OH_DSH_PROFILE: 'desktop' })
+    const right = new RoutingInjector(new FakeLoader(), { OH_DSH_HOME: home, OH_DSH_PROFILE: 'web' })
+    await Promise.all([left.ready, right.ready])
+    await Promise.all([
+      left.inject(packageAt(temporary, 'desktop-plugin')),
+      right.inject(packageAt(temporary, 'web-plugin')),
+    ])
+    const registry = JSON.parse(readFileSync(join(home, 'routing-injector', 'registry.json'), 'utf8'))
+    assert.deepEqual(registry.records.map((record: { packageName: string }) => record.packageName).sort(), [
+      'desktop-plugin',
+      'web-plugin',
+    ])
   } finally {
     rmSync(temporary, { force: true, recursive: true })
   }
