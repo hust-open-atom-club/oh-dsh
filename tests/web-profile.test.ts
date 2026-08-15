@@ -113,6 +113,7 @@ test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
     'oh-web',
     'oh-better-sidebar-runtime',
     'oh-vision',
+    'oh-routing-injector-host',
     'oh-skins',
     'oh-pinned-summary',
     'oh-sidebar',
@@ -233,6 +234,7 @@ test('web launcher resolves a relative data root before spawning the runtime', a
     assert.equal(runtime.plan.env.DSH_HOME, join(dataRoot, 'state'))
     assert.equal(runtime.plan.env.DSH_OH_WEB_DATA, join(dataRoot, 'state'))
     assert.equal(runtime.plan.env.OH_DSH_HOME, join(dataRoot, 'state'))
+    assert.equal(runtime.plan.env.OH_DSH_PROFILE, WEB_PROFILE)
   } finally {
     process.chdir(previous)
     rmSync(temp, { recursive: true, force: true })

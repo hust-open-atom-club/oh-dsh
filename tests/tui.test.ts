@@ -131,6 +131,7 @@ test('TUI launcher initializes its profile and attaches the packaged runtime', a
     const childEnv = launch.options.env
     assert.equal(childEnv?.DSH_HOME, dataRoot)
     assert.equal(childEnv?.OH_DSH_HOME, dataRoot)
+    assert.equal(childEnv?.OH_DSH_PROFILE, TUI_PROFILE)
     assert.equal(childEnv?.OH_DSH_TUI_FULLSCREEN, '0')
     assert.equal(childEnv?.OH_DSH_TUI_LANG, 'en')
     assert.equal(childEnv?.DSH_OH_TUI_VERSION, '1.2.3')

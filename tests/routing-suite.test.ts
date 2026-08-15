@@ -1,0 +1,213 @@
+import assert from 'node:assert/strict'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { test } from 'node:test'
+import {
+  classifySession,
+  classifyTask,
+  coreToolsFor,
+  firstUserMessage,
+} from '../plugins/routing/src/core.ts'
+import { apply as applyRouter } from '../plugins/routing/src/index.ts'
+import { apply as applyInjectorTools } from '../plugins/routing-injector/src/index.ts'
+import { apply as applyInjectorHost } from '../plugins/routing-injector-host/src/index.ts'
+import { RoutingInjector } from '../plugins/routing-injector/src/index.ts'
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+
+interface FakeEntry {
+  options: { name: string }
+}
+
+class FakeLoader {
+  readonly active = new Map<string, FakeEntry>()
+  readonly created: string[] = []
+  readonly removed: string[] = []
+
+  async create(options: { name: string }): Promise<string> {
+    const id = `entry-${String(this.created.length + 1)}`
+    this.created.push(options.name)
+    this.active.set(id, { options })
+    return id
+  }
+
+  entries(): Iterable<FakeEntry> {
+    return this.active.values()
+  }
+
+  async remove(id: string): Promise<void> {
+    this.removed.push(id)
+    this.active.delete(id)
+  }
+}
+
+function userMessage(text: string): { data: unknown; type: string } {
+  return {
+    data: { content: [{ text, type: 'text' }], source: { kind: 'user' } },
+    type: 'user/message',
+  }
+}
+
+function packageAt(rootPath: string, name = 'local-router-plugin'): string {
+  const directory = join(rootPath, name)
+  const lib = join(directory, 'lib')
+  mkdirSync(lib, { recursive: true })
+  writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version: '1.0.0' }))
+  writeFileSync(join(lib, 'index.js'), 'export function apply() {}\n')
+  return directory
+}
+
+test('router mode is a native preset composition source', () => {
+  const preset = readFileSync(join(root, 'agent-presets/router-standard/preset.yml'), 'utf8')
+  const composition = readFileSync(join(root, 'agent-presets/router-standard/agent.cordis.yml'), 'utf8')
+  assert.match(preset, /^name: 思维注入 \+ 路由模式$/m)
+  assert.match(composition, /name: '@oh-dsh\/routing'/)
+  assert.match(composition, /name: '@oh-dsh\/routing-injector'/)
+  assert.match(composition, /disabled: !!js process\.env\.OH_DSH_PROFILE === 'tui'/)
+})
+
+test('router classifies only the first real user message with legacy fallback', () => {
+  const session = {
+    events: [
+      { data: { content: [{ text: 'plugin generated' }], source: { kind: 'plugin' } }, type: 'user/message' },
+      userMessage('Please build a small web application.'),
+      userMessage('Fix the deployment warning.'),
+    ],
+    id: 'session-1',
+  }
+  assert.equal(classifySession(session), 'react')
+  assert.equal(classifyTask('Fix this broken configuration.'), 'spec')
+  assert.deepEqual(coreToolsFor('spec'), ['read', 'edit', 'glob', 'grep'])
+
+  const legacy = { events: [{ data: { content: [{ text: '修复配置' }] }, type: 'user/message' }], id: 'legacy' }
+  assert.equal(firstUserMessage(legacy), legacy.events[0])
+  assert.equal(classifySession(legacy), 'spec')
+})
+
+test('router narrows only the first request and releases per-session state', async () => {
+  type Listener = (...args: any[]) => unknown
+  const listeners = new Map<string, Listener>()
+  const tools = new Map<string, Record<string, unknown>>()
+  const context = {
+    effect(callback: () => (() => void) | void): void { void callback() },
+    on(event: string, listener: Listener): void { listeners.set(event, listener) },
+    tools: { register(tool: Record<string, unknown>): () => void {
+      tools.set(String(tool.name), tool)
+      return () => { tools.delete(String(tool.name)) }
+    } },
+  }
+  applyRouter(context)
+  const session = { events: [userMessage('Build a local tool.')], id: 'shared' }
+  const agent = { session }
+  const assemble = listeners.get('system-prompt/assemble')
+  assert.ok(assemble)
+  const request = async () => await assemble(
+    undefined,
+    { agent },
+    async () => ({
+      contexts: [],
+      sections: [{ name: 'persona', order: 0, text: 'default' }],
+      tools: [{ name: 'read' }, { name: 'write' }, { name: 'edit' }, { name: 'grep' }],
+    }),
+  ) as { sections: Array<{ name: string }>; tools: Array<{ name: string }> }
+  assert.deepEqual((await request()).tools.map(tool => tool.name), ['read', 'write', 'edit'])
+  session.events.push({ data: { name: 'write' }, type: 'tool/call' })
+  assert.deepEqual((await request()).tools.map(tool => tool.name), ['read', 'write', 'edit', 'grep'])
+
+  const modeTool = tools.get('dev_router_mode')
+  assert.ok(modeTool)
+  const mode = modeTool.execute as (args: unknown, execution: unknown) => Promise<{ message: string }>
+  await mode({ mode: 'spec' }, { agent })
+  const disposed = listeners.get('agent/disposed')
+  assert.ok(disposed)
+  disposed({ agent })
+  const fresh = { session: { events: [userMessage('Build a new application.')], id: 'shared' } }
+  const freshResult = await assemble(
+    undefined,
+    { agent: fresh },
+    async () => ({ contexts: [], sections: [], tools: [{ name: 'read' }, { name: 'write' }, { name: 'edit' }] }),
+  ) as { sections: Array<{ name: string }> }
+  assert.ok(freshResult.sections.some(section => section.name === 'router-persona'))
+})
+
+test('injector stores canonical approved packages and rejects changed restore targets', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-'))
+  try {
+    const plugin = packageAt(temporary)
+    const home = join(temporary, 'home')
+    const loader = new FakeLoader()
+    const injector = new RoutingInjector(loader, { OH_DSH_HOME: home, OH_DSH_PROFILE: 'desktop' })
+    await injector.ready
+    assert.equal(existsSync(join(home, 'routing-injector')), false)
+
+    const record = await injector.inject(plugin)
+    assert.equal(record.path, realpathSync(plugin))
+    assert.equal(loader.created[0], 'local-router-plugin')
+    assert.equal(existsSync(join(home, 'profiles', 'desktop', 'node_modules', 'local-router-plugin')), true)
+    const registry = JSON.parse(readFileSync(join(home, 'routing-injector', 'registry.json'), 'utf8'))
+    assert.equal(registry.records[0].fingerprint, record.fingerprint)
+
+    writeFileSync(join(plugin, 'lib', 'index.js'), 'export function apply() { return 1 }\n')
+    const restored = new RoutingInjector(new FakeLoader(), { OH_DSH_HOME: home, OH_DSH_PROFILE: 'desktop' })
+    await restored.ready
+    assert.deepEqual(restored.snapshot().inactive, {
+      'local-router-plugin': 'approved package fingerprint changed',
+    })
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
+test('injector gates every mutation and exposes no HTTP or polling surface', async () => {
+  type Decision = { kind: 'allow' | 'ask' | 'deny'; reason?: string }
+  let gate: ((execution: { name: string }, next: () => Promise<Decision>) => Promise<Decision>) | undefined
+  let service: RoutingInjector | undefined
+  const tools = new Map<string, Record<string, unknown>>()
+  const context = {
+    effect(callback: () => (() => void) | void): void { void callback() },
+    loader: new FakeLoader(),
+    on(_event: 'tools/pre-execute', listener: typeof gate): void { gate = listener },
+    provide(_name: string, value: unknown): void { service = value as RoutingInjector },
+    tools: { register(tool: Record<string, unknown>): () => void {
+      tools.set(String(tool.name), tool)
+      return () => { tools.delete(String(tool.name)) }
+    } },
+  }
+  const home = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-gate-'))
+  const previousHome = process.env.OH_DSH_HOME
+  const previousProfile = process.env.OH_DSH_PROFILE
+  process.env.OH_DSH_HOME = home
+  process.env.OH_DSH_PROFILE = 'desktop'
+  try {
+    applyInjectorHost(context)
+    assert.ok(gate)
+    assert.ok(service)
+    assert.equal((await gate({ name: 'dev_inject_plugin' }, async () => ({ kind: 'allow' }))).kind, 'ask')
+    assert.equal((await gate({ name: 'dev_plugin_status' }, async () => ({ kind: 'allow' }))).kind, 'allow')
+    applyInjectorTools({
+      effect: context.effect,
+      routingInjector: service,
+      tools: context.tools,
+    })
+    assert.ok(tools.has('dev_inject_plugin'))
+    assert.ok(tools.has('dev_plugin_status'))
+    const source = readFileSync(join(root, 'plugins/routing-injector/src/index.ts'), 'utf8')
+    assert.doesNotMatch(source, /webServer|setInterval|fetch\(/)
+  } finally {
+    if (previousHome === undefined) delete process.env.OH_DSH_HOME
+    else process.env.OH_DSH_HOME = previousHome
+    if (previousProfile === undefined) delete process.env.OH_DSH_PROFILE
+    else process.env.OH_DSH_PROFILE = previousProfile
+    rmSync(home, { force: true, recursive: true })
+  }
+})
