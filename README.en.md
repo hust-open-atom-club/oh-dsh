@@ -165,13 +165,14 @@ or only TUI with `pnpm run dist:tui`.
 - [Installation, operations, and troubleshooting](./docs/usage.en.md)
 - [Architecture, design, and plugin boundaries](./docs/design.en.md)
 
-## Upstream dependencies
+## Plugin recommendations
 
-| Upstream repository | Role in Oh-DSH |
+| Recommended project | Description |
 | --- | --- |
 | [DeepSeek Harness](https://github.com/deepseek-harness/deepseek-harness) | DSH runtime, sessions, and plugin loader |
 | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | **Direct upstream plugin for Oh-DSH TUI**, providing terminal rendering, interaction, and commands |
 | [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git review, files, and PTY host capabilities |
+| [dshfind](https://dshfind.com/) | DSH plugin marketplace and learning community with plugin, ecosystem, and DeepSeek Harness peripheral recommendations |
 
 Oh-DSH preserves upstream implementations and attribution, then provides the
 unified launcher, Profiles, data root, cross-surface skins, interface
