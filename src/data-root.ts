@@ -145,41 +145,47 @@ function copyEntry(
   source: string,
   destination: string,
   roots?: CopyRoots,
-): void {
+): boolean {
   const sourceStat = stat(source)
-  if (sourceStat === undefined) return
+  if (sourceStat === undefined) return true
   const destinationStat = stat(destination)
 
   if (sourceStat.isDirectory()) {
-    if (destinationStat !== undefined && !destinationStat.isDirectory()) return
+    if (destinationStat !== undefined && !destinationStat.isDirectory()) return true
     mkdirSync(destination, { recursive: true, mode: sourceStat.mode & 0o777 })
     const copyRoots = roots ?? {
       destination: realpathSync(destination),
       source: realpathSync(source),
     }
+    let copied = true
     for (const entry of readdirSync(source)) {
-      copyEntry(join(source, entry), join(destination, entry), copyRoots)
+      copied = copyEntry(
+        join(source, entry),
+        join(destination, entry),
+        copyRoots,
+      ) && copied
     }
-    return
+    return copied
   }
 
   if (sourceStat.isFile()) {
-    if (destinationStat !== undefined && !destinationStat.isFile()) return
-    if (destinationStat !== undefined) return
+    if (destinationStat !== undefined && !destinationStat.isFile()) return true
+    if (destinationStat !== undefined) return true
     mkdirSync(dirname(destination), { recursive: true, mode: 0o700 })
     try {
       copyFileSync(source, destination, fsConstants.COPYFILE_EXCL)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
     }
-    return
+    return true
   }
 
-  if (!sourceStat.isSymbolicLink() || destinationStat !== undefined) return
+  if (!sourceStat.isSymbolicLink() || destinationStat !== undefined) return true
   mkdirSync(dirname(destination), { recursive: true, mode: 0o700 })
   const targetStat = followedStat(source)
   const linkTarget = relocatedLinkTarget(source, destination, roots, targetStat)
   if (process.platform === 'win32') {
+    if (targetStat === undefined) return false
     if (targetStat?.isDirectory() === true) {
       symlinkSync(linkTarget.absolute, destination, 'junction')
     } else if (targetStat?.isFile() === true) {
@@ -189,7 +195,7 @@ function copyEntry(
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
       }
     }
-    return
+    return true
   }
   try {
     symlinkSync(
@@ -200,6 +206,7 @@ function copyEntry(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
   }
+  return true
 }
 
 function copyDirectoryContents(
@@ -215,11 +222,16 @@ function copyDirectoryContents(
   if (sourceRoot === destinationRoot) return true
   if (containsPath(sourceRoot, destinationRoot)) return false
   const roots = { destination: destinationRoot, source: sourceRoot }
+  let copied = true
   for (const entry of readdirSync(source)) {
     if (options.exclude?.has(entry) === true) continue
-    copyEntry(join(source, entry), join(destination, entry), roots)
+    copied = copyEntry(
+      join(source, entry),
+      join(destination, entry),
+      roots,
+    ) && copied
   }
-  return true
+  return copied
 }
 
 function completeMigration(root: string, name: string): void {
@@ -249,10 +261,15 @@ export function migrateLegacyDesktopState(input: {
   const legacyDshHome = join(legacyRoot, 'dsh')
   if (stat(legacyDshHome) !== undefined
     && !copyDirectoryContents(legacyDshHome, input.ohDshHome)) return false
+  let copiedSharedEntries = true
   for (const entry of DESKTOP_SHARED_ENTRIES) {
     if (entry === 'dsh') continue
-    copyEntry(join(legacyRoot, entry), join(input.ohDshHome, entry))
+    copiedSharedEntries = copyEntry(
+      join(legacyRoot, entry),
+      join(input.ohDshHome, entry),
+    ) && copiedSharedEntries
   }
+  if (!copiedSharedEntries) return false
   if (!copyDirectoryContents(
     legacyRoot,
     desktopElectronDataRoot(input.ohDshHome),
@@ -288,13 +305,17 @@ export function migrateLegacyWebState(input: {
     const copiedLegacyDshHome = !hasLegacyDshHome
       || copyDirectoryContents(legacyDshHome, input.dataRoot)
     let foundLegacyState = hasLegacyDshHome
+    let copiedSharedEntries = true
     for (const entry of WEB_SHARED_ENTRIES) {
       const source = join(legacyDefault, entry)
       if (stat(source) === undefined) continue
       foundLegacyState = true
-      copyEntry(source, join(input.dataRoot, entry))
+      copiedSharedEntries = copyEntry(
+        source,
+        join(input.dataRoot, entry),
+      ) && copiedSharedEntries
     }
-    if (foundLegacyState && copiedLegacyDshHome) {
+    if (foundLegacyState && copiedLegacyDshHome && copiedSharedEntries) {
       completeMigration(input.dataRoot, WEB_DEFAULT_MIGRATION)
       migrated = true
     }

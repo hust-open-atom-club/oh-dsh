@@ -211,3 +211,38 @@ test('legacy directory links are followed before migration completes', t => {
     'web',
   )
 })
+
+test('unavailable Windows junctions keep migration retryable', t => {
+  if (process.platform !== 'win32') {
+    t.skip('Windows junction behavior')
+    return
+  }
+
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'ohdsh-junction-retry-'))
+  t.after(() => rmSync(temporaryRoot, { recursive: true, force: true }))
+
+  const appDataRoot = join(temporaryRoot, 'app-data')
+  const legacyRoot = join(appDataRoot, 'Oh-DSH-Desktop')
+  const dependencyTarget = join(temporaryRoot, 'dependency')
+  const dependencyLink = join(legacyRoot, 'dsh', 'node_modules', 'linked')
+  const sharedRoot = join(temporaryRoot, 'shared')
+  mkdirSync(dirname(dependencyLink), { recursive: true })
+  symlinkSync(dependencyTarget, dependencyLink, 'junction')
+
+  assert.equal(migrateLegacyDesktopState({
+    appDataRoot,
+    env: {},
+    ohDshHome: sharedRoot,
+  }), false)
+
+  write(join(dependencyTarget, 'package.json'), '{"name":"linked"}\n')
+  assert.equal(migrateLegacyDesktopState({
+    appDataRoot,
+    env: {},
+    ohDshHome: sharedRoot,
+  }), true)
+  assert.equal(
+    readFileSync(join(sharedRoot, 'node_modules', 'linked', 'package.json'), 'utf8'),
+    '{"name":"linked"}\n',
+  )
+})
