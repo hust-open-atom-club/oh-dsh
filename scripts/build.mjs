@@ -31,6 +31,9 @@ const pluginPackages = [
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
   { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
   { directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
+  { directory: 'routing', hostOnly: true },
+  { directory: 'routing-injector', hostOnly: true },
+  { directory: 'routing-injector-host', hostOnly: true },
 ]
 
 const shared = {

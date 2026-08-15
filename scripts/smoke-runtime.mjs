@@ -49,6 +49,7 @@ const runtimeEnvironment = {
   DSH_DESKTOP_PROFILE: 'desktop',
   DSH_DESKTOP_VERSION: 'smoke',
   DSH_HOME: dshHome,
+  OH_DSH_PROFILE: 'desktop',
   PATH: runtimeSearchPath(paths),
 }
 

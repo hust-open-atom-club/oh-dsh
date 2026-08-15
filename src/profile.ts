@@ -24,6 +24,7 @@ export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
 /** Host-only capability providers shipped inside the desktop runtime. */
 export const BUNDLED_DESKTOP_HOST_PLUGINS = [
   '@oh-dsh/better-sidebar-runtime',
+  '@oh-dsh/routing-injector-host',
 ] as const
 
 /** Every protected plugin shipped inside the desktop distribution. */

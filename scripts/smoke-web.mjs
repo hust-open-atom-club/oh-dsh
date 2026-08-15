@@ -83,6 +83,7 @@ const runtimeEnvironment = {
   DSH_OH_WEB_DATA: webData,
   DSH_OH_WEB_PROFILE: WEB_PROFILE,
   DSH_OH_WEB_VERSION: 'smoke',
+  OH_DSH_PROFILE: WEB_PROFILE,
   PATH: runtimeSearchPath(paths),
 }
 

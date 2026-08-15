@@ -197,6 +197,7 @@ export function tuiLaunchSpec(
     OH_DSH_TUI_SESSION_ID: options.sessionId,
     OH_DSH_TUI_TITLE: 'Oh-DSH TUI',
     OH_DSH_HOME: dataRoot,
+    OH_DSH_PROFILE: TUI_PROFILE,
     PATH: runtimeSearchPath(paths, env),
   }
   return {

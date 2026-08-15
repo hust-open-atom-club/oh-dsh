@@ -137,6 +137,7 @@ function runtimeEnvironment(
     DSH_DESKTOP_VERSION: info.version,
     DSH_HOME: overrides.dshHome ?? info.dshHome,
     OH_DSH_HOME: overrides.dshHome ?? info.dshHome,
+    OH_DSH_PROFILE: info.profile,
     NODE_USE_ENV_PROXY: '1',
     PATH: runtimeSearchPath(paths),
   }

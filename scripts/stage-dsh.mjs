@@ -792,6 +792,24 @@ function installDesktopPackages() {
         [join(root, 'dist', 'plugins', 'vision', 'LICENSE'), 'dist/LICENSE'],
       ],
     },
+    {
+      manifest: join(root, 'plugins', 'routing', 'package.json'),
+      files: [
+        [join(root, 'dist', 'plugins', 'routing', 'index.js'), 'dist/index.js'],
+      ],
+    },
+    {
+      manifest: join(root, 'plugins', 'routing-injector', 'package.json'),
+      files: [
+        [join(root, 'dist', 'plugins', 'routing-injector', 'index.js'), 'dist/index.js'],
+      ],
+    },
+    {
+      manifest: join(root, 'plugins', 'routing-injector-host', 'package.json'),
+      files: [
+        [join(root, 'dist', 'plugins', 'routing-injector-host', 'index.js'), 'dist/index.js'],
+      ],
+    },
     ...[
       'skins',
       'sidebar',
@@ -953,6 +971,9 @@ for (const required of [
   'plugins/pinned-summary/client.js',
   'plugins/plugin-marketplace/index.js',
   'plugins/plugin-marketplace/client.js',
+  'plugins/routing/index.js',
+  'plugins/routing-injector/index.js',
+  'plugins/routing-injector-host/index.js',
   'plugins/tui/index.js',
   'plugins/tui/cordis.patch.yml',
 ]) {

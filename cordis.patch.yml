@@ -23,6 +23,9 @@
     - id: oh-vision
       name: '@oh-dsh/vision'
 
+    - id: oh-routing-injector-host
+      name: '@oh-dsh/routing-injector-host'
+
     - id: oh-skins
       name: '@oh-dsh/skins'
 

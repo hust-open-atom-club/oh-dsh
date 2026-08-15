@@ -264,6 +264,7 @@ export async function main(
       DSH_OH_WEB_VERSION: version,
       NODE_USE_ENV_PROXY: '1',
       OH_DSH_HOME: dataRoot,
+      OH_DSH_PROFILE: WEB_PROFILE,
       PATH: runtimeSearchPath(paths, env),
     },
     nodeBinary: paths.nodeBinary,
