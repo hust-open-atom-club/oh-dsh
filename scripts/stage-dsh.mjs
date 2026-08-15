@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url'
 import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
 import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 import { adaptTuiRendererPackage } from './tui-upstream-adapter.mjs'
+import { discoverAgentPresetManifests } from './agent-presets.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dshSource = resolveDshSource()
@@ -763,6 +764,24 @@ function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) 
   }
 }
 
+function installAgentPresets() {
+  const destinationRoot = join(runtime, 'config', 'agent-presets')
+  if (!existsSync(destinationRoot)) {
+    throw new Error(`Staged DSH Agent preset root is missing: ${destinationRoot}`)
+  }
+  for (const preset of discoverAgentPresetManifests(root)) {
+    const destination = join(destinationRoot, preset.id)
+    if (existsSync(destination)) {
+      throw new Error(`Downstream Agent preset would overwrite the staged preset: ${preset.id}`)
+    }
+    cpSync(preset.directory, destination, {
+      filter: path => path !== preset.manifestPath,
+      preserveTimestamps: true,
+      recursive: true,
+    })
+  }
+}
+
 function installDesktopPackages() {
   const packages = [
     {
@@ -1013,6 +1032,7 @@ rewriteWorkspaceLinks()
 relinkInstallationWorkspacePackages()
 console.log('Installing desktop packages')
 installDesktopPackages()
+installAgentPresets()
 copyFileSync(join(dshSource, 'THIRD_PARTY_NOTICES.md'), join(runtime, 'THIRD_PARTY_NOTICES.md'))
 restoreExecutableHelpers()
 console.log('Normalizing runtime links')

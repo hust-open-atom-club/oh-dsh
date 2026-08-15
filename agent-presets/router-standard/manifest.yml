@@ -1,0 +1,23 @@
+schema: 1
+id: router-standard
+
+surfaces:
+  desktop: true
+  web: true
+  tui: true
+
+packages:
+  - path: plugins/routing
+    role: agent
+
+  - path: plugins/routing-injector
+    role: agent
+    surfaces:
+      - desktop
+      - web
+
+  - path: plugins/routing-injector-host
+    role: host
+    surfaces:
+      - desktop
+      - web

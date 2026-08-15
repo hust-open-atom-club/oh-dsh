@@ -49,6 +49,7 @@
     "build": "node scripts/build.mjs",
     "build:pages": "node scripts/build-pages.mjs",
     "build:dsh": "node scripts/build-dsh.mjs",
+    "check:agent-presets": "node scripts/agent-presets.mjs",
     "stage:dsh": "node scripts/stage-dsh.mjs",
     "check:plugins": "node scripts/smoke-runtime.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
