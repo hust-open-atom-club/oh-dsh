@@ -1,7 +1,19 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { transformSync } from 'esbuild'
 
 export const TUI_PRODUCT_NAME = 'Oh-DSH TUI'
+
+const STARTUP_CARD_MARKER = 'OH_DSH_STARTUP_CARD_V1'
+const STARTUP_CARD_SOURCE = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'plugins',
+  'tui',
+  'renderer',
+  'LogoV2.jsx',
+)
 
 function replaceOnce(path, before, after) {
   const source = readFileSync(path, 'utf8')
@@ -30,6 +42,36 @@ function scopePreferenceFile(lib, name, declaration = 'PREFS_DIR') {
   )
 }
 
+function installStartupCard(lib) {
+  const target = join(lib, 'components', 'LogoV2.js')
+  const source = readFileSync(target, 'utf8')
+  if (source.includes(STARTUP_CARD_MARKER)) return
+
+  for (const seam of [
+    'export function LogoV2',
+    "renderBigText('DEEPSEEK'",
+    "sweep('✦ dsh-cc'",
+  ]) {
+    const first = source.indexOf(seam)
+    if (first === -1 || source.indexOf(seam, first + seam.length) !== -1) {
+      throw new Error(`TUI upstream adapter seam changed: ${target}`)
+    }
+  }
+
+  const template = readFileSync(STARTUP_CARD_SOURCE, 'utf8')
+  if (!template.includes(STARTUP_CARD_MARKER)) {
+    throw new Error(`TUI startup card marker missing: ${STARTUP_CARD_SOURCE}`)
+  }
+  const replacement = transformSync(template, {
+    format: 'esm',
+    jsx: 'automatic',
+    legalComments: 'inline',
+    loader: 'jsx',
+    target: 'es2022',
+  }).code
+  writeFileSync(target, replacement)
+}
+
 /**
  * Apply the deliberately small Oh-DSH adapter to a copied upstream package.
  * The submodule remains pristine; exact-match guards fail the build when an
@@ -37,18 +79,44 @@ function scopePreferenceFile(lib, name, declaration = 'PREFS_DIR') {
  */
 export function adaptTuiRendererPackage(packageDir) {
   const lib = join(packageDir, 'lib', 'types')
+  installStartupCard(lib)
+
+  const messageList = join(lib, 'components', 'MessageList.js')
   replaceOnce(
-    join(lib, 'components', 'LogoV2.js'),
-    "sweep('✦ dsh-cc', t, wordmarkRGB, wordmarkShimmerRGB, 60)",
-    "sweep(process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI', t, wordmarkRGB, wordmarkShimmerRGB, 60)",
+    messageList,
+    'export function LogoHeader({ model, effort, cwd, }) {',
+    'export function LogoHeader({ model, effort, cwd, sessions, }) {',
   )
   replaceOnce(
-    join(lib, 'components', 'LogoV2.js'),
-    "'  v' + VERSION",
-    "'  v' + (process.env.DSH_OH_TUI_VERSION ?? VERSION)",
+    messageList,
+    '_jsx(LogoV2, { model: model, effort: effort, cwd: cwd })',
+    '_jsx(LogoV2, { model: model, effort: effort, cwd: cwd, sessions: sessions })',
+  )
+
+  const chat = join(lib, 'screens', 'Chat.js')
+  replaceOnce(
+    chat,
+    '    const [themeName, setTheme] = useTheme();',
+    `    const [themeName, setTheme] = useTheme();
+    React.useEffect(() => {
+        let active = true;
+        void channel.listSessions().then(sessions => {
+            if (active) {
+                setResumeSessions(sessions.filter(session => session.id !== channel.agentId));
+            }
+        });
+        return () => {
+            active = false;
+        };
+    }, [channel, channel.agentId]);`,
   )
   replaceOnce(
-    join(lib, 'screens', 'Chat.js'),
+    chat,
+    '_jsx(LogoHeader, { model: channel.model, effort: channel.reasoningEffort, cwd: channel.cwd })',
+    '_jsx(LogoHeader, { model: channel.model, effort: channel.reasoningEffort, cwd: channel.cwd, sessions: resumeSessions.slice(0, 3) })',
+  )
+  replaceOnce(
+    chat,
     'useTerminalTitle(`${titlePrefix} 🐋 ${channel.sessionTitle}`);',
     "useTerminalTitle(`${titlePrefix} ${process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI'} · ${channel.sessionTitle}`);",
   )
@@ -126,7 +194,7 @@ export function adaptTuiRendererPackage(packageDir) {
   )
 
   replaceOnce(
-    join(lib, 'screens', 'Chat.js'),
+    chat,
     '`${userHome}\\\\.dsh-cc\\\\cordis.yml`',
     '`${process.env.OH_DSH_TUI_CONFIG_HOME ?? `${userHome}\\\\.ohdsh\\\\tui`}\\\\cordis.yml`',
   )

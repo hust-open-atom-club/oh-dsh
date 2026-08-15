@@ -171,8 +171,18 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
   })
   try {
     adaptTuiRendererPackage(root)
-    assert.match(readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8'), /Oh-DSH TUI/)
-    assert.match(readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8'), /DSH_OH_TUI_VERSION/)
+    const logo = readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8')
+    assert.match(logo, /OH_DSH_STARTUP_CARD_V1/)
+    assert.match(logo, /Oh-DSH TUI/)
+    assert.match(logo, /DSH_OH_TUI_VERSION/)
+    assert.match(logo, /Recent sessions/)
+    assert.match(logo, /borderText/)
+    assert.doesNotMatch(logo, /renderBigText|useAnimationFrame/)
+    const messageList = readFileSync(
+      join(lib, 'components', 'MessageList.js'),
+      'utf8',
+    )
+    assert.match(messageList, /sessions: sessions/)
     assert.match(readFileSync(join(lib, 'screens', 'Chat.js'), 'utf8'), /Oh-DSH TUI/)
     assert.match(readFileSync(join(lib, 'customTheme.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
     assert.match(readFileSync(join(lib, 'themePrefs.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
@@ -189,6 +199,8 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
     assert.match(channel, /oh-dsh-tui-export-/)
     assert.doesNotMatch(channel, /dsh-cc-export-|join\(userHome, '\.dsh-cc\//)
     const chat = readFileSync(join(lib, 'screens', 'Chat.js'), 'utf8')
+    assert.match(chat, /channel\.listSessions\(\)/)
+    assert.match(chat, /sessions: resumeSessions\.slice\(0, 3\)/)
     assert.doesNotMatch(chat, /userHome}\\\\\.dsh-cc/)
     const themeProvider = readFileSync(
       join(lib, 'components', 'design-system', 'ThemeProvider.js'),
