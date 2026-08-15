@@ -285,6 +285,31 @@ Choose a skin from Settings on Web or Desktop. In TUI, run `/theme` to select
 the same Deep Current, Jade Circuit, Porcelain, or Ember Dusk palette. The
 choice applies immediately and survives restarts.
 
+## Routing mode and guarded injection
+
+`router-standard` is an optional, system-trusted Agent preset installed with
+Oh-DSH. It is available in Desktop, Web, and TUI, and never replaces the
+existing `standard` preset. Choose it for a new session when its task-aware
+routing is useful; copy it to a user preset before making custom changes.
+
+Router Standard classifies only the first real user message. Once the session
+has made a durable tool call, it restores the complete Standard tool catalog
+and stops routing scans. Older sessions without user-source metadata retain a
+compatible first-message fallback.
+
+Desktop and Web also include the guarded `routing-injector-host`, which owns the
+Loader, restore, and approval boundary. Only the Routing mode mounts the
+model-facing injector tools. TUI includes Router Standard but deliberately does
+not load those tools. Injector commands that change local packages, loader
+state, or profile configuration require DSH approval; a rejected request,
+cancellation, or an unavailable approval path does not make a change. Status
+commands are read-only.
+
+Approved injections are recorded only under the active `OH_DSH_HOME`. On a
+later start, an entry is restored only when its canonical package path and
+build fingerprint still match. The injector performs no background watching
+or automatic reload; an explicit reload needs approval again.
+
 ## Plugin marketplace
 
 Recommended flow:

@@ -253,6 +253,26 @@ oh-dsh-vision:
 Web 与 Desktop 可在设置页选择皮肤。TUI 输入 `/theme` 可选择相同的 Deep
 Current、Jade Circuit、Porcelain 和 Ember Dusk；选择立即生效并在重启后保留。
 
+## 路由模式与受保护注入
+
+`router-standard` 是随 Oh-DSH 安装的可选 system-trust Agent preset，可在
+Desktop、Web 和 TUI 中使用，不会替换已有的 `standard` preset。需要按任务路由时，
+请在新会话中选择它；需要定制时，应先复制为 user preset 再修改。
+
+Router Standard 只对第一条真实用户消息分类。会话首次完成持久化的工具调用后，
+它会恢复完整的 Standard 工具目录并停止路由扫描。缺少用户来源元数据的旧会话仍会
+使用兼容的首消息回退逻辑。
+
+Desktop 与 Web 还内置受保护的 `routing-injector-host`，负责 Loader、恢复和审批；
+只有“思维注入 + 路由模式”会挂载模型可见的 injector 工具。TUI 提供 Router Standard，
+但不会加载 injector 工具。会修改本地包、loader 状态或 profile 配置的 injector 命令
+都必须经过 DSH 审批；审批被拒绝、取消或无法进行审批时不会执行修改。状态查询命令
+只读，不请求审批。
+
+已批准的注入记录只写入当前 `OH_DSH_HOME`。下次启动时，仅当规范化后的包路径与
+构建指纹仍然一致才会恢复。injector 不会后台监听或自动热重载；显式 reload 仍需
+重新审批。
+
 ## 插件市场
 
 推荐流程：
