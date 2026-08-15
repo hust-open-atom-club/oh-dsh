@@ -304,11 +304,17 @@ function stageDependencyTarget(sourceTarget) {
   throw new Error(`DSH package dependency points outside the source checkout: ${sourceTarget}`)
 }
 
-function mirrorPackageDependencies(sourcePackage, targetPackage) {
+function mirrorPackageDependencies(sourcePackage, targetPackage, options = {}) {
   const manifestPath = join(sourcePackage, 'package.json')
   if (!existsSync(manifestPath)) return
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  for (const [dependency, optional] of dependencyNames(manifest)) {
+  const dependencies = options.peersOnly === true
+    ? new Map(Object.keys(manifest.peerDependencies ?? {}).map(dependency => [
+      dependency,
+      manifest.peerDependenciesMeta?.[dependency]?.optional === true,
+    ]))
+    : dependencyNames(manifest)
+  for (const [dependency, optional] of dependencies) {
     const sourceLink = join(sourcePackage, 'node_modules', ...dependency.split('/'))
     if (!existsSync(sourceLink)) {
       if (optional) continue
@@ -561,10 +567,14 @@ function rewriteWorkspaceLinks() {
 function relinkInstallationWorkspacePackages() {
   for (const [packageName, source] of discoverSourcePackages()) {
     if (source === dshSource) continue
+    const deployed = findDeployedPackage(source)
+    if (deployed !== undefined) {
+      mirrorPackageDependencies(source, deployed, { peersOnly: true })
+    }
     const link = join(runtime, 'node_modules', ...packageName.split('/'))
     const stat = existsSync(link) ? lstatSync(link) : undefined
     if (stat !== undefined && !stat.isSymbolicLink()) continue
-    if (stat === undefined && findDeployedPackage(source) === undefined) continue
+    if (stat === undefined && deployed === undefined) continue
     const stagedTarget = stageWorkspaceTarget(source)
     mkdirSync(dirname(link), { recursive: true })
     portableSymlink(relative(dirname(link), stagedTarget), link)
