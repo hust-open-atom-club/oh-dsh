@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { resolve } from 'node:path'
 import { test } from 'node:test'
 import {
   desktopLaunchSpec,
@@ -120,6 +121,17 @@ test('macOS installed launches inherit the shared Oh-DSH state root', () => {
       '/Applications/Oh-DSH Desktop.app',
       '--args',
       '--inspect',
+    ],
+    command: '/usr/bin/open',
+  })
+  assert.deepEqual(desktopLaunchSpec([], {
+    OH_DSH_HOME: './relative-state',
+  }, 'darwin'), {
+    args: [
+      '--env',
+      `OH_DSH_HOME=${resolve('./relative-state')}`,
+      '-a',
+      'Oh-DSH Desktop',
     ],
     command: '/usr/bin/open',
   })

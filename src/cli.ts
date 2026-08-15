@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { OH_DSH_HOME_ENV } from './data-root.ts'
+import { OH_DSH_HOME_ENV, resolveOhDshHome } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { main as runTui } from './tui.ts'
 import { main as runWeb } from './web.ts'
@@ -83,7 +83,7 @@ function macOpenEnvironment(env: NodeJS.ProcessEnv): string[] {
   const ohDshHome = env[OH_DSH_HOME_ENV]
   return ohDshHome === undefined || ohDshHome === ''
     ? []
-    : ['--env', `${OH_DSH_HOME_ENV}=${ohDshHome}`]
+    : ['--env', `${OH_DSH_HOME_ENV}=${resolveOhDshHome(env)}`]
 }
 
 /** Resolve one desktop launch without starting a process. */
