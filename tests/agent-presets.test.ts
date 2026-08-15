@@ -10,6 +10,7 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import {
+  discoverAgentPresetPackages,
   discoverAgentPresetManifests,
   readAgentPresetManifest,
 } from '../scripts/agent-presets.mjs'
@@ -80,6 +81,49 @@ test('manifest validation allows a surface-scoped Host package outside the Agent
     assert.equal(manifest.id, 'demo-mode')
     assert.equal(manifest.packages[1]?.role, 'host')
     assert.deepEqual(manifest.packages[1]?.surfaces, ['desktop', 'web'])
+  } finally {
+    rmSync(example.root, { force: true, recursive: true })
+  }
+})
+
+test('preset package discovery deduplicates shared sources and rejects name conflicts', () => {
+  const example = fixture('first-mode')
+  try {
+    const second = join(example.root, 'agent-presets', 'second-mode')
+    mkdirSync(second, { recursive: true })
+    writeFileSync(join(second, 'preset.yml'), 'name: Second mode\ndescription: Test fixture.\n')
+    writeFileSync(join(second, 'agent.cordis.yml'), "- id: demo-agent\n  name: '@oh-dsh/demo-agent'\n")
+    writeFileSync(join(second, 'manifest.yml'), `schema: 1
+id: second-mode
+surfaces: { desktop: true, web: true, tui: true }
+packages:
+  - path: plugins/demo-agent
+    role: agent
+  - path: plugins/demo-host
+    role: host
+    surfaces: [desktop, web]
+`)
+    assert.deepEqual(
+      discoverAgentPresetPackages(example.root).map(entry => entry.path),
+      ['plugins/demo-agent', 'plugins/demo-host'],
+    )
+
+    writePackage(example.root, 'plugins/conflicting-agent', '@oh-dsh/demo-agent')
+    const conflict = join(example.root, 'agent-presets', 'conflict-mode')
+    mkdirSync(conflict, { recursive: true })
+    writeFileSync(join(conflict, 'preset.yml'), 'name: Conflict mode\ndescription: Test fixture.\n')
+    writeFileSync(join(conflict, 'agent.cordis.yml'), "- id: demo-agent\n  name: '@oh-dsh/demo-agent'\n")
+    writeFileSync(join(conflict, 'manifest.yml'), `schema: 1
+id: conflict-mode
+surfaces: { desktop: true, web: true, tui: true }
+packages:
+  - path: plugins/conflicting-agent
+    role: agent
+`)
+    assert.throws(
+      () => discoverAgentPresetPackages(example.root),
+      /package @oh-dsh\/demo-agent is declared from multiple paths/,
+    )
   } finally {
     rmSync(example.root, { force: true, recursive: true })
   }

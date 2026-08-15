@@ -29,7 +29,10 @@ import { fileURLToPath } from 'node:url'
 import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
 import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 import { adaptTuiRendererPackage } from './tui-upstream-adapter.mjs'
-import { discoverAgentPresetManifests } from './agent-presets.mjs'
+import {
+  discoverAgentPresetManifests,
+  discoverAgentPresetPackages,
+} from './agent-presets.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dshSource = resolveDshSource()
@@ -821,24 +824,6 @@ function installDesktopPackages() {
         [join(root, 'dist', 'plugins', 'vision', 'LICENSE'), 'dist/LICENSE'],
       ],
     },
-    {
-      manifest: join(root, 'plugins', 'routing', 'package.json'),
-      files: [
-        [join(root, 'dist', 'plugins', 'routing', 'index.js'), 'dist/index.js'],
-      ],
-    },
-    {
-      manifest: join(root, 'plugins', 'routing-injector', 'package.json'),
-      files: [
-        [join(root, 'dist', 'plugins', 'routing-injector', 'index.js'), 'dist/index.js'],
-      ],
-    },
-    {
-      manifest: join(root, 'plugins', 'routing-injector-host', 'package.json'),
-      files: [
-        [join(root, 'dist', 'plugins', 'routing-injector-host', 'index.js'), 'dist/index.js'],
-      ],
-    },
     ...[
       'skins',
       'sidebar',
@@ -880,6 +865,24 @@ function installDesktopPackages() {
       ],
     },
   ]
+  const knownManifests = new Set(packages.map(spec => realpathSync(spec.manifest)))
+  for (const packageInfo of discoverAgentPresetPackages(root)) {
+    const manifest = join(packageInfo.directory, 'package.json')
+    if (knownManifests.has(realpathSync(manifest))) continue
+    const compiled = join(root, 'dist', packageInfo.path)
+    const files = [
+      ['index.js', 'dist/index.js'],
+      ['client.js', 'dist/client.js'],
+      ['client.js.map', 'dist/client.js.map'],
+    ].flatMap(([source, target]) => existsSync(join(compiled, source))
+      ? [[join(compiled, source), target]]
+      : [])
+    if (files.length === 0) {
+      throw new Error(`preset package ${packageInfo.name} has no compiled artifacts`)
+    }
+    packages.push({ manifest, files })
+    knownManifests.add(realpathSync(manifest))
+  }
   const installedVersions = {}
   for (const spec of packages) {
     const manifest = JSON.parse(readFileSync(spec.manifest, 'utf8'))
@@ -976,7 +979,7 @@ function ensureLinuxPtyBuild() {
 if (!existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
   throw new Error(`DSH source checkout not found: ${dshSource}`)
 }
-for (const required of [
+const requiredArtifacts = [
   'plugin.js',
   'client.js',
   'client.js.map',
@@ -1000,12 +1003,18 @@ for (const required of [
   'plugins/pinned-summary/client.js',
   'plugins/plugin-marketplace/index.js',
   'plugins/plugin-marketplace/client.js',
-  'plugins/routing/index.js',
-  'plugins/routing-injector/index.js',
-  'plugins/routing-injector-host/index.js',
   'plugins/tui/index.js',
   'plugins/tui/cordis.patch.yml',
-]) {
+]
+for (const packageInfo of discoverAgentPresetPackages(root)) {
+  const source = join(packageInfo.directory, 'src')
+  if (existsSync(join(source, 'index.ts'))) requiredArtifacts.push(join(packageInfo.path, 'index.js'))
+  if (existsSync(join(source, 'client.ts'))) {
+    requiredArtifacts.push(join(packageInfo.path, 'client.js'))
+    requiredArtifacts.push(join(packageInfo.path, 'client.js.map'))
+  }
+}
+for (const required of requiredArtifacts) {
   if (!existsSync(join(root, 'dist', required))) {
     throw new Error(`desktop artifact missing: dist/${required}; run pnpm run build first`)
   }

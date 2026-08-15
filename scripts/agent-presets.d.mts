@@ -29,3 +29,7 @@ export function discoverAgentPresetManifests(
   repoRoot: string,
   sourceRoot?: string,
 ): AgentPresetManifest[]
+export function discoverAgentPresetPackages(
+  repoRoot: string,
+  sourceRoot?: string,
+): AgentPresetPackageManifest[]

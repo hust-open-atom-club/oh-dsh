@@ -240,6 +240,23 @@ export function discoverAgentPresetManifests(repoRoot, sourceRoot = join(repoRoo
   return manifests.sort((left, right) => left.id.localeCompare(right.id))
 }
 
+/** Return the unique package sources declared across all downstream presets. */
+export function discoverAgentPresetPackages(repoRoot, sourceRoot = join(repoRoot, 'agent-presets')) {
+  const packages = new Map()
+  const pathsByName = new Map()
+  for (const manifest of discoverAgentPresetManifests(repoRoot, sourceRoot)) {
+    for (const packageInfo of manifest.packages) {
+      const previousPath = pathsByName.get(packageInfo.name)
+      if (previousPath !== undefined && previousPath !== packageInfo.directory) {
+        fail(manifest.manifestPath, `package ${packageInfo.name} is declared from multiple paths`)
+      }
+      pathsByName.set(packageInfo.name, packageInfo.directory)
+      packages.set(packageInfo.directory, packageInfo)
+    }
+  }
+  return [...packages.values()].sort((left, right) => left.path.localeCompare(right.path))
+}
+
 if (process.argv[1] !== undefined
   && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const repoRoot = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), '..'))

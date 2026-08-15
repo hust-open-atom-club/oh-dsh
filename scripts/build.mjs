@@ -1,8 +1,9 @@
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 import { resolveProductVersion } from '../src/version.ts'
+import { discoverAgentPresetPackages } from './agent-presets.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(root, 'dist')
@@ -18,23 +19,40 @@ rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
-  { directory: 'better-sidebar-runtime', hostOnly: true },
+  { path: 'plugins/better-sidebar-runtime', directory: 'better-sidebar-runtime', hostOnly: true },
   {
+    path: 'plugins/vision',
     directory: 'vision',
     id: '@oh-dsh/vision',
     clientExternal: ['@deepseek-ai/*'],
     external: ['@deepseek-ai/*'],
   },
-  { directory: 'tui', hostOnly: true },
-  { directory: 'skins', id: '@oh-dsh/skins' },
-  { directory: 'sidebar', id: '@oh-dsh/sidebar' },
-  { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
-  { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
-  { directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
-  { directory: 'routing', hostOnly: true },
-  { directory: 'routing-injector', hostOnly: true },
-  { directory: 'routing-injector-host', hostOnly: true },
+  { path: 'plugins/tui', directory: 'tui', hostOnly: true },
+  { path: 'plugins/skins', directory: 'skins', id: '@oh-dsh/skins' },
+  { path: 'plugins/sidebar', directory: 'sidebar', id: '@oh-dsh/sidebar' },
+  { path: 'plugins/panel-controls', directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
+  { path: 'plugins/pinned-summary', directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
+  { path: 'plugins/plugin-marketplace', directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
 ]
+
+const knownPresetPackages = new Map(pluginPackages.map(plugin => [plugin.path, plugin]))
+for (const packageInfo of discoverAgentPresetPackages(root)) {
+  if (knownPresetPackages.has(packageInfo.path)) continue
+  const source = join(root, packageInfo.path)
+  const hasHost = existsSync(join(source, 'src', 'index.ts'))
+  const hasClient = existsSync(join(source, 'src', 'client.ts'))
+  if (!hasHost && !hasClient) {
+    throw new Error(`preset package ${packageInfo.name} has no src/index.ts or src/client.ts`)
+  }
+  const plugin = {
+    directory: packageInfo.path.replace(/^plugins\//, ''),
+    id: packageInfo.name,
+    path: packageInfo.path,
+    hostOnly: !hasClient,
+  }
+  pluginPackages.push(plugin)
+  knownPresetPackages.set(packageInfo.path, plugin)
+}
 
 const shared = {
   bundle: true,
@@ -141,12 +159,12 @@ const builds = [
 ]
 
 for (const plugin of pluginPackages) {
-  const source = join(root, 'plugins', plugin.directory, 'src')
-  const output = join(dist, 'plugins', plugin.directory)
+  const source = join(root, plugin.path, 'src')
+  const output = join(dist, plugin.path)
   const hostEntry = plugin.directory === 'better-sidebar-runtime'
     ? join(root, 'upstream', 'DSH-better-sidebar', 'src', 'index.ts')
     : join(source, 'index.ts')
-  builds.push(build({
+  if (existsSync(hostEntry)) builds.push(build({
     ...shared,
     entryPoints: [hostEntry],
     outfile: join(output, 'index.js'),
@@ -156,11 +174,12 @@ for (const plugin of pluginPackages) {
       ? ['@deepseek-ai/*', 'cordis', 'node-pty', 'schemastery', 'ws']
       : []),
   }))
-  if (plugin.hostOnly !== true) {
+  const clientEntry = join(source, 'client.ts')
+  if (plugin.hostOnly !== true && existsSync(clientEntry)) {
     builds.push(build({
       bundle: true,
       define: versionDefine,
-      entryPoints: [join(source, 'client.ts')],
+      entryPoints: [clientEntry],
       outfile: join(output, 'client.js'),
       platform: 'browser',
       format: 'cjs',
