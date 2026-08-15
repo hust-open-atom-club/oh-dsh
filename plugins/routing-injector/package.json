@@ -1,0 +1,15 @@
+{
+  "name": "@oh-dsh/routing-injector",
+  "version": "0.1.5",
+  "description": "Approval-gated local plugin injector for Oh-DSH browser profiles",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/index.js"
+  ]
+}

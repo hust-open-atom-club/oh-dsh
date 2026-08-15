@@ -1,0 +1,15 @@
+{
+  "name": "@oh-dsh/routing",
+  "version": "0.1.5",
+  "description": "Task-aware system-preset router for Oh-DSH",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/index.js"
+  ]
+}

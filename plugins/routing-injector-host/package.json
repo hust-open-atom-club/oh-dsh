@@ -1,0 +1,15 @@
+{
+  "name": "@oh-dsh/routing-injector-host",
+  "version": "0.1.5",
+  "description": "Host-side approval and loader service for Oh-DSH routing injection",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/index.js"
+  ]
+}
