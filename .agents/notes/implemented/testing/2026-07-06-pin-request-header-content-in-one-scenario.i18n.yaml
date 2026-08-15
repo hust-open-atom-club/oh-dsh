@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-06-pin-request-header-content-in-one-scenario.md: bca6d9eb943e758d68efaf3a76ec367179cd15fd
-2026-07-06-pin-request-header-content-in-one-scenario.zh.md: 9637602aca34977bee7c0efd5dc57b848ed93e2c

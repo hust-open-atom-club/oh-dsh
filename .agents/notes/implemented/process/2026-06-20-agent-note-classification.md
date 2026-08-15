@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-agent-note-classification.zh.md)
+
 ## Problem
 
 A lifecycle-only Agent Note tree — `proposed/` / `implemented/` / `rejected/` — does not record what *kind* of decision each file contains. A reader browsing one lifecycle cannot distinguish a new capability from a removal or a tooling-policy change without opening each file.
@@ -36,7 +38,7 @@ Both are `doc-sync` members, in the `verify-md-wrap` style (tsx ESM, verify-don'
 
 - **A `Classification:` prose line** in each file (next to `Status:`), parsed by the gate. Workable, but it duplicates into the file a fact the path can already carry, and a line can disagree with its folder. Path-encoding makes the label and its storage the same thing — there is nothing to keep in sync.
 - **A `refactor` class.** It overlaps `simplification` almost entirely; the only discriminator anyone reached for was "does observable behavior change?", which `simplification` already encodes (it does not). One class, not two.
-- **A generated or hand-maintained corpus index.** Rejected because the lifecycle/class tree is authoritative, while a centralized inventory creates a merge hotspot without providing discovery that tree navigation or repository search cannot provide. The separate [index proposal](../../rejected/process/2026-07-04-generate-agent-note-index-tables.md) records the discarded generated shape.
+- **A generated or hand-maintained corpus index.** Rejected because the lifecycle/class tree is authoritative, while a centralized inventory creates a merge hotspot without providing discovery that tree navigation or repository search cannot provide.
 
 ## Consequences
 

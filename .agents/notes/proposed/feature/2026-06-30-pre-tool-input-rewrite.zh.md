@@ -6,7 +6,7 @@ Status: proposed
 
 ## 问题
 
-[拦截 seam Agent Note](../../implemented/feature/2026-06-30-interception-seams.md) 将 `tools/pre-execute` 定义为一道针对执行的允许/拒绝/询问门禁，此时执行的身份标识已受保护、参数已被深度冻结。Claude Code 的 `PreToolUse` 钩子还提供了 `updatedInput`，因此忠实的桥接需要一个显式的重写机制。重写不能是对现有执行对象的可变逃逸口：它必须保持持久化历史、审计记录、展示层与实际执行值之间的一致性。
+[拦截扩展点 Agent Note](../../implemented/feature/2026-06-30-interception-extension-points.md) 将 `tools/pre-execute` 定义为一道针对执行的允许/拒绝/询问门禁，此时执行的身份标识已受保护、参数已被深度冻结。Claude Code 的 `PreToolUse` 钩子还提供了 `updatedInput`，因此忠实的桥接需要一个显式的重写机制。重写不能是对现有执行对象的可变逃逸口：它必须保持持久化历史、审计记录、展示层与实际执行值之间的一致性。
 
 ## 问题本质：执行前参数的三个读取方
 
@@ -14,7 +14,7 @@ Status: proposed
 
 1. **`assistant/message`** 在工具分发之前追加——它是 `deriveMessages()` 回放时的模型历史来源，因此携带模型自身输出的工具调用参数。
 2. **`tool/call`** 是持久化的审计记录，在 `ctx.tools.execute()` 之前追加。
-3. **展示层实时读取 `tool/call.arguments`**：ACP（Agent Client Protocol）桥接记住这些参数并传给 `presentResult`；`dsh-tool-bash` 从中派生卡片标题、rawInput、cwd 以及终端/后台处理方式。
+3. **面向人类的展示读取 `tool/call.arguments`**：UI 渲染器将这些参数传给 `presentResult`；`dsh-tool-bash` 从中派生卡片标题、rawInput、cwd 以及终端/后台处理方式。
 
 如果只做执行层面的重写，UI 会显示一条命令而实际运行的是另一条，并且结果会对着错误的参数渲染。注册表目前通过以下方式防止这种失败模式：对 `arguments` 做 structured-clone 并深度冻结，将执行身份属性设为不可写，且不暴露任何可替换它们的测试 shim 或监听路径。重写设计必须维护这一受保护的身份边界，而非削弱它。
 
@@ -42,12 +42,12 @@ Status: proposed
 
 ## 风险
 
-- 重写 `assistant/message` 中的工具调用块会改变模型「看到自己说了什么」；是否有提供方在回放时拒绝这种改动，是一个需要通过实验确定的开放问题，必须在决策形状冻结之前解决。
+- 重写 `assistant/message` 中的工具调用块会改变模型「看到自己说了什么」；是否有提供方在回放时拒绝这种改动，是一个需要通过实验确定的开放问题，必须在决策结构定型之前解决。
 - 更早的重写阶段改变了 `assistant/message`、`tool/call`、钩子审计事件与执行之间的顺序关系；设计必须固定这一顺序，同时不削弱轮次封闭性或调用/结果邻接性。
 
 ## 开放问题
 
 - 重写 `assistant/message` 中的工具调用块是否会破坏某些提供方在回放时的预期？还是单独的修正更安全？
 - 原始参数是否应保留在 `tool/call` 事件（审计）上？如果是，放在什么字段？
-- 重写决策是移到日志提交之前，还是成为一个专门的更早 seam？现有的 pre-tool 允许/拒绝钩子如何避免运行两次？
+- 重写决策是移到日志提交之前，还是成为一个专门的更早扩展点？现有的 pre-tool 允许/拒绝钩子如何避免运行两次？
 - 这与未来的权限 `ask` 流程（用户批准一个被重写的调用）如何交互？

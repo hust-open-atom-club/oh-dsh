@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-05-uniform-agent-note-format.zh.md)
+
 ## Problem
 
 Agent Note paths encoded lifecycle and class, but file contents still mixed headings, status formats, ADR and proposal templates, and proposal-era sections in implemented records. Authors copied whichever neighbor they found, and lifecycle moves could skip the required rewrite because no gate enforced an in-file contract.
@@ -21,7 +23,7 @@ The whole corpus was normalized in the same change that defined the format — t
 - **A bare `# <title>` H1** — rejected: the `Agent Note: ` prefix self-describes the genre when a file is read outside its tree, and the format gate prevents it from drifting.
 - **`## What we give up` as the implemented closer** (the README's own phrase for what an Agent Note records) — rejected: it names only costs, and an honest consequences section records what the trade-off bought as well.
 - **Convention without a gate** (write the contract down, enforce by review) — rejected: the slop checklist already outlawed spec-speak in `implemented/` by convention, and nineteen files show what convention alone achieves here.
-- **A standalone `FORMAT.md` contract file** — rejected because one front door carrying layout, classification, and format is easier to discover and maintain than two contract files.
+- **A standalone `FORMAT.md` contract file** — rejected because one entry point carrying layout, classification, and format is easier to discover and maintain than two contract files.
 
 ## Consequences
 

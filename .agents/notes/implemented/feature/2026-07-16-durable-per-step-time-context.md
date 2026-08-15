@@ -6,65 +6,69 @@ English | [中文](2026-07-16-durable-per-step-time-context.zh.md)
 
 ## Problem
 
-A request-only clock can tell the model the current time, but replacing that value in the system prompt removes the evidence behind earlier time-sensitive reasoning. Multi-step turns need requests to retain the readings that shaped preceding steps. The request must remain reconstructable after restart, and automatic compaction must account for the same timing context the model receives.
+A request-only clock can tell the model the current time, but replacing that value in the system prompt removes the evidence behind earlier time-sensitive reasoning. Multi-step turns need requests to retain the readings used by preceding steps. The request must remain reconstructable after restart, and automatic compaction must account for the same timing context the model receives.
 
-A process-local refresh cache makes displayed time depend on state that cannot survive resume or be reconstructed from the durable session. Durable interval scheduling can reduce append frequency without introducing that hidden state.
+A process-local refresh cache makes displayed time depend on state that cannot survive resume. Browser-originated natural language also needs a request-owned zone: a server process zone cannot infer the user's locality, while a mutable Session or connection default lets travel or concurrent tabs reinterpret another prompt.
 
 ## Decision
 
-`@deepseek-ai/dsh-time-context` is an opt-in function plugin in `packages/context/time-context/`. It registers a prepended `agent/pre-step` listener and, when an injection is due, calls `agent.inject()` for a pre-step attempt whose signal is not already aborted. The injected `context/message` carries source `{ kind: 'plugin', plugin: 'time-context' }` and append surface metadata; a suppressed attempt appends nothing.
+`@deepseek-ai/dsh-time-context` is an opt-in function plugin in `packages/context/time-context/`. Default compositions leave its disclosure and token cost disabled; the Schedule Web overlay mounts it so the model can interpret otherwise-unqualified dates and times in the browser zone attached to the current request.
 
-The listener records preparation context before a possible `step/start`. Its prepended registration runs before ordinary automatic compaction listeners, so pressure estimation and any resulting surface rewrite observe a newly appended reading. A later pre-step listener can cancel or fail the attempt before the step opens; the reading remains because the durable log is append-only and this plugin performs no rollback.
+The plugin prepends an `agent/pre-step` listener and delegates first. When the downstream decision enters and a reading is due, it combines that decision's final messages with durable user messages already in the open turn, derives browser-zone provenance from exact `user-rpc` sources, and appends one reading to the decision. Rejection, listener failure, or an already-aborted signal records nothing. Steering claimed after the current batch keeps ordinary next-step ownership and receives a fresh reading when that step enters.
 
-The optional `timeZone` config resolves the Node process's IANA zone once at plugin load when omitted; an explicit value is validated by `Intl.DateTimeFormat`. The timestamp includes the numeric UTC offset and resolved IANA zone.
+Each Web prompt samples the browser's IANA zone. The Host validates and canonicalizes it before binding it to the exact durable user-message source. One unique zone in the open turn resolves the request; multiple zones produce a sorted `mixed` result; no zone is `unavailable`. A resolved request tells the model to interpret unqualified dates and times in that zone. Mixed or unavailable provenance tells it to ask the user to clarify.
 
-The optional `refreshIntervalMs` config is manually validated at plugin load as a non-negative safe integer. Omission or `0` injects on every eligible preparation attempt. A positive value scans the raw session events for the most recent `context/message` with this plugin's source and injects when none exists, wall time moved backward, or the event is at least the configured age. The raw event timestamp governs even after compaction shadows the message, so scheduling persists across turns and process resume without a timer or process-local cache.
+This message-bound provenance is not copied to `SessionHeader`, a connection default, or Schedule state. Time-context owns model guidance only. A tool accepting local calendar fields must still make its own explicit boundary; Schedule therefore requires `time_zone` rather than importing this plugin's reading ([decision](../simplification/2026-08-09-explicit-schedule-time-zone.md)).
+
+The resolved browser zone also formats the reading's timestamp. Mixed or unavailable requests use the configured `timeZone` fallback, or the Node process zone resolved once at plugin load when config is omitted, while retaining the clarify policy. Every fallback is validated through `Intl.DateTimeFormat`.
+
+Each reading uses the exact snapshot source `{ kind: 'plugin', plugin: 'time-context', form: 'snapshot', sections: [{ name: 'time-context', text: <same text> }] }`. The invariant companion checks the snapshot shape, re-derives current-turn browser provenance from the original user-rpc messages, and validates the rendered timestamp zone and elapsed baseline.
+
+The optional `refreshIntervalMs` config is a non-negative safe integer. Omission or `0` injects on every eligible entered step. A positive value scans raw Session events for the latest plugin reading and injects when none exists, wall time moved backward, or the event is old enough. The event timestamp governs after compaction and resume without a process-local cache. The Schedule Web overlay omits the interval so every request step gets current browser guidance.
 
 ### Text and elapsed baselines
 
-An injected first-step reading is:
+A resolved first-step reading is:
 
 ```text
-Time sampled while preparing turn <turn>, step 1: <timestamp>
+Time sampled while preparing turn <turn>, step 1: <timestamp-in-browser-zone>
+Browser time zone for this request: <iana-zone>. Interpret otherwise-unqualified dates and times in this zone.
 Elapsed since the preceding model-visible message: <duration-or-unavailable>.
 ```
 
-The baseline is the latest preceding user, assistant, tool-result, context, or steering message. This includes the accepted prompt that opened an ordinary message turn. If no model-visible message exists, the duration is `unavailable`.
+Mixed and unavailable variants replace the second line with an instruction to ask for clarification. The baseline is the latest durable preceding user, assistant, or tool-result message. The prompt proposed for this step has not been appended yet; a new Session can therefore report `unavailable`.
 
-An injected later-step reading is:
+A later-step reading changes the first line's step number and ends with:
 
 ```text
-Time sampled while preparing turn <turn>, step <step>: <timestamp>
 Elapsed since the preceding step context: <duration-or-unavailable>.
 ```
 
-Their baseline is the durable event timestamp of the preceding time-context message in the same turn. If interval suppression leaves no earlier same-turn reading, the duration is `unavailable`. Duration formatting uses compact whole-second units and clamps backward wall-clock movement to zero. The explicit turn and step make every retained reading attributable to its historical preparation attempt after later turns append more context.
+That baseline is the preceding time-context event in the open turn. Missing baselines report `unavailable`; duration formatting uses compact whole-second units and clamps backward wall-clock movement to zero.
 
-### Durability and request reconstruction
+### Durability and reconstruction
 
-Each reading remains a normal surface node until compaction shadows it; positive interval scheduling never removes existing readings. A later request therefore sees the cumulative unshadowed readings that affected earlier preparation and steps, rather than a system-prompt value rewritten in place.
+An entered step appends its returned messages followed by the time reading after `step/start`, before request derivation. A later preparation failure can leave the reading in history because it records entry, not successful transmission. Each reading remains a normal surface node until compaction shadows it. A positive interval can let a later request reuse existing history without adding a fresh reading.
 
-The plugin contributes nothing to system-prompt assembly. `request/header` contains no time-context text; request reconstruction obtains the complete durable surface prefix at each `step/start`. Readings and requests need not map one-to-one because a failed preparation can leave a reading while interval suppression can prepare a request without appending one. The plugin depends on the agent registry for its lifecycle listener and does not require the system-prompt service at runtime.
-
-## Testing
-
-Unit and real-loop tests pin formatting, both elapsed baselines, interval omission and zero, threshold boundaries, cross-turn and per-session scheduling, backward-clock behavior, invalid config, resumed raw-event lookup after compaction, aborted-signal behavior, later-listener cancellation and failure, listener disposal, source and surface metadata, cumulative multi-step visibility, and absence from request headers. A keyless subprocess e2e boots the real Loader and stdio app, drives two turns, and verifies the persisted context events externally.
-
-## Supersedes
-
-This decision supersedes the dynamic system-prompt storage and refresh policy in [Optional time-context plugin](2026-07-14-time-context-plugin.md). It keeps the package location, opt-in deployment stance, timestamp formatting, process-zone default, and load-time validation. Durable history replaces the `context:time` prompt section, process-local refresh cache, and request-header deltas; `refreshIntervalMs` controls durable append frequency instead of prompt replacement.
+The plugin contributes nothing to system-prompt assembly or `request/header`. Request reconstruction obtains the complete durable surface prefix at each `step/start`, so historical requests recover the exact time and browser policy the model saw.
 
 ## Alternatives considered
 
-- **Keep the dynamic system-prompt section and process-local refresh cache** — rejected because replacement erases earlier readings, cache state is not replayable, and a frozen request envelope would make the value stale for an entire loop instance.
-- **Replace the preceding context surface node** — rejected because replacement preserves the old node's position or shadows intervening conversation; neither represents when the new reading became visible.
-- **Inject from a background timer** — rejected because idle time has no pending request to consume the value, and timer-driven injection would create durable turns solely to report time passing.
-- **Expose time only through a tool** — rejected because ordinary temporal reasoning would require an avoidable tool round trip and would not guarantee a reading before every step.
-- **Use `agent/session-prefix`** — rejected because one loop-instance prefix cannot represent distinct step timestamps and does not accumulate historically attributable readings.
+- **Replace a dynamic system-prompt value** — rejected because replacement erases prior readings and changes reconstructed historical requests.
+- **Persist a Session default zone** — rejected because the browser fact belongs to one prompt; travel and concurrent tabs must not mutate shared meaning or spread zone state through Session, fork, and persistence contracts.
+- **Copy the browser zone into a second context authority** — rejected because the original user-rpc source already owns it and the invariant can re-derive policy directly.
+- **Let Schedule consume the reading implicitly** — rejected because prose context is not a stable typed default and would couple an absolute-time parser to AgentLoop history. The model instead passes an explicit offset or zone.
+- **Use only the process zone** — rejected because deployment locality cannot infer a remote user's zone. It remains a display fallback when request provenance is absent or mixed.
+- **Expose time only through a tool** — rejected because ordinary temporal reasoning would require an avoidable round trip and would not ensure a reading before each step.
+- **Mount time-context by default** — rejected because disclosure, freshness, and history cost remain composition policy.
+
+## Verification
+
+Unit and real-loop tests pin timestamp formatting, unique/mixed/missing browser derivation, fallback display, both elapsed baselines, interval boundaries, cross-turn and resumed scheduling, backward-clock behavior, steering ownership, cancellation, exact snapshot validation, and request reconstruction. Host/client tests pin browser sampling plus validation and canonicalization at prompt entry. The keyless assembled Schedule Web scenario sends a real browser prompt, observes the same zone in the model request, and verifies that the model supplies it explicitly to `schedule_create`.
 
 ## Consequences
 
-- Omission or `0` records every eligible preparation attempt; a positive interval reduces append frequency and history growth while preserving durable scheduling across resume.
-- Timing context remains append-only until compaction shadows older surface nodes, including a preparation reading left by a later cancellation or failure.
-- The first-step duration normally measures from the prompt that opened the turn, while later-step durations measure model and tool processing since the preceding step context.
-- An omitted `timeZone` still reflects the deployment process rather than a remote user, and elapsed time still uses durable harness append boundaries rather than client-origin timestamps.
+- Browser-zone meaning is request-local and durable without changing Session, fork, JSONL, or SQLite schemas.
+- The model receives the requested browser-local assumption on each Schedule Web request step; mixed or missing provenance asks instead of guessing.
+- Tools remain explicit: context helps the model choose fields but does not become a hidden package-seam default.
+- Timing context remains append-only until compaction; a positive interval reduces history growth but can omit fresh browser guidance on later requests.

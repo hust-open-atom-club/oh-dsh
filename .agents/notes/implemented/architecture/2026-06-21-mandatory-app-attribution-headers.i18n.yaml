@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-06-21-mandatory-app-attribution-headers.md: a8ffe91c431cdc7907626bbc3eaf8096035777de
-2026-06-21-mandatory-app-attribution-headers.zh.md: 5529a42dddf4615ee1054b4d1dee36b077800d7d
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.md
+2026-06-21-mandatory-app-attribution-headers.md: 479d3a46dc41c5cc9ae9b77b81dbef3d6524370b
+2026-06-21-mandatory-app-attribution-headers.zh.md: 75162604623099d50ca87aafd5d45567e2121789

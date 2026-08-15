@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-05-prompt-variables-and-tool-guidance-ownership.md: 94f5fa409e7b539b48750d12576c7a342a30c9ba
-2026-07-05-prompt-variables-and-tool-guidance-ownership.zh.md: 572a95c34381f6d73d1f6e053e565f30704026d3
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-05-prompt-variables-and-tool-guidance-ownership.md
+2026-07-05-prompt-variables-and-tool-guidance-ownership.md: 9a53619d9510e3f4fa561f8420b2da3bedbbf4bb
+2026-07-05-prompt-variables-and-tool-guidance-ownership.zh.md: 6174f277f0a4e8c46ff8d732411f28b4ea97728c

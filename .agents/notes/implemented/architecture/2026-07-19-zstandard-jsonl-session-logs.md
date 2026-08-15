@@ -28,15 +28,15 @@ First materialization compresses the two initial frames before opening the tempo
 
 ### Read, listing, and crash recovery
 
-A frame-boundary scanner reads the standard magic, variable header fields, block headers and payload sizes, and optional checksum trailer. It does not interpret compressed blocks. Complete frames are decompressed independently and sequentially, which validates their checksums, and their plaintext is passed to the existing JSONL scanner. A checksum/decompression failure in any complete frame, a malformed complete-frame JSONL tail, or invalid frame structure is corruption and rejects.
+A frame-boundary scanner reads the standard magic, variable header fields, block headers and payload sizes, and optional checksum trailer. It does not interpret compressed blocks. Complete frames are independently checksum-validated and passed through the [large-session restore pipeline](2026-08-05-large-session-jsonl-restore-pipeline.md), which owns decoder reuse, cooperative yielding, and incremental JSONL scanning. A checksum/decompression failure in any complete frame, a malformed complete-frame JSONL tail, or invalid frame structure is corruption and rejects.
 
 Listing reads in bounded chunks only until the first complete frame is available, validates and decompresses that header frame, and never reads an event frame. The dedicated header frame therefore preserves metadata-only listing even for very large session logs.
 
-EOF inside the final frame is a recoverable torn tail. Node's decoder is given the available frame prefix; every complete newline-terminated event it emits is retained. Repair truncates from that frame's starting byte and appends one new checksummed frame containing the recovered complete events followed by the coordinator's synthetic tool, step, and turn closers. If the tear occurs before any complete event is decodable, repair drops the partial frame and retains all prior complete frames.
+EOF inside the final frame is a recoverable torn tail. After the scanner establishes that boundary, a dedicated prefix decoder uses `finishFlush: ZSTD_e_flush` so Node emits available plaintext without requiring frame or checksum completion; every complete newline-terminated event it emits is retained. Repair truncates from that frame's starting byte and appends one new checksummed frame containing the recovered complete events followed by the coordinator's synthetic tool, step, and turn closers. If the tear occurs before any complete event is decodable, repair drops the partial frame and retains all prior complete frames.
 
 ### Consumers and verification
 
-The CLI, ACP, and stdio app bundles expose symmetric `persistenceCompression` pass-through configuration. Snapshot recording and replay compositions select `'none'` explicitly because committed fixtures are raw JSONL inputs to replay and normalization; ordinary runtime compositions use the compressed default.
+The CLI, ACP, and stdio app bundles expose symmetric `persistenceCompression` pass-through configuration. The web host assembly and ordinary app compositions omit the option and use the compressed default. Snapshot recording and replay compositions select `'none'` explicitly because committed fixtures are raw JSONL inputs to replay and normalization.
 
 The shared persistence and coordinator contracts run against both encodings. Backend tests cover standard framing and checksum interoperability, header-only listing, append rollback, encoding mismatch rejection, complete-frame corruption, and final-frame tears through headers, blocks, and checksum trailers. Default runtime, built-bin, headless, ACP, and Python smokes assert the compressed suffix and Zstandard magic or decode the header; raw-content tests opt out explicitly.
 
@@ -53,5 +53,5 @@ The shared persistence and coordinator contracts run against both encodings. Bac
 - Ordinary session roots store `.jsonl.zstd` and retain append-only, fsync, rollback, and interrupted-turn recovery semantics.
 - Raw JSONL remains a deliberate configuration, but changing encoding requires a fresh/separate root or selecting the mode that matches existing artifacts.
 - One frame per durable batch adds bounded framing/checksum overhead and allows header-only listing plus repair from an exact append boundary.
-- External tools must understand concatenated Zstandard frames or consume raw-mode artifacts; generic one-shot Node decompression reads only the first independent frame, so backend reads walk frames explicitly.
+- External tools must understand concatenated Zstandard frames or consume raw-mode artifacts; generic one-shot Node decompression reads only the first independent frame, so backend reads walk frames through the [restore pipeline](2026-08-05-large-session-jsonl-restore-pipeline.md).
 - The implementation depends on Node's experimental built-in Zstandard API without an npm dependency; the supported-version compatibility gate makes drift visible.

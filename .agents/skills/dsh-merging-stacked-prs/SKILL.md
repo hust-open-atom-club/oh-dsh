@@ -1,52 +1,127 @@
 ---
 name: dsh-merging-stacked-prs
-description: Use when landing a stack of dependent GitHub PRs (A ← B ← C, where each bases on the one below) onto master — merging more than one PR in a chain, merging a PR whose base is another open PR's branch, or whenever a request mentions "stacked PRs", "PR stack", "dependent PRs", "base branch", or merging several related PRs in sequence. Critical because deleting a base branch mid-chain auto-closes the open PR that bases on it — get the order wrong and you silently close unmerged work.
+description: Use when landing a stack of dependent GitHub PRs (A ← B ← C, where each bases on the one below) onto master, merging a PR whose base is another open PR's branch, or whenever a request mentions "stacked PRs", "PR stack", "dependent PRs", or merging several related PRs in sequence. Requires every same-repository dependency chain to use GitHub's official stacked-PR feature before landing so GitHub owns stack-wide rules, CI, ordering, retargeting, and merge state.
 ---
 
-# Merging a stacked PR chain
+# Landing an official GitHub PR stack
 
-This skill is the landing procedure for a dependent PR stack. The standing orders it rests on — merge commits only (`gh pr merge --merge`), never rewrite a pushed branch — live in the root [AGENTS.md](../../../AGENTS.md) § Conventions; the discipline for handling review comments across a stack before it lands is the [responding-to-pr-review-on-a-stack](../../../docs/cookbook/responding-to-pr-review-on-a-stack.md) cookbook guide.
+Land dependent PRs through GitHub's native stack object and `gh stack merge`. Do not reproduce stack semantics by merging and retargeting individual PRs with `gh pr merge` and `gh pr edit`. The root [AGENTS.md](../../../AGENTS.md) owns the allowed merge-forward and rebase histories; the [stack review guide](../../../docs/cookbook/responding-to-pr-review-on-a-stack.md) owns review-fix propagation.
 
-## The hazard this prevents
+## Require native stack support
 
-On GitHub, **deleting a PR's base branch auto-closes that PR.** In a stack `A ← B ← C` (B bases on A, C bases on B), branch A is the base of PR B, and branch B is the base of PR C. So if you merge A with `--delete-branch`, GitHub closes PR B before it's merged — silently destroying the chain. The whole procedure below exists to avoid that: **merge one at a time, retarget each dependent as you go, and delete nothing until every PR has landed.**
+Run `gh stack --version` before changing GitHub state. Hard-stop if the official extension or server-side stack feature is unavailable; do not fall back to manually merging and retargeting PRs one at a time. GitHub stacks require every head branch to live in the same repository, so hard-stop on a cross-fork chain.
 
-## The procedure
+Use a clean dedicated worktree. Fetch current PR metadata and exact head OIDs rather than trusting branch names or an earlier report:
 
-Given `A ← B ← C` landing on `master`:
+```sh
+gh pr view <pr> --json number,author,baseRefName,baseRefOid,headRefName,headRefOid,isCrossRepository,state,isDraft,reviewDecision,mergeStateStatus,statusCheckRollup
+```
 
-1. **Merge PR A into master, keeping its branch.** `gh pr merge A --merge` — no `--delete-branch`. Branch A must survive because PR B still bases on it. Before touching the next link, confirm the merge actually landed: with required checks pending or a merge queue, `gh pr merge` may only enable auto-merge and return early, so wait until `gh pr view A --json state` reports `MERGED`. This applies after every merge in the stack.
+Query `PullRequest.stack` and `stackEntry.position` for at least one PR in each apparent chain; this official GitHub object, not base-branch inference alone, is the stack-membership authority. Paginate `entries` when `size` exceeds the returned page:
 
-2. **Retarget PR B, refresh it, then merge it — keeping its branch.**
-   - `gh pr edit B --base master` (now that A is in master, B's base becomes master).
-   - Merge the new master *into* branch B: check out B, `git fetch origin`, `git merge origin/master` — merge `origin/master`, not local `master`, because `gh pr merge` updated only GitHub and the local branch is stale — resolve any conflicts here, and push. This makes B current and surfaces conflicts in the working branch where they can be tested — not as a surprise at the GitHub merge.
-   - `gh pr merge B --merge` — still no `--delete-branch` (PR C bases on branch B).
+```sh
+gh api graphql -F owner=<owner> -F name=<repo> -F number=<pr> -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      number
+      author { login }
+      baseRefName
+      headRefName
+      stackEntry { position }
+      stack {
+        number
+        baseRefName
+        size
+        entries(first: 100) {
+          nodes {
+            position
+            pullRequest { number author { login } baseRefName headRefName state isDraft }
+          }
+        }
+      }
+    }
+  }
+}'
+```
 
-3. **Retarget PR C, refresh it, then merge it — keeping its branch.** Same steps: `gh pr edit C --base master`, fetch and merge `origin/master` into branch C, resolve conflicts there and push, then `gh pr merge C --merge` without `--delete-branch`.
+Establish the expected bottom-to-top order from the live PR bases: the bottom targets the trunk, and each higher PR targets the head branch immediately below it.
 
-4. **Only after every PR (A, B, C) is merged, delete the branches** — local and remote, for all of A, B, C.
+## Link missing stack members
 
-## Why "merge new master into the dependent before merging it"
+First compare any existing stack entries with the expected chain. One existing stack may contain an order-preserving subset of the requested chain; multiple stack numbers, an unexpected entry, or a conflicting order requires user direction before any mutation.
 
-Each retarget step merges the freshly-updated master back into the dependent branch *before* merging the PR. This keeps each PR's diff clean (it only shows that PR's own changes, not the parent's) and forces conflicts to surface in the working branch, where you can build and test the resolution — instead of letting GitHub attempt a blind merge that may conflict or quietly mis-resolve.
+When any dependent PR is not yet in that official stack:
 
-## Verify before deleting anything
+1. Compare every `author.login` exactly.
+2. If all authors match, link the chain automatically in bottom-to-top order:
 
-Before deleting a branch, ask GitHub directly whether any open PR still bases on it:
+```sh
+gh stack link --base <trunk> <bottom-pr> <next-pr> ... <top-pr>
+```
+
+3. If authors differ or any author is unavailable, ask the user whether to link before changing GitHub state.
+4. Re-query GraphQL and require one stack number, the expected trunk, the complete PR set, and the expected positions and base chain.
+
+Never dissolve, reorder, or rebuild an existing stack automatically; `gh stack link` is additive and merged or queued entries cannot be unstacked.
+
+## Refresh only when needed
+
+Do not rewrite branches merely because a refresh mechanism exists. When the live merge state or repository rules require an updated trunk, choose either allowed history:
+
+- **Native cascading rebase:** check out the remote stack with `gh stack checkout <pr-or-stack>` when it is not tracked locally, then run `gh stack sync`. The command may rebase and lease-protected force-push every active layer before local validation. Immediately inspect the rewritten scope, run the relevant checks for every affected layer, and do not merge or claim readiness until they pass. If sync detects a rebase conflict, use `gh stack rebase`, resolve and validate it, then publish with `gh stack push`. If checkout or sync reports divergent local and remote stack compositions, cancel and ask rather than deleting or recreating the remote stack automatically.
+- **Incremental merge-forward:** merge the trunk into the bottom affected branch, then propagate each updated parent into its child in bottom-to-top order and push normally. If the base advances during an in-progress merge, preserve that checkpoint before merging the newer tip as specified by the [incremental-retargeting note](../../notes/implemented/process/2026-07-26-incremental-pr-base-retargeting.md).
+
+Any history rewrite is allowed after review, but it invalidates commit-OID assumptions. Re-fetch exact heads and re-audit unresolved review threads, approvals, mergeability, and checks after the push. Never use raw `--force` or overwrite a concurrently advanced remote head.
+
+## Preflight the merge range
+
+Re-query the official stack immediately before merging. Require every selected PR to be open, non-draft, in the expected order, and compliant with the repository's review and check requirements. Treat each PR's state independently; a ready top layer does not prove its dependencies are ready.
+
+"Land the stack" selects the whole stack. A partial landing requires an explicit boundary PR and includes every layer from the bottom through that boundary.
+
+## Merge through the stack API
+
+Merge the whole stack by its official stack number:
+
+```sh
+gh stack merge <stack-number> --yes --merge
+```
+
+For an explicitly requested partial landing, merge through the boundary PR:
+
+```sh
+gh stack merge <boundary-pr> --yes --merge
+```
+
+Do not pass `--delete-branch`, manually retarget dependents, or issue per-PR merge commands. GitHub merges the selected range bottom-up and retargets/rebases any remaining upper layers. A direct stack merge is all-or-nothing; when the trunk uses a merge queue, GitHub queues the selected range together but may land it in separate groups.
+
+Do not bypass merge requirements. If the native merge reports a blocker, inspect and resolve that blocker through the owning PR or stop and report it; never fall back to `gh pr merge`.
+
+## Verify the landed state
+
+Wait for every selected PR to report `MERGED`; a queued request is not a completed landing:
+
+```sh
+gh pr view <pr> --json number,state,mergedAt,mergeCommit,baseRefName,headRefName
+```
+
+For a partial landing, re-query the official stack and verify that every remaining PR is still linked in the expected order and targets the stack trunk or the layer below it. Re-check current heads, review state, and CI because GitHub may have rebased the remaining layers.
+
+Delete branches only in a separate final pass after the corresponding PRs report `MERGED`. Before deleting each branch, require GitHub to report no open PR still using it as a base:
 
 ```sh
 gh pr list --state open --base <branch> --json number --jq length
 ```
 
-Anything other than `0` means open PRs still base on `<branch>` and deleting it would auto-close them — do not delete it. The `--base` filter is applied server-side, so zero-versus-non-zero is exact no matter how many PRs are open; the printed number itself saturates at `gh`'s `--limit` (default 30), which never matters here because only `0` clears a delete. Default to merging without `--delete-branch` throughout, and do the deletions as a separate final pass once every branch you're about to delete reports `0`.
+Anything other than `0` blocks deletion.
 
-## Longer chains
+## Checklist
 
-The pattern extends to any depth. For `A ← B ← C ← D ← …`, walk the stack from the bottom up: merge the lowest, then for each next link retarget to master, fetch and merge `origin/master` into it, merge the PR — always without deleting — and only sweep up all the branches at the very end. The invariant never changes: **a branch may be deleted only when no open PR bases on it.**
-
-## Quick checklist
-
-- [ ] Merge bottom PR first, `--merge`, no `--delete-branch`; wait until `gh pr view <n> --json state` shows `MERGED`.
-- [ ] For each dependent: `gh pr edit <n> --base master` → fetch and merge `origin/master` into the branch (resolve conflicts there, push) → `gh pr merge <n> --merge`, no `--delete-branch`; again wait for `MERGED`.
-- [ ] Before each branch delete: `gh pr list --state open --base <branch> --json number --jq length` prints `0`.
-- [ ] Delete all branches (local + remote) only as a final pass.
+- [ ] Native `gh stack` support is available; every PR branch is in the same repository.
+- [ ] Live PR bases and exact heads establish one bottom-to-top dependency chain.
+- [ ] GraphQL reports one official stack with the expected trunk, entries, and order; an eligible same-author unstacked chain was linked automatically.
+- [ ] Any rewritten layers passed relevant validation, and review threads, approvals, mergeability, and checks were re-audited afterward.
+- [ ] The whole stack, or an explicitly bounded prefix, was submitted through `gh stack merge --yes --merge`.
+- [ ] Every selected PR reports `MERGED`; any remaining upper layers still form the expected official stack.
+- [ ] Branch deletion happened only after merged-state and zero-dependent verification.

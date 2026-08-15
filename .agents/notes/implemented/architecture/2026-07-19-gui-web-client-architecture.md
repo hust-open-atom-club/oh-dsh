@@ -4,7 +4,7 @@ Status: implemented
 
 English | [中文](2026-07-19-gui-web-client-architecture.zh.md)
 
-> Division of labor: the channel-independent layering model and RPC protocol (message model / type system / contract face / client base class) are in the [layering and RPC protocol RFC](2026-07-19-gui-layering-and-rpc-protocol.md); this document = the browser side: how the client cordis tree loads, how UI plugins compose through slots and services, and how the React-free object layer feeds React through immutable snapshots.
+> Division of labor: the channel-independent layering model and RPC protocol (message model / type system / contract face / client base class) are in the [layering and RPC protocol note](2026-07-19-gui-layering-and-rpc-protocol.md); this document = the browser side: how the client cordis tree loads, how UI plugins compose through slots and services, and how the React-free object layer feeds React through immutable snapshots.
 
 ## Problem
 
@@ -17,70 +17,63 @@ Both ends run cordis. The host is a cordis plugin tree; the browser runs a secon
 ```
 ┌─ Host ─────────────────────────┐   ┌─ Browser ─────────────────────────────────────────┐
 │ sessions/agents/SessionLog     │   │ client cordis root ctx                             │
-│ apiproxy: RPC + mux/host 双流  │◀─▶│  ├ loader（壳静态持有，不能经自己装载）             │
-│ webserver:                     │   │  ├ immediately 先行组: connection/runtime/         │
-│  ├ GET /plugins/<id>/client.js │   │  │   ui-theme/i18n（动态 bundle，并行先装）        │
-│  └ GET / 注入 __DSH_BOOT__     │   │  ├ 后续组: layout/sidebar/conversation/trajectory  │
-└────────────────────────────────┘   │  └ session scope ×N（观看驱动，惰性建）            │
+│ apiproxy: RPC + mux/host 双流  │◀─▶│  ├ vendored Loader + ctx.modules（内核，壳静态持有）│
+│ webserver:                     │   │  ├ immediately entries: connection/runtime/        │
+│  ├ GET /plugins/<id>/client.js │   │  │   ui-theme/i18n（fetch bundle，boot 预拉）       │
+│  └ GET / 注入 __DSH_BOOT__ 图  │   │  ├ lazy entries: layout/sidebar/                   │
+│                                │   │  │   conversation/trajectory（fetch bundle，按需） │
+└────────────────────────────────┘   │  ├ app-shell 伪行（壳内静态注册，同一治理）        │
+                                     │  └ session scope ×N（观看驱动，惰性建）            │
                                      │ React: loading 页 → settled → 整 UI 一次成型       │
                                      └────────────────────────────────────────────────────┘
 ```
 
 ## The client cordis tree and the loading chain
 
-Every UI plugin is simultaneously a host plugin (dual-entry package): the node half sits in the host's plugin tree so the host Loader governs its lifecycle, and the browser half is a tsdown closure bundle under the package's `exports["./client"]`. The host webserver derives the boot manifest from loaded plugins carrying a `dshClient` manifest field and injects it into the page as `window.__DSH_BOOT__` — the HTML alone tells the browser everything to fetch, zero extra round trips.
+The loading chain — the two package kinds (plain vs dsh.client plugin), the module-system/plugin-governor split, the two-phase boot over the host-authored entry graph with revisions, and hot reload — is owned by the [client plugin loading note](2026-07-23-client-plugin-loading-model.md). The load-bearing facts for this document: the browser boots the same vendored `@cordisjs/plugin-loader` as the host with a client module system (`ctx.modules`, `packages/client/modules`) filling its `internal` contract; every unit with product behavior is an entry in the host-authored `__DSH_BOOT__` graph — every production plugin package (infrastructure included) carries the `dsh.client` declaration and arrives as a fetched `./client` tsdown closure bundle, `immediately` rows differing only in boot phase-one prefetch, while plain packages (react family, cordis, the not-yet-promoted libraries) stay shell-bundled, seeded, and invisible to the graph; bundles execute `window.__ModuleLoader__.load({ id, factory })` and their `require` is answered from the lazy CJS module table (seed words + registered factories, materialized and memoized on first require — cross-plugin value imports are a build error, cooperation goes through cordis services); plugin CSS is inlined in the bundle and injected as `<style data-plugin="<id>">` at materialization (CSS Modules hashing + ownership tag = isolation, removal on reload); hot reload is live in dev graphs — the webserver stat-polls the bundles it serves and broadcasts `rebuilt` SSE frames, and the `client-hmr` plugin swaps one fiber per frame. The settled flip (`loader.await()` + an all-ACTIVE sweep) still switches the shell from the loading page to the real UI in one pass — settled means every entry is created and every fiber reached ACTIVE, with FAILED/PENDING fibers listed loud; there is no partial-availability mode (progressive rendering is deferred work).
 
-The loading chain, end to end:
-
-1. `GET /` → the shell boots, mounts `ctx.loader` (the loader mechanism is held statically by the shell — a loader cannot load itself; its code home is `packages/client/runtime/src/client/loader/`, imported through the `./loader` subpath so the shell bundle does not swallow the rest of the runtime package), seeds the require module table with the pure-library instances (react, react-dom, cordis, ui-slots, web-react, ui-primitives), and renders a plugin-independent loading page.
-2. `loader.start()` reads `__DSH_BOOT__`. Entries flagged `immediately` form the early-load group (connection, runtime, ui-theme, i18n): fetched in parallel, applied in intra-group `inject` topological order, and **the whole group must land before anything else loads**. Remaining plugins then load in inject order.
-3. Each bundle executes `window.DSHClientProxy.loadPlugin({ id, factory })`. The loader calls `factory(require)` — bundles are closure factories whose external dependencies arrive through the injected `require`, resolved against the module table (no globals, no import maps; an unresolvable specifier fails loud). The factory returns its module export surface (including the cordis `apply`); the loader runs `ctx.plugin(apply)`, then **registers that export surface into the module table under the package name**, so inject topology guarantees later plugins can `require` earlier ones. Plugin CSS is inlined in the bundle and injected as `<style data-plugin="<id>">` (CSS Modules hashing + ownership tag = isolation).
-4. `await loader.settled()` → the shell flips from the loading page to the real UI in one pass. A single failed plugin fails loud on the loading page; there is no partial-availability mode (progressive rendering is deferred work).
-
-**The dual-instance ban**: a module-table package inlined into a plugin bundle would duplicate runtime identity (two React copies, two store registries — the root cause of an actual white-screen P0). The tsdown client preset enforces purity at build time: a bare-name import of a module-table package must resolve external (rewritten to its `/client` form where applicable), and any other workspace leak that is not an inline-safe wire/type layer fails the build (`packages/client/tsdown.client.ts`, pinned by `scripts/client-bundle-purity.spec.ts`).
-
-Dev equals prod: plugins rebuild under `tsdown --watch`, refresh reloads the same chain; vite serves only the shell (`apps/web`). Type universes stay split at the aggregate level — `tsconfig.host.json` is the host program and `tsconfig.client.json` the client program, both referenced by the solution root `tsconfig.json` — because both sides merge cordis `Context` under the same keys (`sessions`, `loader`) with different services; client packages consume the wire vocabulary through pure type subpaths (`@deepseek-ai/dsh-session/types` and kin) so no host augmentation rides into the client program.
+Type universes stay split at the aggregate level — `tsconfig.host.json` is the host program and `tsconfig.client.json` the client program, both referenced by the solution root `tsconfig.json` — because both sides merge cordis `Context` under the same keys (`sessions`, `loader`) with different services; client packages consume the wire vocabulary through pure type subpaths (`@deepseek-ai/dsh-session/types` and kin) so no host augmentation rides into the client program.
 
 ## The slot system: how the page composes
 
-The slot system has its own RFC — the [slot system standard](2026-07-22-slot-type-chain-implementation.md) — and this document defers to it entirely. The one-paragraph summary for orientation: the shell renders only `'root'`; a plugin composes UI through a single `register` call that occupies a slot, declares+authorizes its child slots (`children` spec object), declares its store, and injects its business face; component props arrive in four auto-derived shares (`PropsRuntime<K>` / `PropsRenderSlots<S>` / `PropsStore<H>` / inject), each from its single source of truth. `SlotMap` declaration merging is the type authority and entries carry only the owner share ("whoever injects it, owns its type"); every rendered entry sits in a per-entry error boundary.
+The slot system has its own note — the [slot system standard](2026-07-22-slot-type-chain-implementation.md) — and this document defers to it entirely. The one-paragraph summary for orientation: the shell renders only `'root'`; a plugin composes UI through a single `register` call that occupies a slot, declares+authorizes its child slots (`children` spec object), declares its store, and injects its business face; component props arrive in four auto-derived shares (`PropsRuntime<K>` / `PropsRenderSlots<S>` / `PropsStore<H>` / inject), each from its single source of truth. `SlotMap` declaration merging is the type authority and entries carry only the owner share ("whoever injects it, owns its type"); every rendered entry sits in a per-entry error boundary.
 
 Implementation homes: registry core and the props-share types in `packages/client/ui-slots`, outlet/renderer/uSES bridge in `packages/client/web-react`.
 
 ## Services and scope addressing
 
-A service is a plugin's only API surface toward other plugins (UI components and injection faces are not APIs; a plugin nobody calls mounts no service — ui-trajectory is the minimal-plugin exemplar: no ctx service, only view-map merges). The roster: `ctx.connection` (api client + stream handles), `ctx.slots` (registry wrapper emitting `slots/changed`, render entry, renderer install seam), `ctx.sessions` (list store, current-session state, scope tree), `ctx.loader`, `ctx.theme`, `ctx.i18n`, `ctx.layout` (cross-plugin view navigation), `ctx.conversation` (send/cancel/views/startSession), `ctx.toolviews` (named per-tool render registry with per-session scope filters). Viewing state that used to live in service stores (panel widths, selection, drafts) now lives in entry-declared stores per the [slot system standard](2026-07-22-slot-type-chain-implementation.md).
+A service is a plugin's only API toward other plugins (UI components and injection faces are not APIs; a plugin nobody calls mounts no service — ui-trajectory is the minimal-plugin exemplar: no ctx service, only view-slot registrations). The roster: `ctx.connection` (api client + stream handles), `ctx.slots` (registry wrapper emitting `slots/changed`, render entry, renderer installation contract), `ctx.sessions` (list store, current-session state, scope tree), `ctx.loader`, `ctx.theme`, `ctx.i18n`, `ctx.layout` (cross-plugin view navigation), `ctx.conversation` (send/cancel/startSession). Viewing state that used to live in service stores (panel widths, selection, drafts) now lives in entry-declared stores per the [slot system standard](2026-07-22-slot-type-chain-implementation.md).
 
-Beyond SlotMap, two more typed registration rings follow the same declare-merge idiom: the **view ring** (`ConversationViewMap` — an entry may declare `chromeProps`/`extraProps` extension shapes; `ConvViewPropsOf<Id>`/`ChromePropsOf<Id>` compose base + extension, so a view with no declaration gets the base for free while ui-trajectory's entries carry real per-view props) and the **tool ring** (tool names stay an open set — no global key table; typing hardens inside the entry: `ToolViewProps.block` is the real `ToolCallBlock` union defined in runtime, and register infers the registrant's injected share like slots do).
+There is no component registration model besides slots — the former view and tool rings both dissolved into it. Conversation views are entries of the `'conversation.view'` list slot ui-conversation declares, tab metadata rides the registration options (`id`/`order`/`label`), and per-view chrome lives inside the view components themselves. Final Chat business Nodes dispatch through the keyed/session `'conversation.chat.node'` slot; ui-tool owns its `tool-call` entry, recursively renders the supplied `subCalls`, and declares the keyed/session `'tool.call.toolview'` child slot. The key space stays runtime-open (SlotMap declares slots, never keys), and roots and descendants dispatch by `entryKey: toolName` with `GenericToolCard` as the fallback. Business packages register atomic views through `ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: '<tool>' }, Row))`; the declaration is the load and reload dependency ([decision](2026-08-05-slot-declaration-injection.md)). ui-conversation separately delegates the selected call's details body through `'conversation.details.tool'`, so ui-tool's card models remain the single presentation owner without making conversation import Tool components. The target-neutral event and view registries are data assembly seams rather than parallel component registries ([decision](2026-08-09-client-conversation-node-assembly.md)).
 
 **Scope addressing** mirrors the host's agent-scope idiom: services are root singletons whose methods take no sessionId — they read the caller's scope mark (`scopeOf(ctx)`). Inside a session scope, `ctx.conversation.send('hi', 'queue')` targets that session; cross-session calls re-target by switching ctx (`ctx.sessions.scope(id)!.conversation.send(...)`); calling a scoped method from root ctx throws. Client session scopes are minted like host agent scopes (a no-op plugin fiber + a scope-key extend), built lazily on first viewing and torn down only when the session is removed and unwatched — host-session death alone does not tear a scope (it freezes into a read-only viewport).
 
 ## The data object layer (`packages/client/runtime/src/client/sessions/`)
 
-Frames enter, snapshots exit, the fold sits between — React-free (zero React imports, grep-assertable):
+Frames enter, snapshots exit, the Conversation assembler sits between — React-free (zero React imports, grep-assertable):
 
 ```
-mux/host 帧（ConnectionController 泵入，sinks 注入）
+mux/host frames (ConnectionController pump, injected sinks)
         │
         ▼
 SessionManager.handleMuxEnvelope / handleHostEnvelope
-        │ 带 sessionId 的帧只投已存在实例（审批/问答 requested 例外：进 pendingBuffers 缓冲）
+        │ session frames target existing instances (requested waits buffer)
         ▼
-Session.handleMuxEnvelope ──► events 窗口（seq 连续升序）
-        │                        │ 定稿事件            │ chunk
-        │                        ▼                    ▼
-        │                   FoldAdapter        PartialAccumulator
-        │                  （→ nodes）          （→ partial）
+Session.handleMuxEnvelope ──► contiguous Event window
+        │                        │ replace / prepend / append
+        │                        ▼
+        │                ConversationNodeAssembler
+        │                  Definitions -> Contexts -> view builders
         ▼
 Notifier 微任务合批 ──► ConversationSnapshot 缓存 ──uSES──► 组件
 ```
 
-- **Session** (session.ts): lazily built, resident — once created it keeps eating frames in the background, so switching away and back renders instantly. Operations: `prompt`/`cancel` (RPC passthrough; failures land in the snapshot's `promptError`), `open` (pull the tail history page, idempotent), `loadOlder` (upward paging, reentry-guarded), `resync` (reconnect = clear the window and rerun open). Subscription: `subscribe`/`getSnapshot` (always the cached reference) — `implements ObservableSnapshot<ConversationSnapshot>`, with `useSelector = bindSnapshotSelector(this)` attached at construction, so a Session is directly a uSES source. Frame dispatch is one switch: `session/event` frames dedup by seq (the only dedup key), buffer while open is in flight, otherwise append + incremental fold; open/stitch merges the live buffer by seq and backfills once if `subscribed.lastSeq` outruns the window tail.
-- **ConversationSnapshot** (conversation.ts): the immutable snapshot contract — `nodes` (folded, surface-ordered), `partial`, `runningCalls`, `pending`, `running`, `removed`, `openState`, `hasMore`, `promptError` and kin. **Reference discipline** (the premise of memo and uSES): the top-level object is fresh on every change; the nodes array is rebuilt but element references come from the cache; unchanged substructures reuse the previous snapshot's references.
+- **Session** (session.ts): lazily built, resident — once created it keeps eating frames in the background, so switching away and back renders instantly. Operations: `prompt`/`cancel` (RPC passthrough; failures land in the snapshot's `promptError`), `open` (pull the tail history page, idempotent), `loadOlder` (upward paging, reentry-guarded), `resync` (reconnect = clear the window and rerun open). Subscription: `subscribe`/`getSnapshot` (always the cached reference) — `implements ObservableSnapshot<ConversationSnapshot>`, with `useSelector = bindSnapshotSelector(this)` attached at construction, so a Session is directly a uSES source. Frame dispatch is one switch: `session/event` frames dedup by seq (the only dedup key), buffer while open is in flight, otherwise append + incremental projection; open/stitch merges the live buffer by seq and backfills once if `subscribed.lastSeq` outruns the window tail.
+- **ConversationSnapshot** (conversation.ts): the top-level immutable snapshot contract. `chat` contains structural `order`, an identity-stable keyed Node reader, Turn/Step indexes, and the timeline; `nodes`, `partial`, `runningCalls`, `turnTimings`, and `turnEnds` are the compatibility slice for unmigrated Trajectory consumers. Pending interactions, queue, running, removal, open state, paging, and prompt errors remain Session facts. **Reference discipline** (the premise of memo and uSES): unchanged substructures and Node values keep their references; one business update replaces only the corresponding key's value unless its order or Location changes. React still subscribes to the Session as the sole observable source, while the framework-provided `useSession(selector)` isolates Node and Location aggregate updates.
 - **SessionManager** (manager.ts): instance cluster + frame entry + the session list. sessionId-bearing frames go only to existing instances (a mux broadcast must not instantiate every session); approval/question `requested` frames are the exception — they never land in history, so they buffer in `pendingBuffers` and replay on instantiation.
 - **Notifier** (notifier.ts): two channels chosen by change source. `markDirty()` (default; frame-driven changes always) batches per microtask — N changes, one notification, one re-render; the flush rebuilds the snapshot cache before notifying. `notifyNow()` (only direct echoes of user gestures) rebuilds and notifies in the same tick — controlled inputs roll the DOM back and jump the caret if their echo defers to a microtask. Frame-driven code using notifyNow collapses batching back to per-frame renders; banned.
-- **FoldAdapter / PartialAccumulator**: the fold reuses the core SurfaceManager (`@deepseek-ai/dsh-session/surface`), padding sentinel events so a paged window starting at seq > 0 satisfies the core's `seq === index` assertion; a cross-window replace degrades to a tolerant linear scan and sets `foldDegraded`. Chunks stay out of the fold entirely (O(1) skip): the accumulator folds StreamChunks into `AssistantBlock[]`, a delta swapping only that block's reference, and the finalizing message discards the accumulator in the same batch (no flicker on promotion). Cost model: one chunk = one string concatenation + a dirty mark; an unsubscribed Session under a frame storm costs only the mark.
-- **ConnectionController** (in `packages/client/connection`): opens the mux/host streams, pumps with for-await, reconnects with exponential backoff (500ms doubling to 10s, jitter, unlimited) behind a generation fence; sinks are injected one-way (the Controller does not know Session). Reconnect = rebuild: `onConnected` → list refresh + per-open-session resync. The object layer faces only `IApiClient`; the Web carriage (HTTP POST for the two client→server quadrants, SSE for the two server→client) and the client class family are the layering RFC's territory.
+- **ConversationNodeAssembler** (`runtime/src/client/conversation/`): the Session-owned incremental engine runs independently registered Definitions over raw events. `match(event)` selects `(kind, id)` without Context scans; start/update build Definition state; engine-computed Locations carry Turn/Step closure; backward Context reads record dependencies repaired by later prepends; `buildViewNode(target)` materializes only dirty Contexts. The Chat builder preserves structural order and per-key value identity, `useSession` selectors isolate consumption, and Assistant token publication coalesces to one animation frame. The [Conversation Node decision](2026-08-09-client-conversation-node-assembly.md) owns assembly, while [Tool presentation ownership](2026-08-08-client-tool-presentation-ownership.md) owns recursive Tool rendering.
+- **ConnectionController** (in `packages/client/connection`): opens the mux/host streams, pumps with for-await, reconnects with exponential backoff (500ms doubling to 10s, jitter, unlimited) behind a generation fence; sinks are injected one-way (the Controller does not know Session). Reconnect = rebuild: `onConnected` → list refresh + per-open-session resync. The object layer faces only `IApiClient`; Web carriage uses HTTP POST for the two client→server quadrants and [one WebSocket per logical stream](2026-08-04-websocket-downlink-carrier.md) for the two server→client quadrants, while the client class family remains the layering note's territory.
 
 ## The React face (`packages/client/web-react`)
 
@@ -93,34 +86,37 @@ The glue package is the whole ctx↔React boundary; components stay framework-fr
 
 ## Directory shape
 
-Twelve `packages/client/*` packages (ui-slots, ui-primitives, web-react, connection, runtime, ui-layout, ui-sidebar, ui-conversation, ui-trajectory, ui-theme, i18n, web) plus `apps/web` — the vite application, a thin `main` over the shell's boot export. Plugin packages keep their browser half under `src/client/`; **every build artifact lands in `lib/`** — the node half as `lib/index.js`/`lib/invariant.js`, the browser bundle as `lib/client.js` (the shared tsdown client preset emits both; there is no `dist/` directory, and `exports["./client"]` points at `./lib/client.js`). Dependency direction: `ui-slots ← web-react ← runtime ← ui-* (peers) ← web`, with ui-primitives/ui-theme/i18n as zero-dependency side paths.
+Client packages live under `packages/client/*`, with `apps/web` as the thin Vite application over the shell's boot export. Plugin packages keep their browser half under `src/client/`; **every build artifact lands in `lib/`** — the node half as `lib/index.js`/`lib/invariant.js`, the browser bundle as `lib/client.js` (the shared tsdown client preset emits both; there is no `dist/` directory, and `exports["./client"]` points at `./lib/client.js`). `ui-slots`, web-react, and runtime form the infrastructure direction; feature plugins cooperate through services and slots rather than importing presentation implementations.
 
 A multi-domain plugin package additionally splits its client half by future package boundaries — ui-conversation is the exemplar:
 
 ```
 src/client/
-  contract/    the only shared face between domains (types + composed props shares)
-  service.ts   cross-domain orchestration (imports contract only)
-  skeleton/    domain: shell components (ConversationRoot/InputBar/EmptyState/DetailsPanel)
-  chat/        domain: the chat view
-  toolviews/   domain: the tool-row registry and samples
-  apply.ts     the ONLY file allowed to import across domains (assembly point)
-  index.ts     thin re-export shell (contract + apply + components)
+  contract/    shared slot and cross-domain types
+  service.ts   cross-domain orchestration
+  skeleton/    conversation shell and details host
+  conversation-nodes/ independently registered business Definitions and Chat builder
+  chat/        ordered conversation view
+  input/       composer state machine
+  queue/       queued-message presentation
+  settings/    conversation settings rows
+  apply.ts     cross-domain assembly point
+  index.ts     public contract surface
 ```
 
-Domain implementation files never import a sibling domain — shared surfaces route through `contract/` (e.g. chat consumes the tool registry through a `ToolViewResolver` read-face interface, not the registry class). `scripts/verify-client-domain-graph.ts` enforces the layering (contract=0, domains=1, apply/index=2; imports may only point at levels ≤ own; sibling-domain edges fail). A future package split promotes each domain directory to a package and mechanically rewrites import paths.
+Domain implementation files never import a sibling domain; shared surfaces route through `contract/`. `scripts/verify-client-domain-graph.ts` enforces the layering (contract=0, domains=1, apply/index=2; imports may only point at levels ≤ own; sibling-domain edges fail). Tool presentation is already a separate `ui-tool` package and reaches chat and details only through the slots ui-conversation declares.
 
 ## How to develop
 
-- **A new UI feature** = a new plugin package: declare `dshClient` (+ `inject` topology) in package.json, write the browser half under `src/client/` (apply mounts services/stores, registers slots and toolviews), keep the node half an empty apply unless there is host logic, build with the shared preset. Add the plugin to the host config; the manifest and loading follow automatically.
-- **A new slot**: see the [slot system standard RFC](2026-07-22-slot-type-chain-implementation.md) — merge the contract into `SlotMap`, declare it in the parent entry's `children`, render through the auto-injected `renderSlot` prop. Never export components globally.
-- **Consuming a new frame type**: sessionId-bearing → a branch in Session's dispatch switch; host-level → the Manager routing table; if the UI needs it, a `ConversationSnapshot` field with the reference discipline kept.
+- **A new UI feature** = a new plugin package: declare `dsh.client` (+ `inject` topology) in package.json, write the browser half under `src/client/` (apply mounts services/stores and registers slots), keep the node half an empty apply unless there is host logic, build with the shared preset. Add the plugin to the host config; the manifest and loading follow automatically.
+- **A new slot**: see the [slot system standard note](2026-07-22-slot-type-chain-implementation.md) — merge the contract into `SlotMap`, declare it in the parent entry's `children`, render through the auto-injected `renderSlot` prop. Never export components globally.
+- **Consuming a new frame type**: transport-only session frames → Session's dispatch switch; host-level frames → the Manager routing table; logged conversation business events → a Definition plus a keyed view renderer, without a Session business branch.
 - **Where does this state live**: business data (events, streaming, pending) → always the object layer; what the parent knows → owner props at the renderSlot site; private to one component (scroll, search text, expansion) → component state; shared across entries or surviving remounts (selection, drafts, panel widths) → an entry-declared store ([slot system standard](2026-07-22-slot-type-chain-implementation.md)).
 - **Notification channel**: frame-driven/async = `markDirty` batching; direct user-gesture echo whose controlled input needs the same tick = `notifyNow`.
 
 ## Consequences
 
-Token streams no longer shake the render tree: a frame storm costs unsubscribed sessions one dirty bit and the subscribed view one batched re-render per microtask (raf-batched for frame-driven stores). UI features load, fail, and get disabled as independent plugins — one crashing slot entry blacks out one card, one failed bundle fails loud before the UI flips in. The accepted costs: the loader/module-table machinery is bespoke infrastructure the team owns end to end; the one-flip boot (no progressive rendering) trades first-paint granularity for assembly simplicity; and the dual type programs make "which aggregate sees this file" a question developers occasionally have to answer.
+Token streams no longer shake the render tree: Assistant chunks update one business Context and publish its keyed Node at most once per animation frame; unrelated rows' selector results retain their references, so those rows do not re-render. UI features load, fail, and get disabled as independent plugins — one crashing slot entry blacks out one card, one failed bundle fails loud before the UI flips in. The accepted costs: the loader/module-table machinery is bespoke infrastructure the team owns end to end; the one-flip boot (no progressive rendering) trades first-paint granularity for assembly simplicity; and the dual type programs make "which aggregate sees this file" a question developers occasionally have to answer.
 
 ## Alternatives considered
 
@@ -129,5 +125,5 @@ Token streams no longer shake the render tree: a frame storm costs unsubscribed 
 | One statically-linked SPA bundle | Plugins must be host-composable at runtime (config-driven); a monolith re-couples every UI feature to one build |
 | window globals / import maps for shared deps | The DI require table keeps sharing explicit, fail-loud, and swappable; globals leak identity and version silently |
 | Business data in zustand slices | The event window/accumulator is a behavioral state machine, not a flat slice; the object layer keeps snapshot granularity and batching controllable |
-| String-keyed global component registry for tool rows | Tool views are consumed by multiple views and need per-session differentiation — a named service (`ctx.toolviews`) with scope filters is the honest shape |
-| Progressive/Suspense boot in P-I | One-flip boot is strictly simpler; the loader's per-plugin status face is kept so progressive lighting can land later without re-architecture |
+| Parallel string-keyed component registry for Tool rows | ui-tool's keyed child slot carries the runtime-open Tool-name set through the one slot registration model ([toolview dissolution](2026-07-23-toolview-dissolution.md)) |
+| Progressive/Suspense boot in the initial web client delivery | One-flip boot is strictly simpler; the loader's per-plugin status face is kept so progressive lighting can land later without re-architecture |

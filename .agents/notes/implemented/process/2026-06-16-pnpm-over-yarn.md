@@ -2,11 +2,13 @@
 
 Status: implemented
 
+English | [中文](2026-06-16-pnpm-over-yarn.zh.md)
+
 ## Problem
 
 The repo shipped on **Yarn 4** with the `node-modules` linker — a deliberately conservative choice that behaves like npm's flat layout while giving us Yarn's workspaces and `yarn constraints`. It worked. But Yarn 4's Plug'n'Play heritage makes the `node-modules` linker the off-the-beaten-path mode, and the broader JS ecosystem — tooling defaults, CI actions, Corepack examples, contributor familiarity — increasingly centers on pnpm. For a repo that is built primarily by agents and read by occasional human contributors, "the package manager most tools and people expect" has real value: fewer surprises, better-trodden failure paths, more copy-pasteable answers.
 
-The switching cost is at its lowest right now. Nothing publishes from this repo yet (every package is `private: true`); dev/test/demo all run **unbuilt** via tsx, so the package manager only has to (a) resolve and link `node_modules`, (b) run the workspace scripts, and (c) enforce the workspace constraints. The one Yarn-specific asset is `yarn.config.cjs` (the `@yarnpkg/types` constraints engine), which is small and mechanical to re-express. This mirrors the reasoning in [the tsdown decision](2026-06-11-tsdown-over-dumble.md): swap a load-bearing tool for the healthier-ecosystem option while the blast radius is still small.
+The switching cost is at its lowest right now. Nothing publishes from this repo yet (every package is `private: true`); development, tests, and source-mode demos run through their declared TypeScript launchers, while artifact checks build explicitly. The package manager therefore only has to (a) resolve and link `node_modules`, (b) run the workspace scripts, and (c) enforce the workspace constraints. The one Yarn-specific asset is `yarn.config.cjs` (the `@yarnpkg/types` constraints engine), which is small and mechanical to re-express. This mirrors the reasoning in [the tsdown decision](../../archived/process/2026-06-11-tsdown-over-dumble.md): swap a load-bearing tool for the healthier-ecosystem option while the blast radius is still small.
 
 ## Decision
 

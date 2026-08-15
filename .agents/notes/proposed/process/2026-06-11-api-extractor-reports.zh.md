@@ -4,7 +4,7 @@ Status: proposed
 
 [English](2026-06-11-api-extractor-reports.md) | 中文
 
-> 从最初的「doc-sync（文档同步门禁）与 API 报告」Agent Note（agent 决策记录）中拆出（首次提出于 2026-06-11）。第 1 至第 2 部分（文档块类型检查、事件分类体系校验）已交付，见 [doc-sync 强制](../../implemented/process/2026-06-11-doc-sync-enforcement.md)。本文是被推迟的第 3 部分，作为独立提案保留。
+> 文档块类型检查与事件分类体系两部分已交付（[doc-sync（文档同步门禁）强制](../../archived/process/2026-06-11-doc-sync-enforcement.md)）；剩余的 API 报告部分作为独立提案被推迟。
 
 ## 问题
 
@@ -12,11 +12,11 @@ Status: proposed
 
 ## 提案
 
-使用 api-extractor（或 `tsc --emitDeclarationOnly` 加一份规范化的公开接口导出）为每个包（package）生成一份签入仓库的 `etc/<pkg>.api.md`；CI 在重新生成结果与已签入报告不一致时失败。这样，每一次公开 API 变更都会成为评审者（或评审 agent（智能体））必须看到的一行 diff。
+使用 api-extractor（或 `tsc --emitDeclarationOnly` 加一份规范化的公开 API 清单）为每个包生成一份签入仓库的 `etc/<pkg>.api.md`；CI 在重新生成结果与已签入报告不一致时失败。这样，每一次公开 API 变更都会成为评审者（或评审 agent（智能体））必须看到的一行 diff。
 
 ## 曾考虑的替代方案
 
-**`tsc --emitDeclarationOnly` 加规范化的公开接口导出**：如果 api-extractor 过于笨重，这是更轻量的机制；两者都能满足提案所需的「签入仓库、可 diff」的报告形态。
+**`tsc --emitDeclarationOnly` 加规范化的公开 API 清单**：如果 api-extractor 过于笨重，这是更轻量的机制；两者都能满足提案所需的「签入仓库、可 diff」的报告形态。
 
 ## 验收标准
 

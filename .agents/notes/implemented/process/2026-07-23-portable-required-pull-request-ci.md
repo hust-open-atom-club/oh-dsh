@@ -1,4 +1,4 @@
-# Agent Note: Portable required pull-request CI
+# Agent Note: Portable pull-request CI recovery boundary
 
 Status: implemented
 
@@ -8,28 +8,28 @@ English | [中文](2026-07-23-portable-required-pull-request-ci.zh.md)
 
 Required pull-request jobs assigned to organization-owned runner labels remain queued when GitHub cannot allocate those pools. The workflow is valid and standard GitHub-hosted jobs can still pass, but `all checks passed` never starts and an otherwise healthy pull request cannot satisfy branch protection.
 
-Billing health, a runner definition's `Ready` state, and a large autoscaling ceiling do not prove that a named pool can receive a job. Required correctness checks need a portable execution path that does not depend on repository-external runner provisioning.
+Billing health, a runner definition's `Ready` state, and a large autoscaling ceiling do not prove that a named pool can receive a job. Required correctness checks need a known portable recovery path even when the ordinary low-latency path depends on repository-external runner provisioning.
 
 ## Decision
 
-[CI](../../../../.github/workflows/ci.yml) runs every required pull-request job on GitHub's standard `ubuntu-latest` or `windows-2025` capacity. The primary Node and Windows jobs keep their complete consolidated inventories, while top-level gates, coverage, ESLint, publint, and snapshot replay use one worker on the smaller hosts. Node versions are selected through `actions/setup-node`, and the Windows job enables Developer Mode before installing the symlinked workspace.
+[CI](../../../../.github/workflows/ci.yml) runs the required primary Node 24 jobs, plus the stable `all checks passed` aggregate, on repo-restricted enterprise 32-core pools. The aggregate performs no checkout or repository gate, but sharing the enterprise pool prevents the required verdict from introducing a separate standard-hosted billing dependency after its substantive jobs have already succeeded. The required Windows job runs Windows Node under Wine on standard `ubuntu-latest` for the blocking surfaces; an independent native `windows-2025` job starts automatically but does not participate in the aggregate ([dual Windows decision](2026-08-08-native-windows-pull-request-ci.md)). Standard `ubuntu-latest` jobs retain Node 22.19, Node 26, the Python SDK unit suite, and the [release-shaped Linux x64 Python runtime validation](../testing/2026-08-12-required-python-runtime-pull-request-ci.md), while the serial references remain the complete unsharded cross-platform definitions. Those standard-hosted jobs keep the portable execution boundary observable without duplicating the primary inventory on every pull request.
 
-The `node 24 / complete`, Node compatibility, Python SDK, and `windows node 24 / complete` jobs remain dependencies of `all checks passed`; no gate is removed or made observational to recover availability. Branch protection continues to require `e2e` and `all checks passed`.
+The three Linux primary jobs, Node compatibility, Python SDK unit suite, Python runtime validation, and `windows node 24 / wine blocking` remain dependencies of `all checks passed`; `windows node 24 / native complete` is deliberately absent. Branch protection continues to require `e2e` and `all checks passed`. There is no automatic fallback when a remaining enterprise Linux label cannot allocate: the standard jobs continue to report their own contracts, but they cannot manufacture the missing required result.
 
-The two manual larger-runner suites and all twelve organization-owned labels remain available for measurement. They do not participate in ordinary pull requests. The [larger-runner measurements](2026-07-22-evidence-based-larger-hosted-runners.md) remain evidence for future performance work, while the [serial cross-platform reference](2026-07-21-serial-cross-platform-ci-reference.md) remains the independent master-push completeness check.
+The [larger-runner decision](2026-07-22-evidence-based-larger-hosted-runners.md) owns the current primary topology and its measurements. The [serial cross-platform reference](2026-07-21-serial-cross-platform-ci-reference.md) remains the independent standard-hosted completeness check, and the manual larger-runner suites retain size comparisons without expanding the ordinary required matrix.
 
 ## Alternatives considered
 
-**Wait for organization-runner allocation to recover.** A queue with no assigned runner emits no repository diagnostic and can block every pull request indefinitely, so an external recovery is not a correctness path.
+**Keep the Linux primary jobs and aggregate on standard capacity.** This removes the remaining enterprise allocation dependency, but complete standard-runner jobs give materially slower feedback and still experience shared-capacity queues. The current split retains portable compatibility and serial evidence while spending enterprise capacity on the Linux primary critical path.
 
-**Use only the smallest organization-owned pools.** Every named pool crosses the same organization allocation boundary; reducing core count does not remove the dependency that caused the queue.
+**Select enterprise size from advertised core count.** Benchmarks show non-monotonic scaling and setup variance, so exact complete-job measurements choose the required pools instead.
 
 **Skip or demote checks while capacity is unavailable.** This would make the status green by dropping evidence rather than by running the repository's required contracts.
 
-**Keep larger-host worker limits on standard runners.** Concurrent full-repository gates and their inner worker pools can oversubscribe the smaller memory and CPU allocation, turning an availability repair into contention failures.
+**Use one worker policy on every host.** Outer gate concurrency and inner tool workers contend differently on Linux, Windows, and standard runners; measured host-specific bounds avoid turning additional cores into slower execution.
 
 ## Consequences
 
-Ordinary pull requests can acquire runners without organization-specific configuration, and a live exact-head run proves the same commands that branch protection consumes. The trade-off is longer elapsed time and more rounded standard-runner minutes than the measured larger-runner topology.
+Ordinary pull requests spend enterprise capacity on the Linux critical path while the Wine job keeps the required Windows verdict on standard Linux allocation. The independent native job uses standard Windows allocation without delaying or changing the aggregate. A live exact-head run distinguishes the commands branch protection consumes from the separate diagnostic contract; queue delay is reported separately from each job's `startedAt` to `completedAt` execution interval.
 
-Manual larger-runner benchmarks can remain queued without blocking pull requests. Restoring larger runners to the required path needs a separate evidence-based decision after exact-head jobs receive nonzero runner IDs and complete reliably; changing a definition's status alone is insufficient.
+Standard compatibility, required Wine, and diagnostic native Windows jobs remain useful when enterprise allocation is degraded, but they do not make a blocked required Linux job or aggregate green. Recovering Linux availability may require restoring the complete standard-hosted topology; changing a pool definition's status alone is insufficient evidence that it can receive work.

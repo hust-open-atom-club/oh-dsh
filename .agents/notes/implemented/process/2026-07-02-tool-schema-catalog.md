@@ -2,13 +2,15 @@
 
 Status: implemented
 
+English | [中文](2026-07-02-tool-schema-catalog.zh.md)
+
 ## Problem
 
-The repository had no single reference for the names, descriptions, and JSON Schemas actually exposed to the model. Source declarations are scattered and runtime-composed, while the existing Cordis and data-structure catalogs cover wiring and vocabulary rather than tools.
+The repository had no single reference for the names, descriptions, and JSON Schemas actually exposed to the model. Source declarations are scattered and runtime-composed, while the existing Cordis reference and subsystem pages cover wiring and vocabulary rather than tools.
 
 ## Decision
 
-Generate the catalog by **booting each tool plugin and reading its registered schemas**, not by parsing source. `scripts/gen-tool-catalog.ts` mounts each shipped tool package on a fresh cordis `Context` (with `SystemPrompt` + `ToolRegistry` and the injected seams the plugin's `apply` reads), calls `ctx.tools.schemas()` — exactly the `ToolSchema[]` the model is sent — disposes the context, and renders one `## <package>` section per package with a ` ```json ` `parameters` block per tool. It mirrors the `gen-cordis-catalog` / `gen-module-graph` CLI shape: default `--write` regenerates, `--check` fails if the committed copy is stale, output is deterministic (manifest-ordered, tools sorted by name). `verify-tool-catalog` (the `--check`) runs inside `doc-sync`, so relevant documentation changes and CI exercise the same freshness check.
+Generate the catalog by **booting each tool plugin and reading its registered schemas**, not by parsing source. `scripts/gen-tool-catalog.ts` mounts each shipped tool package on a fresh cordis `Context` (with `SystemPrompt` + `ToolRuntime` and the injected services the plugin's `apply` reads), calls `ctx.tools.schemas()` — exactly the `ToolSchema[]` the model is sent — disposes the context, and renders one `## <package>` section per package with a ` ```json ` `parameters` block per tool. It mirrors the `gen-cordis-catalog` / `gen-module-graph` CLI shape: default `--write` regenerates, `--check` fails if the committed copy is stale, output is deterministic (manifest-ordered, tools sorted by name). `verify-tool-catalog` (the `--check`) runs inside `doc-sync`, so relevant documentation changes and CI exercise the same freshness check.
 
 ### Why boot, not parse (the crux)
 
@@ -27,11 +29,11 @@ Booting has a cost the AST pass did not: there is no source declaration set to e
 
 ### A hand-maintained boot manifest is the irreducible policy
 
-The filesystem discovers the tool-package inventory and the completeness guard rejects omissions. `TOOL_PACKAGES` still owns an explicit boot recipe for each package because required seam implementations and config are policy, not facts that can be inferred safely from layout or injection names.
+The filesystem discovers the tool-package inventory and the completeness guard rejects omissions. `TOOL_PACKAGES` still owns an explicit boot recipe for each package because required Service Providers and config are policy, not facts that can be inferred safely from layout or injection names.
 
 ### Scope
 
-Shipped product tool packages under `packages/*/tool-*`, each booted with its default config, including `dsh-tool-bash` (`bash`), `dsh-tool-tasks` (`task_output`, `task_list`, `task_kill`), and `dsh-tool-subagent` (`subagent`). Example-only tools are excluded.
+Shipped product tool packages under `packages/*/tool-*`, each booted with its default config, including `dsh-tool-bash` (`bash`), `dsh-tool-jobs` (`job_output`, `job_list`, `job_kill`), and `dsh-tool-subagent` (`subagent`). Example-only tools are excluded.
 
 The catalog unit is a package, not every configured tool instance. Each package boots once with default config; load-time aliases such as `subagent_fork` are noted without enumerating every deployment permutation. A deployment inventory is a separate, unbounded surface.
 

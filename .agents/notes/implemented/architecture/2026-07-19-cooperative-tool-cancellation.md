@@ -36,17 +36,17 @@ An around-dispatch wrapper may replace `exec.signal` for its delegated lifetime 
 
 ### Pre-aborted entry short-circuits after materialization
 
-The registry first creates the call token and losslessly snapshots and freezes the arguments. A materialization failure wins even when the caller signal is already aborted. After successful materialization, a pre-aborted signal skips `tools/pre-execute`, approval, `tools/execute`, `tools/post-execute`, and the tool body, then publishes exactly one frozen authoritative `tools/result` with `ABORTED_BEFORE_DISPATCH`.
+The registry first creates the call token, snapshots the visible definition's optional final-content callback, and losslessly snapshots and freezes the arguments. An argument-materialization failure wins even when the caller signal is already aborted. Before final content, the registry also losslessly snapshots the candidate result and converts a result-snapshot failure into an ordinary error, so the callback can still enforce its content invariant. After successful argument materialization, a pre-aborted signal skips `tools/pre-execute`, approval, `tools/execute`, `tools/post-execute`, and the tool body, then passes `ABORTED_BEFORE_DISPATCH` through that content-only callback before publishing exactly one frozen authoritative `tools/result`.
 
 ### Started work still reaches quiescence
 
 Once a tool body starts, the registry awaits it. Cancellation reaches the body through the fused signal but never races or abandons its promise. A cooperative implementation stops or forwards cancellation and settles after its owned work reaches quiescence; an uncooperative same-process implementation can keep the registry pending indefinitely. Process, worker, network, and provider layers retain responsibility for their own termination mechanisms.
 
-This decision requires cancellation at the tool invocation seam only. Making signals required on asynchronous capabilities reachable from tool bodies is a separate migration proposed in [Required cancellation through tool-reachable capability seams](../../proposed/architecture/2026-07-19-required-cancellation-through-tool-capability-seams.md).
+This decision requires cancellation at the tool invocation boundary only. Making signals required on asynchronous capabilities reachable from tool bodies is a separate migration proposed in [Required cancellation through tool-reachable capability seams](../../proposed/architecture/2026-07-19-required-cancellation-through-tool-capability-seams.md).
 
 ## Verification
 
-[`execution-signal-types.spec.ts`](../../../../packages/core/tools/tests/execution-signal-types.spec.ts) proves the required exact signal types, readonly observer and tool views, mutable-but-required around-dispatch view, and `defineTool()` inference. [`tools.spec.ts`](../../../../packages/core/tools/tests/tools.spec.ts) covers pre-aborted materialization, phase skipping, policy and wrapper races, body invocation classification, caller-signal fusion, error precedence, context retention, and quiescent drainage. [`tool-calls.spec.ts`](../../../../packages/core/agent-loop/tests/tool-calls.spec.ts) and [`contract-regressions.spec.ts`](../../../../packages/core/agent-loop/tests/contract-regressions.spec.ts) cover balanced durable results for undispatched siblings. [`code-mode.spec.ts`](../../../../packages/core/tools/tests/code-mode.spec.ts) and first-party integration suites cover explicit forwarding, while [`timeout-policy.spec.ts`](../../../../packages/timeout/timeout-policy/tests/timeout-policy.spec.ts) preserves timeout ownership.
+[`execution-signal-types.spec.ts`](../../../../packages/core/tools/tests/execution-signal-types.spec.ts) proves the required exact signal types, readonly observer and tool views, mutable-but-required around-dispatch view, and `defineTool()` inference. [`tools.spec.ts`](../../../../packages/core/tools/tests/tools.spec.ts) covers pre-aborted materialization, phase skipping, policy and wrapper races, body invocation classification, caller-signal fusion, error precedence, context retention, and quiescent drainage. [`tool-calls.spec.ts`](../../../../packages/core/agent-loop/tests/tool-calls.spec.ts) and [`contract-regressions.spec.ts`](../../../../packages/core/agent-loop/tests/contract-regressions.spec.ts) cover balanced durable results for undispatched siblings. [`code-mode.spec.ts`](../../../../packages/core/tools/tests/code-mode.spec.ts) and first-party integration suites cover explicit forwarding, while [`timeout-policy.spec.ts`](../../../../packages/guard/timeout-policy/tests/timeout-policy.spec.ts) preserves timeout ownership.
 
 No registry test can prove that arbitrary third-party same-process code observes the signal or stops in bounded time. Capability tests continue to prove cancellation and quiescence at the boundary that owns each side effect.
 
@@ -54,7 +54,7 @@ No registry test can prove that arbitrary third-party same-process code observes
 
 **Keep the signal optional and synthesize a fallback.** Rejected because a registry-owned fallback has no caller lifetime to represent and preserves the exact omission the type should prevent.
 
-**Validate `AbortSignal` at runtime.** Rejected because this is a typed same-process seam, not a serialization boundary. Runtime checks would duplicate the static contract without making cooperative use enforceable.
+**Validate `AbortSignal` at runtime.** Rejected because this is a typed same-process boundary, not a serialization boundary. Runtime checks would duplicate the static contract without making cooperative use enforceable.
 
 **Add `supportsCancellation` metadata, callback-arity checks, or signal-use linting.** Rejected because none proves that asynchronous work observes or correctly forwards cancellation. Availability is a type contract; behavior remains a tool and capability responsibility.
 

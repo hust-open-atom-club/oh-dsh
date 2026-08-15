@@ -2,19 +2,21 @@
 
 Status: proposed
 
+English | [中文](2026-07-13-human-review-skill-maintenance.zh.md)
+
 ## Problem
 
 The `dsh-code-review` skill records failure modes that require reviewer judgment, but one-off audits are expensive to repeat and easy to scope inconsistently. Treating every comment as a lesson produces checklist bloat; treating merge, thread resolution, or an author's “fixed” reply as proof of adoption promotes feedback that the final code may not implement. The maintenance process needs enough evidence and independent review to fail closed without requiring a webhook service, durable event state, or automatic repository promotion before the workflow has proven useful.
 
 ## Proposal
 
-Periodic out-of-repo maintenance. A private tool, kept on the skill maintainer's machine rather than committed to this repository, runs against a clean full-history checkout at refreshed `origin/master`. The intended scheduler runs daily with a two-UTC-day overlap; manual runs accept another `--since` duration or repeated `--pr` arguments for an explicit set. The scan is idempotent against the current skill and stores no repository cursor. The only repository file changed by promotion is [.agents/skills/dsh-code-review/SKILL.md](../../../skills/dsh-code-review/SKILL.md); the draft PR carries a provenance summary so reviewers can audit the source feedback and adoption evidence without the private adapter logs.
+Periodic out-of-repo maintenance. A private tool, kept on the skill maintainer's machine rather than committed to this repository, runs against a clean full-history checkout at refreshed `origin/master`. The intended scheduler runs daily with a two-UTC-day overlap; manual runs accept another `--since` duration or repeated `--pr` arguments for an explicit set. The scan is idempotent against the current skill and stores no repository cursor. The only repository file changed by promotion is [.agents/skills/dsh-code-review/SKILL.md](../../../skills/dsh-code-review/SKILL.md); the draft PR lists the source feedback URLs or IDs and adoption evidence without exposing the private adapter logs.
 
 ```mermaid
 flowchart TD
   A["Maintainer or scheduler runs the tool on origin/master"] --> B["List PRs merged in the overlap window"]
   B --> C["Collect pre-merge User feedback and final PR evidence"]
-  C --> D["Two reviewers verify provenance and adoption"]
+  C --> D["Two reviewers verify the author and adoption"]
   D --> E{"Both confirm human-authored and adopted?"}
   E -- "No" --> F["Exclude or retain as unresolved"]
   E -- "Yes" --> G["Two reviewers classify against the current skill"]
@@ -36,7 +38,7 @@ Each feedback item carries a stable source ID and bounded change evidence. When 
 
 ### Dual-reviewer classification and drafting
 
-Two independently configured reviewer adapters classify every eligible item by provenance (`human-authored`, `forwarded-automation`, or `unclear`) and adoption (`adopted`, `rejected`, or `unclear`). Only matching `human-authored` plus `adopted` verdicts proceed. The adopted set then receives a second independent classification against the current skill: candidate, already covered, implementation-specific, or not feedback. A singleton may qualify; recurrence is not required. Disagreement receives one bounded re-evaluation and remains visible in run artifacts if unresolved. A single batch whose adapter output fails schema or id validation is failed closed at the batch level — every feedback item in it is marked unclear and routed to `excluded` — rather than aborting the whole run; the offending raw output is preserved under the run's private artifacts for debugging. If either adapter returns no valid result for any nonempty batch in an operation, the run exits non-zero and emits a failure record instead of reporting “no candidate.”
+Two independently configured reviewer adapters classify who authored every eligible item (`human-authored`, `forwarded-automation`, or `unclear`) and whether the change adopted it (`adopted`, `rejected`, or `unclear`). Only matching `human-authored` plus `adopted` verdicts proceed. The adopted set then receives a second independent classification against the current skill: candidate, already covered, implementation-specific, or not feedback. A singleton may qualify; recurrence is not required. Disagreement receives one bounded re-evaluation and remains visible in run artifacts if unresolved. A single batch whose adapter output fails schema or id validation is failed closed at the batch level — every feedback item in it is marked unclear and routed to `excluded` — rather than aborting the whole run; the offending raw output is preserved under the run's private artifacts for debugging. If either adapter returns no valid result for any nonempty batch in an operation, the run exits non-zero and emits a failure record instead of reporting “no candidate.”
 
 The primary adapter drafts from structured agreed guidance, never raw review text. It remains tool-free and read-only by adapter-author contract: it returns complete candidate file content, which the tool validates before writing the sole target. Both adapters then review the same complete skill diff; blocking findings return to a bounded revision loop, and both must approve the same revision. The tool rejects staged changes and edits outside the target skill both before running the documentation and lint gates and again before reporting success, so a gate or concurrent process that adds another path cannot slip through. It restores its own write on failure using best-effort compare-and-swap so a concurrent maintainer edit is not overwritten. On success it saves a candidate bundle containing the source `origin/master` commit, source skill blob ID, reviewed diff, complete candidate, source feedback IDs and URLs, landed evidence ranges, adapter verdicts, and gate results; it never commits, pushes, opens, or merges a PR.
 
@@ -46,21 +48,21 @@ Each private executable receives a byte-bounded, versioned JSON request on stdin
 
 ### Promotion contract
 
-The promote helper starts from a clean checkout at refreshed `origin/master` and refuses to apply a candidate when the current skill blob differs from the bundle's recorded source blob. The operator then reruns the maintenance analysis or manually rebases the diff and repeats the candidate review; the helper never replaces a newer `SKILL.md` with stale complete-file output. After applying a current candidate, it opens a draft PR whose body lists the source feedback URLs or IDs, the landed commit range used as adoption evidence, the originating run, gate results, and any operator edits. Raw adapter prompts and responses remain private, but repository reviewers receive enough provenance to judge whether each proposed rule follows from adopted human feedback.
+The promote helper starts from a clean checkout at refreshed `origin/master` and refuses to apply a candidate when the current skill blob differs from the bundle's recorded source blob. The operator then reruns the maintenance analysis or manually rebases the diff and repeats the candidate review; the helper never replaces a newer `SKILL.md` with stale complete-file output. After applying a current candidate, it opens a draft PR whose body lists the source feedback URLs or IDs, the landed commit range used as adoption evidence, the originating run, gate results, and any operator edits. Raw adapter prompts and responses remain private, but repository reviewers receive those concrete inputs so they can judge whether each proposed rule follows from adopted human feedback.
 
 ### Where the mechanism lives
 
-The tool source, adapter binaries, provider credentials, and intended daily scheduler are kept private to the maintainer's machine rather than committed to this repository. This document specifies the protocol; the reference implementation is private infrastructure. The mechanism serves a single skill maintained by a single operator, so the ongoing cost of vetting mechanism edits through repository review outweighs any provenance benefit. If the mechanism is ever handed off to a second maintainer, that handoff is a follow-up Agent Note that revises this decision — the operator doc at [docs/cookbook/maintaining-dsh-code-review.md](../../../../docs/cookbook/maintaining-dsh-code-review.md) is the entry point for anyone taking over.
+The tool source, adapter binaries, provider credentials, and intended daily scheduler are kept private to the maintainer's machine rather than committed to this repository. This document specifies the protocol; the reference implementation is private infrastructure. The mechanism serves a single skill maintained by a single operator, so the ongoing cost of vetting mechanism edits through repository review outweighs the benefit of committing the tool and its history. If the mechanism is ever handed off to a second maintainer, that handoff is a follow-up Agent Note that revises this decision — the operator doc at [docs/cookbook/maintaining-dsh-code-review.md](../../../../docs/cookbook/maintaining-dsh-code-review.md) is the entry point for anyone taking over.
 
 ## Alternatives considered
 
-- **Ship the tool inside this repository.** Rejected for a single-maintainer scope: repository maintenance overhead (typecheck, lint, coverage, cross-cutting refactors) would exceed the value of committed provenance. Retained option for a later handoff.
+- **Ship the tool inside this repository.** Rejected for a single-maintainer scope: repository maintenance overhead (typecheck, lint, coverage, cross-cutting refactors) would exceed the value of committed source and review history. Retained option for a later handoff.
 - **Record every feedback-time PR head** — rejected: it improves causal isolation but requires a continuously running observer, durable event state, retries, and force-push reconciliation. Periodic maintenance uses reviewed-commit evidence where available and fails closed on broader whole-PR evidence.
 - **Persist a processed-PR cursor** — rejected: an overlapping time-window scan is cheap and naturally idempotent against the current skill, while cursor state creates recovery and missed-event problems.
 - **Run on every new comment** — rejected: review waves produce many related comments and lack the final artifact needed to judge adoption.
 - **Treat merge or thread resolution as adoption** — rejected: a PR can merge with rejected, superseded, or intentionally unresolved feedback.
 - **Create or merge repository changes automatically** — rejected: the tool first needs a track record of useful periodic output. The maintainer inspects and promotes the local diff through normal repository review.
-- **Learn from bot findings that were fixed** — rejected: the source contract is human review feedback. Actor type is filtered before analysis, and human accounts forwarding automated findings are excluded by provenance review.
+- **Learn from bot findings that were fixed** — rejected: the source contract is human review feedback. Author type is filtered before analysis, and human accounts forwarding automated findings are excluded by the author check.
 - **Use one reviewer as author and final judge** — rejected: independent verdicts expose unsupported generalization before it reaches the skill.
 
 ## Acceptance criteria
@@ -71,7 +73,7 @@ Promotion from `proposed/` to `implemented/` requires all of the following to be
 - Both reviewer adapters are independently configured (distinct providers or models) and complete an analyze / adopt / review pass without user intervention. **Observed on 2026-07-15:** distinct primary/secondary adapters completed adoption + analysis in ~8 minutes; batch fail-closed handled one adapter id-hallucination without aborting the run.
 - A scheduler triggers the tool without an interactive terminal, and a candidate diff (or a "no candidate" record) reaches the operator through a durable notification channel.
 - A controlled acquisition case advances the target branch with a feedback-matching change after the feedback baseline; the reviewer evidence excludes that target-only change while retaining a later PR-owned change.
-- The promote helper rejects a candidate after the source skill changes, and a current candidate opens a draft PR with the provenance summary defined above.
+- The promote helper rejects a candidate after the source skill changes, and a current candidate opens a draft PR with the source feedback IDs, adopted commit range, originating run, checks, and operator edits defined above.
 - At least one candidate diff produced by this workflow is inspected by the operator and promoted to `master` through a normal repository PR review. That PR is the evidence that the workflow can turn adopted feedback into shipped skill guidance.
 
 ## Risks

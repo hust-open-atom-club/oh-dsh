@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-12-agent-scope-runtime-design.zh.md)
+
 ## Problem
 
 The [agent-scope contract](2026-07-08-agent-scope-contexts.md) is simple for contributors: register through `agent.ctx`, resolve one global-plus-agent view, publish only after setup, and retain the scope until work stops. The runtime must preserve that contract across a cooperative plugin framework, asynchronous creation, reentrant listeners, durable session commits, and worker or process failure.
@@ -23,7 +25,7 @@ The design can be skimmed as seven choices:
 | Coordinate create/resume | One `AgentCreationTransaction` |
 | Protect durable, queued, model, or wire data | Materialize once at that boundary |
 | Pass typed values inside one process | Readonly borrowed contract |
-| Compose the model-visible prompt and tool surface | One shared tool view plus the authoritative assembly-waterfall result |
+| Compose the model-visible prompt and tool set | One shared tool view plus the authoritative assembly-waterfall result |
 | Coordinate subagent, worker, and process shutdown | One cancellation signal plus the independent terminal/quiescence facts of that boundary |
 
 The rest of this Agent Note expands those choices in dependency order: Cordis mechanics, scope routing, creation and session commit, tools and prompts, subagents and workflows, then executable checks.
@@ -32,11 +34,11 @@ The [July 8 Agent Note](2026-07-08-agent-scope-contexts.md) remains the contribu
 
 ## Cordis model: context, fiber, effect, receiver, and waterfall
 
-Five Cordis ideas are required to understand the implementation. A context selects services and registration ownership; a fiber is one live plugin or child lifecycle; an effect attaches cleanup to a fiber; an event receiver selects listeners; and a waterfall lets listeners transform or veto an operation in sequence.
+Five Cordis ideas are required to understand the implementation. A context selects services and registration ownership; a fiber is one live plugin or child lifecycle; an effect attaches cleanup to a fiber; an event receiver selects listeners; and a waterfall lets listeners transform or short-circuit an operation in sequence.
 
 ### A context is an ownership path through one service graph
 
-All agents share one Cordis service graph. A derived context does not clone `ToolRegistry`, `SystemPrompt`, persistence, or model adapters; it changes how registrations made through that context are tagged and which effects own their cleanup.
+All agents share one Cordis service graph. A derived context does not clone `ToolRuntime`, `SystemPrompt`, persistence, or model adapters; it changes how registrations made through that context are tagged and which effects own their cleanup.
 
 `agent.ctx` is such a derived context. Service calls still reach the shared instances, while a registration can inspect its calling context and store a contribution under the nearest scope key. Ordinary plugin contexts carry no scope key and therefore register globally.
 
@@ -54,7 +56,7 @@ Cordis filters listeners using the dispatch receiver (`this`), while harness lis
 
 Product helpers therefore construct the carrier and pass the domain subject separately. This prevents listener routing from becoming an alternate object model and keeps event signatures understandable without knowledge of carrier internals.
 
-A Cordis waterfall is middleware-style dispatch. Each listener receives `next()`: calling it delegates to the remaining listeners and base operation, while returning without it vetoes or replaces the downstream result. Waterfalls power prompt assembly and tool policy; ordinary emit events notify synchronously, and parallel events await all listeners without a veto result.
+A Cordis waterfall is middleware-style dispatch. Each listener receives `next()`: calling it delegates to the remaining listeners and base operation, while returning without it short-circuits or replaces the downstream result. Waterfalls power prompt assembly and tool policy; ordinary emit events notify synchronously, and parallel events await all listeners without a veto result.
 
 ## Scope routing: one opaque key selects one layer
 
@@ -148,7 +150,7 @@ sequenceDiagram
 Every teardown request joins one memoized path. The order is:
 
 1. Deactivate creation or driving and let synchronous publication finish.
-2. Stop and drain the driver, including idle injection flushes.
+2. Stop and drain the driver, discarding any injection that remains pending.
 3. Detach the agent.
 4. Detach the session.
 5. Dispose the agent scope.
@@ -218,13 +220,13 @@ A fresh registry-assigned Symbol provides collision-free execution identity with
 
 Arguments are materialized once where model/tool JSON enters the pipeline. Pre-, around-, and post-execute listeners operate on the typed execution and decisions. Call ID correlation, approval, monotonic guards, and Code Mode nesting remain explicit relational checks.
 
-After the last post-execute listener, the registry materializes and freezes the accepted final result once. Every synchronous `tools/result` observer receives that exact committed object, and observer failures are contained individually. An outer pipeline failure is normalized into a committed error result, so observers can discard staged work against the same authoritative boundary.
+After post-execute or outer pipeline normalization, the registry losslessly snapshots the candidate result, converting a snapshot failure into an ordinary error, invokes the call's snapshotted optional `ToolDefinition.finalizeContent` callback, then materializes and freezes the accepted final result once. The callback may replace only content, so structured error identity, contexts, and metadata remain registry-owned even when a tool enforces a last-mile result bound. Every synchronous `tools/result` observer receives that exact committed object, and observer failures are contained individually. An outer pipeline or candidate-snapshot failure is normalized before final content, so observers can discard staged work against the same authoritative boundary.
 
 ### The assembly waterfall owns the final model-visible composition
 
 SystemPrompt first resolves the global-plus-agent sections, variables, and tool providers into a deterministic registry contribution. The scope-filtered `system-prompt/assemble` waterfall may then reorder, replace, add, or remove any section, variable, or schema. Its returned assembly is authoritative; there is no later restoration pass and no finality metadata on ordinary prompt sections, tool definitions, or provider results.
 
-This is a trusted same-process extension seam, not an authority boundary. A listener that changes Code Mode's `run_code` schema or `tools:sdk` instructions, or a structured child's capture schema or instruction, owns preserving a coherent protocol in the assembly it returns. ToolRegistry still reserves `run_code` against ordinary tool registration and restriction because those are registry invariants, but assembly middleware remains free to transform the final model-visible surface.
+This is a trusted same-process extension point, not an authority boundary. A listener that changes Code Mode's `run_code` schema or `tools:sdk` instructions, or a structured child's capture schema or instruction, owns preserving a coherent protocol in the assembly it returns. ToolRuntime still reserves `run_code` against ordinary tool registration and restriction because those are registry invariants, but assembly middleware remains free to transform the final model-visible surface.
 
 Scope solves the real isolation problem directly. Structured-output contributions register in the child's exact scope, while Code Mode derives its transport and SDK from the same resolved tool view. A second named-protection system would need another ownership and collision rule across arbitrary schema providers—including providers that intentionally contribute duplicate names—without creating a new trust boundary.
 
@@ -236,7 +238,7 @@ For a native call, the observer deletes the stage and commits its value only whe
 
 For a Code Mode SDK call, the inner successful result records `{ parentToken, value }` rather than committing. The observer waits for the `run_code` execution whose token matches `parentToken` and commits only if that outer final result also succeeds. Program failure, runtime abort, or outer post-policy denial discards the pending value.
 
-Once a value is pending or committed, a scoped monotonic guard denies later tool calls. After commit, the ordinary serial `agent/turn-stop` listener returns a stop decision after continuation and steering have already folded. A schema-validation failure remains an ordinary `INVALID_ARGS` tool error and leaves the child able to retry within the same turn.
+Once a value is pending or committed, a scoped monotonic guard denies later tool calls. The successful structured-output execution calls `exec.concludeTurn()`, so its own immutable result carries `concludesTurn: true` and the loop ends the tool loop at that step. A schema-validation failure remains an ordinary `INVALID_ARGS` tool error and leaves the child able to retry within the same turn.
 
 Pure Code Mode's registry contribution omits `structured_output` from native wire schemas and exposes it through the generated SDK. The assembly waterfall may deliberately change that presentation; execution still validates against the child-scoped definition, and the listener owns the consistency of any alternate model-visible route it creates.
 
@@ -248,9 +250,9 @@ Prompt assembly is intentionally cooperative, but three execution facts need one
 |---|---|---|
 | Tool pre-policy | Deny monotonically | A later listener must not re-allow an already denied call |
 | Tool result | Observe the immutable committed outcome | Structured output must commit only the result that actually escaped the pipeline |
-| Turn continuation | Stop after ordinary continuation folding | A committed terminal output must end the turn |
+| Turn continuation | Conclude through the committed tool result | A committed terminal output must end the turn |
 
-`ToolGuard` is the monotonic policy registry. Committed tool observation is the contained `tools/result` point described above. Terminal structured output listens on the ordinary serial `agent/turn-stop` fold after normal continuation and steering decisions; no public `strictSerial()` dispatcher is needed for the typed listener contract.
+`ToolGuard` is the monotonic policy registry. Committed tool observation is the contained `tools/result` point described above. Terminal structured output marks its own execution with `concludesTurn`, so terminality is data on the authoritative result rather than a separate hook decision.
 
 ### Skill and approval services trust typed callers
 
@@ -258,19 +260,19 @@ Skill registry definitions and approval policies are readonly same-process contr
 
 Skill still validates external skill files and parsed provider output, routes catalogs through the calling agent's tool view, and disposes registrations exactly. Approval still resolves policy, observes cancellation, routes `approval/request` by `request.agent`, records the durable audit pair, and contains answerer and post-commit observer failures.
 
-## Subagents: readiness is the start promise
+## Subagents: publication is the start promise
 
-Subagent startup has one ownership transfer. The provider owns partial resources until its start promise fulfills with a ready published run; the caller owns the returned run and must dispose it.
+Subagent startup has one ownership transfer. The provider owns unpublished resources until its start promise fulfills with a published run; the caller owns the returned run and must dispose it.
 
 ### The service contract has one cancellation channel
 
-`SubagentProvider.start()` and `SubagentService.start()` return `Promise<SubagentRun>`. The promise fulfills only after the backend has established the child it promises, so callers and `subagent/start` observers never need a second `run.started` readiness promise.
+`SubagentProvider.start()` and `SubagentRuntime.start()` return `Promise<SubagentRun>`. The promise fulfills after the backend crosses its publication boundary, so callers and `subagent/start` observers never need a second `run.started` promise. Provider work that fails before publication rejects `start()`; prompt, turn, cancellation, and infrastructure outcomes after publication settle through `SubagentRun.result` without hiding the child id, as required by the [durable catalog decision](../feature/2026-07-22-durable-subagent-catalog-and-list-agents.md).
 
-`SubagentStartRequest.signal` is required. Aborting it requests cancellation during startup and after readiness. `SubagentRun.dispose()` also requests cancellation and awaits quiescence. There is no separate public `run.cancel()` channel.
+`SubagentStartRequest.signal` is required. Aborting it requests cancellation during startup and across the published run's remaining readiness or turn work. `SubagentRun.dispose()` also requests cancellation and awaits quiescence. There is no separate public `run.cancel()` channel.
 
-Optional `sendMessage()` supports a live backend that can accept steering. Optional `resume()` returns `Promise<SubagentRun>` because the resumed child has the same asynchronous readiness boundary.
+Continuable conversations use their separate creation and follow-up operations and have no `SubagentRun`; their manager owns each resident `AgentHandle`.
 
-The service validates provider capabilities and request semantics before calling the provider. A provider rejection cleans any partial resources before the rejection escapes and emits no `subagent/start`/`subagent/end` pair. After fulfillment, the service attaches result observation, emits scoped start, and returns the run. Provider removal prevents later starts but does not revoke a run already accepted by the provider.
+The service validates provider capabilities and request semantics before calling the provider. A provider rejection cleans unpublished resources before the rejection escapes and emits no `subagent/start`/`subagent/end` pair. After fulfillment, the service attaches result observation, emits scoped start, and returns the run; a post-publication result rejection closes that pair. Provider removal prevents later starts but does not revoke a run already accepted by the provider.
 
 ### In-process providers reuse the core transaction
 
@@ -286,13 +288,13 @@ An ACP provider crosses a real process and wire boundary, so it retains validati
 
 Start resolves only after `initialize` and `newSession` succeed. Abort, spawn failure, RPC failure, or invalid startup response reaps the process before rejection. After readiness, result maps the ACP prompt outcome and streamed output; dispose requests cancellation, closes the connection, and awaits process exit through one memoized path.
 
-## Workflows and ACP UI: retain only independent async facts
+## Workflows and ACP processes: retain only independent async facts
 
-Worker and editor bridges need more state than same-process registries because messages, process death, and rendering can settle independently. Their state is organized around those real facts rather than duplicate cancellation protocols.
+Worker and child-process bridges need more state than same-process registries because messages, process death, and cleanup can settle independently. Their state is organized around those real facts rather than duplicate cancellation protocols.
 
 ### Workflow children are pending starts or published records
 
-The workflow host keeps pending provider-start promises and published child records. A child moves from pending to published only when async `SubagentService.start()` fulfills; rejected starts clean their partial provider work and produce no child lifecycle pair.
+The workflow host keeps pending provider-start promises and published child records. A child moves from pending to published only when async `SubagentRuntime.start()` fulfills; rejected starts clean their partial provider work and produce no child lifecycle pair.
 
 One host-owned AbortController supplies the required signal to pending and live children. Closing workflow admission aborts that signal, so there is no duplicate `ChildCancel` worker RPC or explicit host-side `run.cancel()` fanout. Quiescence waits for both pending starts and published child disposal.
 
@@ -304,11 +306,11 @@ The workflow result records the first accepted terminal outcome according to the
 
 Public disposal claims its memoized promise before invoking callbacks. Worker death closes admission before processing any queued late child request, synthesizes missing lifecycle ends, and starts child/process cleanup without rewriting an outcome already claimed.
 
-### ACP prompt settlement does not depend on rendering success
+### ACP prompt settlement does not depend on update delivery
 
-The ACP UI correlates a prompt with its observed turn directly. It does not scan from a `logWatermark` or use session status as a second reconciliation oracle.
+The [automation-only ACP bridge](../simplification/2026-07-23-acp-automation-only-protocol.md) correlates one in-flight prompt with its observed user-message turn directly. It does not scan from a log watermark or use session status as a second reconciliation oracle.
 
-Prompt handling settles correlation in a `finally` around transcript rendering. A rendering failure can fail presentation, but it cannot skip prompt settlement or leave the session permanently in flight. Concurrent loads of the same persisted caller-supplied session ID remain excluded because that is a real persistence identity race, not a UUID collision concern.
+The session-event listener settles correlation from the matching `turn/end` even when a committed-message update cannot reach the client. Update delivery therefore cannot leave the session permanently in flight. ACP creates server-assigned fresh session ids and owns every resulting agent handle until connection teardown.
 
 ## Correctness enforcement
 
@@ -316,7 +318,7 @@ The design is enforced at types, runtime escape points, generated contracts, and
 
 ### Types make the ordinary path hard to misuse
 
-Readonly contracts describe borrowed same-process values. `Scoped<T>` marks event receivers, `agentEvents()` fuses carrier and subject, tool inputs omit registry-owned tokens, and subagent async return types expose readiness directly.
+Readonly contracts describe borrowed same-process values. `Scoped<T>` marks event receivers, `agentEvents()` fuses carrier and subject, tool inputs omit registry-owned tokens, and subagent async return types expose publication and settlement directly.
 
 TypeScript cannot govern JavaScript casts, direct Cordis dispatch, process messages, or durable files, so runtime enforcement remains at those escape points.
 
@@ -354,11 +356,11 @@ Parallel sentinels can all mirror whether one operation is live. One transaction
 
 ### Keep synchronous subagent start plus `run.started`
 
-This splits provider acceptance from readiness and forces every consumer to register a partial run, attach result observation, await readiness, and clean up readiness failure. An async start promise makes provider-to-caller ownership transfer the readiness boundary itself.
+This splits provider acceptance from publication and forces every consumer to register a partial run, attach result observation, await publication, and clean up publication failure. An async start promise keeps provider-to-caller ownership transfer at publication; the existing result promise owns any remaining readiness instead of adding another lifecycle promise.
 
 ### Restore selected prompt or tool contributions after assembly
 
-A post-waterfall restoration pass would create a second composition rule after the documented cooperative seam. Correctly assigning canonical presence or absence would also require provider ownership and collision rules for arbitrary tool-schema providers, whose ordinary output may contain duplicate names. Scoped registration already supplies the required per-agent isolation, and trusted assembly listeners own the protocol consistency of what they return, so named restoration adds machinery without establishing an independent boundary.
+A post-waterfall restoration pass would create a second composition rule after the documented cooperative waterfall. Correctly assigning canonical presence or absence would also require provider ownership and collision rules for arbitrary tool-schema providers, whose ordinary output may contain duplicate names. Scoped registration already supplies the required per-agent isolation, and trusted assembly listeners own the protocol consistency of what they return, so named restoration adds machinery without establishing an independent boundary.
 
 ### Remove worker/process lifecycle guards with same-process hardening
 
@@ -374,9 +376,9 @@ The implementation is smaller and its proof follows the same shape as its owners
 - Create and resume expose no partially configured handle; final-entry losers and publication failures clean every prepared resource.
 - Disposal retains scoped listeners and persistence through driver drain and final session work, then revokes the scope.
 - Durable, queued, model, worker, process, and wire values are owned at their real boundary; typed same-process values follow readonly contracts.
-- ToolRegistry's presentation, lookup, and execution resolve the same live view before expert assembly transforms, and committed results have one immutable observation point.
+- ToolRuntime's presentation, lookup, and execution resolve the same live view before expert assembly transforms, and committed results have one immutable observation point.
 - Registry contributions are deterministic inputs, while the trusted assembly waterfall owns the final model-visible composition.
-- Subagent start returns only a ready run, required signals cancel pending or live work, and disposal reaches the backend's quiescence contract.
+- Subagent start returns only a published run, required signals cancel pending or live work, and disposal reaches the backend's quiescence contract.
 - Worker/process result precedence and cleanup remain correct under death, late messages, and bounded teardown.
 
 ### Costs and limits

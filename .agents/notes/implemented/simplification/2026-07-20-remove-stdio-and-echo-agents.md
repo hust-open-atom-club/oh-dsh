@@ -18,21 +18,24 @@ The stdio and Echo agents are removed without compatibility packages, modes, com
 
 The remaining application roles are explicit:
 
-- [`@deepseek-ai/dsh-tui-demo`](../../../../packages/examples/tui-demo/README.md) owns terminal-interactive execution. `examples/tui-agent` owns the complete coding composition, Code Mode overlay, PTY coverage, and terminal snapshots.
-- [`@deepseek-ai/dsh-cli-demo`](../../../../packages/examples/cli-demo/README.md) owns non-interactive execution. `examples/headless-agent` owns the real-model one-shot composition, replay snapshots, generic real-agent suites, and test-only keyless Loader fixtures.
-- [`@deepseek-ai/dsh-acp-demo`](../../../../packages/examples/acp-demo/README.md) and `@deepseek-ai/dsh-jsonrpc` own their framed protocol integrations.
+- `@deepseek-ai/dsh-tui` owns terminal-interactive execution. It rejects non-TTY streams before Loader boot; `apps/cli/config/base.cordis.yml` plus the `tui.cordis.yml` overlay own the complete coding composition, with PTY plus terminal-snapshot coverage in `apps/cli/tests/`.
+- [`dsh --profile headless`](../../../../apps/cli/README.md) owns non-interactive execution. Its `headless` profile is the product composition; `examples/headless-agent` owns replay snapshots, generic real-agent suites, and an unexported keyless Loader driver.
+- [`@deepseek-ai/dsh-acp-demo`](../../../../packages/examples/acp-demo/README.md) and `@deepseek-ai/dsh-sdk-jsonrpc-server` own their framed protocol integrations.
 
-The SDK project model and create/config workflows replace the `stdio` run-interface option with `tui`; generated TUI projects compose `@deepseek-ai/dsh-tui` and create or resume one exact session. Repository-facing demo documentation requires a DeepSeek API key and leads with the real Headless or TUI agents.
+The SDK project model that carried the `stdio` run-interface option is deleted by the [SDK project toolchain removal](2026-08-11-remove-sdk-project-toolchain.md). Repository-facing demo documentation requires a DeepSeek API key and leads with a current runnable product.
 
-Keyless validation is test-owned. The Headless Loader smoke uses a fixture adapter to exercise a real tool round trip, the CLI built-bin suite pins output, persistence, failure, and signal semantics, and package-specific Loader tests keep deterministic adapters beside their scenarios. None is exposed as a runnable mock agent.
+Keyless validation is test-owned. The Headless Loader smoke uses a fixture adapter to exercise a real tool round trip, the `dsh` built-bin suite pins the published one-shot entry and output, the product Headless snapshot pins persistence, and the Headless PTY shutdown e2e pins signal escalation. Package-specific Loader tests keep deterministic adapters beside their scenarios. None is exposed as a runnable mock agent.
 
 ## Verification
 
-TUI and Headless Loader coverage run the real app packages in source and built modes. TUI uses a pseudo-terminal; Headless proves its task/result and tool-call contracts. Generated graphs and repository searches reject stale package, command, leaf, and SDK-interface references.
+TUI and Headless Loader coverage run the real app packages in source and built modes. PTY-driven subprocess coverage is reserved for the TUI lifecycle; other entry-point smokes use the one-shot pipe protocol. Headless proves its task/result and tool-call contracts. Generated graphs and repository searches reject stale package, command, leaf, SDK-interface, `createStdioChat`, and `StdioRuntime` references.
+
+The built `dsh` bin rejects a piped TUI launch before Loader boot and points at `dsh --profile headless`; `apps/cli/tests/built-bin.e2e.ts` pins the product one-shot entry under plain Node, including output and invalid arguments. `examples/headless-agent/tests/headless.snapshot.ts` pins product persistence, while `apps/cli/tests/headless-shutdown.e2e.ts` owns bounded signal escalation. The headless example's test-only JSONL driver preserves assembled canonical-event snapshots without creating a second CLI contract. Code Mode has programmatic TUI snapshots and an ACP overlay demo. Time-context integration uses the explicit Headless test composition for two ordered turns, while its package tests own finer elapsed-time behavior.
 
 ## Alternatives considered
 
 - **Keep the line agent only for pipes** — rejected because Headless has a bounded task contract, format-pure stdout, durable completion, and process exit status.
+- **Keep, fold, or promote the readline helper as a package** — rejected because it had one app consumer and no independently swappable contract. Folding it into the stdio app removed an unjustified support-package boundary but still retained the redundant product; a future standalone line UI needs a real second consumer before reintroducing that package.
 - **Keep Echo as the keyless quick start** — rejected because the first product experience should exercise the real model and supported coding agent, not a scripted adapter with a bespoke tool.
 - **Keep Echo only as a CI demo command** — rejected because test-owned Headless fixtures cover the same Loader and built-artifact boundaries without preserving a mock product leaf.
 - **Remove every stdio or mock mechanism** — rejected because framed protocols, process I/O, and deterministic test adapters are independent infrastructure, not the removed agents.
@@ -42,4 +45,5 @@ TUI and Headless Loader coverage run the real app packages in source and built m
 - Interactive and non-interactive product execution each have one owner and one runnable coding leaf.
 - The repository has no keyless user-facing agent demo; local agent demos require `DEEPSEEK_API_KEY`.
 - CI retains keyless real-entry coverage through test fixtures rather than a product command.
-- Existing stdio-agent configurations, Echo commands, and SDK `--interface=stdio` invocations fail instead of being translated.
+- Existing stdio-agent configurations and Echo commands fail instead of being translated.
+- Piped multi-turn interaction in one process and the readline provider for non-TTY `ask_user_question` are intentionally gone; resume covers durable multi-turn work, and a non-TTY composition must supply its own interaction provider.

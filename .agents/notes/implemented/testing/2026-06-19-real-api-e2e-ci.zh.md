@@ -6,15 +6,13 @@ Status: implemented
 
 ## 问题
 
-根据策略，harness 高度依赖真实 API 测试：[docs/testing.md](../../../../docs/testing.md) 指出，无密钥套件证明的是管线，而非产品；[ACP（Agent Client Protocol）inject 事后分析](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)则是常设证据——178 项无密钥测试保持绿色时，真实编辑器 session 却立即崩溃。真实 API e2e 套件（`pnpm run test:e2e`，即 `*.e2e.ts` 文件）的存在正是为了弥合这一缺口：它针对实时 DeepSeek API 驱动 agent（智能体）——真实模型调用、真实 bash 工具、多 turn、恢复、ACP-over-stdio。
+根据策略，harness 高度依赖真实 API 测试：[docs/testing.md](../../../../docs/testing.md) 指出，无密钥套件证明的是管线，而非产品；[ACP（Agent Client Protocol）inject 事故复盘（postmortem）](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)则是常设证据——178 项无密钥测试保持绿色时，真实 ACP 客户端会话却立即崩溃。真实 API e2e 套件（`pnpm run test:e2e`，即 `*.e2e.ts` 文件）的存在正是为了弥合这一缺口：它针对线上 DeepSeek API 驱动 agent（智能体）——真实模型调用、真实 bash 工具、多轮次、恢复、ACP-over-stdio。
 
 默认门禁（[.github/workflows/ci.yml](../../../../.github/workflows/ci.yml)）刻意无密钥：不携带 secret，可供 fork 运行。`test:e2e` 在无密钥时自动跳过（`describe.skipIf(!process.env.DEEPSEEK_API_KEY)`），因此将其加入该工作流只会报绿而不会真正执行真实套件。要让真实 API 覆盖率成为合并信号，需要一个独立的、携带 secret 的工作流。
 
-本 Agent Note（agent 决策记录）记下了新增**第二条消费 secret 的工作流**以在 CI 中运行真实 API 套件的决策；由于向未来可能公开的仓库引入第一个 CI secret 属于安全/隔离决策，本文也记录其依赖的威胁模型，以及仓库公开时需要做出的变更。
-
 ## 决策
 
-添加一个专用工作流 [.github/workflows/e2e.yml](../../../../.github/workflows/e2e.yml)，与 ci.yml 分离。它仅使用 repo secret 对外部 API 运行 `pnpm run test:e2e`，仅在可信事件上触发，并带有一个 preflight 检查：将缺失的 secret 转化为明确的失败而非虚假的绿色。无密钥工作流保持独立，使可 fork 的质量门禁与消费 secret 的真实 API 门禁各自拥有不同的触发和凭证策略。
+一个与 ci.yml 分离的专用工作流 [.github/workflows/e2e.yml](../../../../.github/workflows/e2e.yml) 使用 repo secret 对外部 API 运行且仅运行 `pnpm run test:e2e`，仅在可信事件上触发，并带有一个 preflight 检查：将缺失的 secret 转化为明确的失败而非虚假的绿色。无密钥工作流保持独立，使可 fork 的质量门禁与消费 secret 的真实 API 门禁各自拥有不同的触发和凭证策略。
 
 ### 独立工作流，而非 ci.yml 中的一个 job
 
@@ -22,11 +20,11 @@ ci.yml 的价值在于它无密钥、可 fork、始终为绿：任何贡献者�
 
 ### 约束不是成本，而是可靠性
 
-内部推理成本不是限制因素，因此工作流针对覆盖面和信号优化。它会在多种触发条件和每个受信任 PR（Pull Request）上运行所有匹配的 `*.e2e.ts` 文件，以落实 [docs/testing.md](../../../../docs/testing.md) 的有密钥策略。
+内部推理（inference）成本不是限制因素，因此工作流针对覆盖面和信号优化。它会在多种触发条件和每个受信任 PR（Pull Request）上运行所有匹配的 `*.e2e.ts` 文件，以落实 [docs/testing.md](../../../../docs/testing.md) 的有密钥策略。
 
 ### 触发条件：仅限可信事件
 
-`workflow_dispatch` + `push` 到 `main`/`master` + 每夜 `schedule`（`17 0 * * *`，即北京时间 08:17）+ `pull_request`。push 提供合并后信号；schedule 捕捉外部 API 漂移；dispatch 是手动逃生通道；可信 pull request 获得合并前门禁。该合并前信号有意接受 § 安全性中描述的更大密钥暴露面。
+`workflow_dispatch` + `push` 到 `main`/`master` + 每夜 `schedule`（`17 0 * * *`，即北京时间 08:17）+ `pull_request`。push 提供合并后信号；schedule 捕捉外部 API 漂移；dispatch 是手动逃生通道；可信 PR 获得合并前门禁。该合并前信号有意接受 § 安全性中描述的更大密钥暴露面。
 
 ### 不可信 PR 的门禁
 
@@ -41,7 +39,7 @@ Dependabot 子句基于 PR **作者**（`pull_request.user.login`）而非 `gith
 
 该门禁是一个*干净跳过的便利措施*，而非 secret 的安全边界（见 § 安全性——边界是 GitHub 自身在 `pull_request` 下对 fork 的 secret 扣留机制）。没有该门禁，fork 仍然无法读取密钥；只是会遇到令人困惑的 preflight 硬失败并浪费计算资源。
 
-### Preflight：大声失败，绝不虚假为绿
+### Preflight：明确失败，绝不虚假报绿
 
 由于 job 仅在 secret 应当存在的可信事件上运行，preflight 是一个无条件的存在性检查：密钥为空→`exit 1` 并附带 `::error::` 注解指明需要配置的 secret 名称。这是让自跳过套件可以安全地作为门禁的关键。没有它，被删除/重命名/错误配置的 secret 会让 `test:e2e` 跳过所有真实套件并报告全绿——整个安全网的静默退化。该守卫将「secret 缺失」从不可见的虚假通过转化为可见的失败。（其正确性已在实际中验证：secret 存在之前的运行恰好在此步骤失败。）
 
@@ -49,16 +47,16 @@ Dependabot 子句基于 PR **作者**（`pull_request.user.login`）而非 `gith
 
 repo secret 命名为 `DEEPSEEK_API_KEY_EXTERNAL`；映射到适配器和测试读取的 `DEEPSEEK_API_KEY` 环境变量（`process.env.DEEPSEEK_API_KEY`）。独立的 secret 名称记录了意图（这是*外部*公开 API 密钥，不是内部端点密钥），并允许内部端点密钥日后无冲突地共存。以下卫生选择均为防御性设计：
 
-- **Step 级 secret。** `DEEPSEEK_API_KEY` 仅在 preflight 和 e2e 步骤的 `env:` 中设置，从不在 job 级设置——因此 checkout/setup-node/install 永远看不到它。依赖中被入侵的安装时生命周期脚本无法读取不在其环境中的 secret。
+- **步骤级 secret。** `DEEPSEEK_API_KEY` 仅在 preflight 和 e2e 步骤的 `env:` 中设置，从不在 job 级设置——因此 checkout/setup-node/install 永远看不到它。依赖中被入侵的安装时生命周期脚本无法读取不在其环境中的 secret。
 - **`permissions: contents: read`。** job 仅读取仓库以运行测试；不需要写权限（无 PR 评论、无 status 写入），因此 `GITHUB_TOKEN` 降至最小权限。
-- **`DEEPSEEK_BASE_URL` 固定**为 e2e 步骤上的 `https://api.deepseek.com`。适配器在未设置时会默认使用此值（[packages/llm/llm-deepseek/src/index.ts](../../../../packages/llm/llm-deepseek/src/index.ts) `PUBLIC_BASE_URL`），但显式固定具有自文档性和密封性——仓库根目录的 `.env`（`vitest.e2e.config.ts` 存在时会加载）无法静默地将运行重定向到其他端点。
+- **`DEEPSEEK_BASE_URL` 固定**为 e2e 步骤上的 `https://api.deepseek.com`。适配器在未设置时会默认使用此值（[packages/llm/llm-deepseek/src/index.ts](../../../../packages/llm/llm-deepseek/src/index.ts) `PUBLIC_BASE_URL`），但显式固定具有自文档性和密封性——仓库根目录的 `.env`（如果存在，`vitest.e2e.config.ts` 会加载它）无法静默地将运行重定向到其他端点。
 - **不回显 secret。** preflight 仅打印 `DEEPSEEK_API_KEY present.`——不打印值或长度。
 
 ### 范围与运行时形态
 
 job 仅在 Node 24 上运行 `test:e2e`；无密钥门禁和版本兼容性属于主 CI 工作流。测试通过 workspace paths 映射以未构建形式运行，使用有界的可配置 worker 池、逐测试重试和 job 超时。被取代的 PR 运行会被取消，而 push 和 schedule 运行完整执行以提供合并后信号。
 
-DeepSeek 原生 `web_search` 探测已注册但会跳过。实时 Anthropic 兼容端点可能返回成功响应却没有结构化来源块，因此对来源存在性的正向断言不是可靠的合并信号；单元覆盖率仍会固定响应解析，但 CI 不会证明实时来源块的线协议形状。
+DeepSeek 原生 `web_search` 探测已注册但会跳过。线上 Anthropic 兼容端点可能返回成功响应却没有结构化来源块，因此对来源存在性的正向断言不是可靠的合并信号；单元测试仍会锁定响应解析行为，但 CI 不会验证线上端点返回的来源块协议格式（wire format）。
 
 ## 安全性
 

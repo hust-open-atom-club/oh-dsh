@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-仅按生命周期组织的 Agent Note（agent 决策记录）目录树（`proposed/` / `implemented/` / `rejected/`）无法记录每个文件包含哪一*类*决策。读者浏览某个生命周期时，如果不逐一打开文件，就无法区分新功能、移除项或工具策略变更。
+仅按生命周期组织的 Agent Note 目录树（`proposed/` / `implemented/` / `rejected/`）无法记录每个文件包含哪一*类*决策。读者浏览某个生命周期时，如果不逐一打开文件，就无法区分新功能、移除项或工具策略变更。
 
 本仓库一贯的倾向是[机械质量门禁优于行文规范](2026-06-11-quality-gates.md)：不被机器检查的约定终将腐烂。因此这里的分类方案必须可强制执行，而非靠自觉的文件头。
 
@@ -19,9 +19,9 @@ Status: implemented
 | 类别 | 涵盖范围 |
 |---|---|
 | `feature` | 面向用户或模型的新功能。 |
-| `bug-fix` | 修正缺陷或填补事后复盘暴露的空白。 |
-| `simplification` | 移除代码、行为或对外表面积，不引入新功能。 |
-| `architecture` | 关于**交付源码**的结构性决策——包（package）之间的关系、运行时词汇。 |
+| `bug-fix` | 修正缺陷或填补事故复盘（postmortem）暴露的空白。 |
+| `simplification` | 移除代码、行为或对外接口范围，不引入新功能。 |
+| `architecture` | 关于**交付源码**的结构性决策——包之间的关系、运行时词汇。 |
 | `process` | **围绕**代码的工具、策略或工作流，而非运行时行为。 |
 | `testing` | 测试基础设施与策略。 |
 
@@ -31,14 +31,14 @@ Status: implemented
 
 两者都是 `doc-sync`（文档同步门禁）的成员，风格与 `verify-md-wrap` 一致（tsx ESM，只校验不生成，首个违规即以非零退出码退出）：
 
-- **`scripts/verify-agent-note-classification.ts`**：定义封闭的生命周期与类别集合。它断言生命周期文件夹下的每个文件都位于规范集合中的类别文件夹内（生命周期根目录下散落的 `.md` 或未知类别文件夹都会失败），并拒绝集中式 `INDEX.md`。规范集合位于 `scripts/agent-note-tree.ts` 中，[README](../../README.md)则以行文记录每个类别。
-- **`scripts/verify-doc-refs.ts`**：检查引用文档的源码注释。Agent Note 路径不仅出现在 Markdown 中，也出现在 TypeScript 文档注释中（例如以仓库根为起点的 `.agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md`）。`verify-md-links` 看不到这些引用，因此目录重组可能静默留下失效引用。该门禁扫描 `packages/**` 与 `examples/**` 下仓库自有的 `.ts` 文件（排除已构建的 `lib/` 与 `vendor/`），查找 `docs/….md` 和 `.agents/notes/….md` token，解析每个以仓库根为起点的路径并断言其存在。它要求使用 `.md` 扩展名，因此不处理无扩展名的行文。
+- **`scripts/verify-agent-note-classification.ts`**：定义封闭的生命周期与类别集合。它断言生命周期文件夹下的每个文件都位于规范集合中的类别文件夹内（生命周期根目录下散落的 `.md` 或未知类别文件夹都会失败），并拒绝集中式 `INDEX.md`。规范集合位于 `scripts/agent-note-tree.ts` 中，[README](../../README.md) 则以行文记录每个类别。
+- **`scripts/verify-doc-refs.ts`**：检查引用文档的源码注释。Agent Note 路径不仅出现在 Markdown 中，也出现在 TypeScript 文档注释中（例如以仓库根为起点的 `.agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md`）。`verify-md-links` 看不到这些引用，因此目录重组可能静默留下失效引用。该门禁扫描 `packages/**` 与 `examples/**` 下仓库自有的 `.ts` 文件（排除已构建的 `lib/` 与 `vendor/`），查找 `docs/….md` 和 `.agents/notes/….md` token，解析每个以仓库根为起点的路径并断言其存在。它要求使用 `.md` 扩展名，因此会忽略行文中不带扩展名的引用。
 
 ## 曾考虑的替代方案
 
-- **在每个文件中添加 `Classification:` 行文行**（紧邻 `Status:`），由门禁解析。可行，但它将路径已能承载的事实重复到文件中，且行内容可能与所在文件夹不一致。路径编码使标签与其存储合二为一，没有需要保持同步的东西。
+- **在每个文件中添加 `Classification:` 文本行**（紧邻 `Status:`），由门禁解析。可行，但它将路径已能承载的事实重复到文件中，且行内容可能与所在文件夹不一致。路径编码使标签与其存储合二为一，没有需要保持同步的东西。
 - **设立 `refactor` 类别。** 与 `simplification` 几乎完全重叠；唯一有人试图用来区分的标准是「可观察行为是否改变？」，而 `simplification` 已经编码了这一点（它不改变）。一个类别即可，无需两个。
-- **生成或手工维护的语料索引。** 不予采纳：生命周期/类别目录树才是权威结构；集中式清单会制造合并热点，却没有提供目录树导航或仓库搜索无法实现的发现能力。单独的[索引提案](../../rejected/process/2026-07-04-generate-agent-note-index-tables.md)记录了被放弃的生成形状。
+- **生成或手工维护的文档集索引。** 不予采纳：生命周期/类别目录树才是权威结构；集中式清单会制造合并热点，却没有提供目录树导航或仓库搜索无法实现的发现能力。
 
 ## 后果
 

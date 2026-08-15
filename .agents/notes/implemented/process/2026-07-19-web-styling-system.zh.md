@@ -1,8 +1,8 @@
-# RFC: Web 样式体系——token 框架与工程约束
+# Agent Note: Web 样式体系——token 框架与工程约束
 
 Status: implemented
 
-> token 体系更新（2026-07-22）：本文框架裁决（CSS Modules + clsx、无组件库、无 tailwind、组件只用 token）仍然生效，但两层 `--bg-*`/`--text-*` token 表及其宿主 `web-ui/src/style/global.css` 已被 `packages/client/ui-theme/src/styles/` 的 `--dsw-*` static+alias 双层表取代（暗色=`body[data-ds-dark-theme]` 覆写）——样式表本身即 token 权威。
+> token 体系更新（2026-07-22）：本文框架裁决（CSS Modules + clsx、无组件库、无 tailwind、颜色只用 token）仍然生效，但两层 `--bg-*`/`--text-*` token 表及其宿主 `web-ui/src/style/global.css` 已被 `packages/client/ui-theme/src/styles/` 的 `--dsw-*` static+alias 双层表取代（暗色=`body[data-ds-dark-theme]` 覆写）——样式表本身即 token 权威。
 
 [English](2026-07-19-web-styling-system.md) | 中文
 
@@ -10,16 +10,16 @@ Status: implemented
 
 ## Problem
 
-GUI 无设计师供给，样式由 agent 编写并 review；没有一套机器可对照的 token 体系与编码规范，颜色/圆角/动效会在组件间字面量漂移，暗色主题会长成组件内散落的条件分支。
+GUI 无设计师供给，样式由 agent 编写并 review；没有一套机器可检查的 token 体系与编码规范，颜色/圆角/动效会在组件间字面量漂移，暗色主题会长成组件内散落的条件分支。
 
 ## Decision（框架五条）
 
 | # | 决策 | 内容 |
 |---|---|---|
-| 1 | **视觉基线 = Chat 对齐** | 取值全部来自对 Chat 前端调研（品牌蓝 `--accent: #3964fe`、灰阶、气泡/侧边栏几何、阴影分级……）；允许偏离但须在 web-styling.md 偏离表记录 |
+| 1 | **视觉基线 = Chat 对齐** | 取值全部来自对 Chat 前端的调研（品牌蓝 `--accent: #3964fe`、灰阶、气泡/侧边栏几何、阴影分级……）；允许偏离但须在 web-styling.md 偏离表记录 |
 | 2 | **token 两层不三层** | 基线仓是 static→alias→specific 三层；我们体量下压成「语义层直接持实值（注释标 base 色板出处）+ 极少数组件专属槽位（`--bg-sidebar`/`--bubble-bg`）」两层，全部住 `web-ui/src/style/global.css` |
 | 3 | **字号/间距不 token 化** | 基线仓同款决策：字号在组件里写 px 且**成对写行高**（16/24、14/22、12/18），间距用 4 的倍数；token 化只覆盖颜色/圆角/动效/字体栈/阴影 |
-| 4 | **边框与交互态用透明度制** | 边框 `rgba(0,0,0,.04/.1)`、hover/active `rgba(38,49,72,.06/.1)`——叠加在任意海拔底色上都成立，不新造实色灰 |
+| 4 | **边框与交互态用透明度制** | 边框 `rgba(0,0,0,.04/.1)`、hover/active `rgba(38,49,72,.06/.1)`——叠加在任意层级的背景色上都成立，不新造实色灰 |
 | 5 | **暗色只在 token 表做** | `:root` 亮色实值 + `[data-theme='dark']` 覆盖同名变量；**组件 CSS 零主题选择器**；确需按主题换非 token 值时用「CSS 变量桥」（组件定义局部变量、主题块只覆写变量） |
 
 ## 工程约束
@@ -45,13 +45,13 @@ GUI 无设计师供给，样式由 agent 编写并 review；没有一套机器�
 
 | 内容 | 归属 |
 |---|---|
-| 框架五条、工程约束、为何两层/为何不 token 化字号 | 本 RFC（改=新 RFC 供替） |
-| token 逐项权威值（含暗色）、视觉基线常数（侧边栏/气泡/会话列/输入卡片几何）、RPC 四象限方向符视觉词汇、编码规范 12 条、偏离记录 | web-styling.md（活文档，随实现演进） |
+| 框架五条、工程约束、为何两层/为何不 token 化字号 | 本 RFC（修改框架须由新 RFC 取代本文） |
+| token 逐项权威值（含暗色）、视觉基线常数（侧边栏/气泡/会话行/输入卡片几何）、RPC 四象限方向符视觉词汇、编码规范 12 条、偏离记录 | web-styling.md（活文档，随实现演进） |
 | 取值证据（deepseekchat file:line） | 调研归档已完成使命，git 历史留档 |
 
 ## Consequences
 
-样式收敛到机器可对照：颜色/圆角/动效/阴影只引 web-styling.md §1 token，暗色是单一属性选择器覆盖表，review 与自查共用同一张 12 条清单。接受的代价：字号/间距靠成对行高与 4 倍数纪律而非 token；动框架本身须新 RFC 供替。
+样式收敛到机器可检查：颜色/圆角/动效/阴影只引 web-styling.md §1 token，暗色是单一属性选择器覆盖表，review 与自查共用同一张 12 条清单。接受的代价：字号/间距靠成对行高与 4 倍数纪律而非 token；动框架本身须由新 RFC 取代本文。
 
 ## Alternatives considered
 

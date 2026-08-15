@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-20-jsonl-storage-identity.md: 1ada16791f411a54fbcf9271c7d7963223bbe683
-2026-07-20-jsonl-storage-identity.zh.md: 8027c51dbf6c7d01463b7851d859a40890bf03e1
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-20-jsonl-storage-identity.md
+2026-07-20-jsonl-storage-identity.md: 1079eb700c819951dbb81e99376c0b71e3e84617
+2026-07-20-jsonl-storage-identity.zh.md: 6beb0d9f92ac1b1f4c3b03a783aa67e16b5fa7bb

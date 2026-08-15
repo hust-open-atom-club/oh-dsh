@@ -6,11 +6,11 @@ Status: implemented
 
 ## 问题
 
-subagent seam（[seam Agent Note](2026-06-21-subagent-capability-seam.md)）的设计使多个后端可以按名称共存于 `ctx.subagents`。进程内后端（`-spawn`/`-fork`）将子 agent（智能体）作为第二个 `Agent` 运行在同一个 Cordis 上下文上：开销低，但子 agent 与父 agent 共享进程、模型客户端和工具。seam 的核心意义在于同时支持通过协议到达的进程外子 agent，以证明该抽象能跨越进程边界泛化。本 Agent Note 添加第一个此类后端：一个 ACP（Agent Client Protocol）客户端。
+subagent seam（[seam Agent Note](2026-06-21-subagent-capability-seam.md)）的设计使多个后端可以按名称共存于 `ctx.subagents`。进程内后端（`-spawn`/`-fork`）将子 agent（智能体）作为第二个 `Agent` 运行在同一个 Cordis 上下文中：开销低，但子 agent 与父 agent 共享进程、模型客户端和工具。seam 的核心意义在于同时支持通过协议到达的进程外子 agent，以证明该抽象可跨进程边界适用。本 Agent Note 添加第一个此类后端：一个 ACP（Agent Client Protocol）客户端。
 
 ## 决策
 
-`@deepseek-ai/dsh-subagent-acp` 注册一个 `SubagentProvider`，将每个子 agent 运行在一个派生的子进程中，并以 ACP *客户端*身份驱动它。它是现有服务端桥接 `@deepseek-ai/dsh-acp`（ACP *agent*）的方向反转孪生体：桥接应答 `initialize`/`newSession`/`prompt`；本后端调用它们并实现 `Client` 回调（`sessionUpdate`、`requestPermission`）。将配置的 spawn 命令指向 `acp-agent` 示例，即可让 harness 与自身进程通信。
+`@deepseek-ai/dsh-subagent-acp` 注册一个 `SubagentProvider`，将每个子 agent 运行在一个通过 spawn 启动的子进程中，并以 ACP *客户端*身份驱动它。它是现有服务端桥接 `@deepseek-ai/dsh-acp`（ACP *agent*）的方向反转孪生体：桥接应答 `initialize`/`newSession`/`prompt`；本后端调用它们并实现 `Client` 回调（`sessionUpdate`、`requestPermission`）。将配置的 spawn 命令指向 `acp-agent` 示例，即可让 harness 与自身进程通信。
 
 ### 每次运行启动全新进程
 
@@ -18,7 +18,7 @@ subagent seam（[seam Agent Note](2026-06-21-subagent-capability-seam.md)）的�
 
 ### 最小化客户端桩
 
-客户端不声明任何可选能力（无 `fs`、无 `terminal`）：子 agent 在自己的进程中自行处理文件/终端访问。`session/update` 通知被消费：后端将 `agent_message_chunk` 文本累积为结果输出，在本阶段忽略其余内容（思考、工具调用卡片），仅暴露子 agent 的最终回答。`session/request_permission` 由配置的策略自动应答（`reject` 拒绝所有提示，`allow` 通过第一个允许形态的选项批准）——本阶段不向人类暴露任何权限提示。将 `fs`/`terminal` 代理回父进程（共享工作区模式）仍为后续工作，如 seam Agent Note 所述。
+客户端不声明任何可选能力（无 `fs`、无 `terminal`）：子 agent 在自己的进程中自行处理文件/终端访问。`session/update` 通知被消费：后端将 `agent_message_chunk` 文本累积为结果输出，忽略其余内容（思考、工具调用卡片），因此仅暴露子 agent 的最终回答。`session/request_permission` 由配置的策略自动应答（`reject` 拒绝所有提示，`allow` 通过第一个表示允许的选项批准）——不向人类暴露任何权限提示。将 `fs`/`terminal` 代理回父进程（共享工作区模式）仍为后续工作，如 seam Agent Note 所述。
 
 ### 无启动时能力
 
@@ -26,22 +26,22 @@ subagent seam（[seam Agent Note](2026-06-21-subagent-capability-seam.md)）的�
 
 ### 工作区 cwd 解析
 
-子进程工作目录来自显式解析，绝不使用 harness 进程的 cwd：若已配置部署 `cwd` 覆盖，则相对于启动目录将其转为绝对路径并在加载时验证；否则使用父会话 header 的 cwd 并在启动时验证；如果两者都不存在，则在生成任何进程前大声拒绝。一个 ACP 服务端进程会服务来自多个工作区的会话，因此 `process.cwd()` 不能代替会话工作区——旧的隐式回退会让子进程在服务端启动目录中运行。候选路径必须是 harness 可以进入的绝对目录（要求 `X_OK`；仅 `statSync().isDirectory()` 会接受 mode-600 的目录，而 spawn 会因 EACCES 失败）；解析出的同一路径同时用作子进程 cwd 与 ACP `session/new` 工作区。
+子进程工作目录来自显式解析，绝不使用 harness 进程的 cwd：若已配置部署 `cwd` 覆盖，则相对于启动目录将其转为绝对路径并在加载时验证；否则使用父会话 header 的 cwd 并在启动时验证；如果两者都不存在，则在 spawn 任何进程前响亮拒绝。一个 ACP 服务端进程会服务来自多个工作区的会话，因此 `process.cwd()` 不能代替会话工作区——旧的隐式回退会让子进程在服务端启动目录中运行。候选路径必须是 harness 可以进入的绝对目录（要求 `X_OK`；仅 `statSync().isDirectory()` 会接受 mode-600 的目录，而 spawn 会因 EACCES 失败）；解析出的同一路径同时用作子进程 cwd 与 ACP `session/new` 工作区。
 
 ### StopReason 映射
 
-ACP `StopReason` → harness `SubagentStopReason`：`end_turn`→`completed`、`max_tokens`→`max-tokens`、`refusal`→`refusal`、`cancelled`→`aborted`、`max_turn_requests`→`error`（无对等语义，任务未完成）、未知→`error`。spawn/传输/RPC 失败解析为 `error`（如果已请求取消则为 `aborted`）；按 seam 契约，`result` 在子 agent 级别失败时从不 reject。
+ACP `StopReason` → harness `SubagentStopReason`：`end_turn`→`completed`、`max_tokens`→`max-tokens`、`refusal`→`refusal`、`cancelled`→`aborted`、`max_turn_requests`→`error`（无对等语义，任务未完成）、未知→`error`。spawn/传输/RPC 失败时，结果为 `error`（如果已请求取消则为 `aborted`）；按 seam 约定，`result` 在子 agent 级别失败时从不 reject。
 
 ### 安全：清洗子进程环境
 
-子 agent 是独立进程，因此会继承环境变量。形如凭证的环境变量（`/KEY|SECRET|TOKEN/i`）默认不转发——父 harness 自身的密钥不得隐式泄露到派生进程中（与 bash 执行器采用的策略相同）。子 agent 自己的凭证（它需要模型密钥）通过 `config.env` 显式提供，在清洗之后叠加，因此有意传入的 `DEEPSEEK_API_KEY` 得以保留，而偶然存在的 `AWS_SECRET_ACCESS_KEY` 则不会。子进程的 stderr 继承到父进程的 stderr（诊断信息自然浮现）；spawn 级别的 `error` 事件（如命令不存在时的 ENOENT）被捕获并与 ACP 驱动竞速，因此错误命令解析为 `error` 而非以未处理错误崩溃父进程。
+子 agent 是独立进程，因此会继承环境变量。形如凭证的环境变量（`/KEY|PASSWORD|SECRET|TOKEN/i`）默认不转发——父 harness 自身的密钥不得隐式泄露到 spawn 启动的进程中（与 bash 执行器采用的策略相同）。子 agent 自己的凭证（它需要模型密钥）通过 `config.env` 显式提供，在清洗之后叠加，因此有意传入的 `DEEPSEEK_API_KEY` 得以保留，而偶然存在的 `AWS_SECRET_ACCESS_KEY` 则不会。子进程的 stderr 继承到父进程的 stderr（诊断信息自然浮现）；spawn 级别的 `error` 事件（如命令不存在时的 ENOENT）被捕获并与 ACP 驱动竞速，因此错误命令的结果为 `error` 而非以未处理错误崩溃父进程。
 
 ## 测试
 
-- **无需密钥的单元/集成测试：** 一个脚本化的 ACP 子进程通过真实 stdio 测试 prompt/output 流、所有 stop-reason 映射、信号与 dispose 取消（包括 pre-abort、pre-session 竞态和管道断裂场景）、两种权限策略、被忽略的非消息更新、命令缺失时的清理、提供方重载以及命名空间导出。
+- **无需密钥的单元/集成测试：** 一个脚本化的 ACP 子进程通过真实 stdio 测试提示词输入／输出流程、所有 stop-reason 映射、信号与 dispose 取消（包括 pre-abort、会话前竞态和管道断裂场景）、两种权限策略、被忽略的非消息更新、命令缺失时的清理、提供方重载以及命名空间导出。
 - **无需密钥的 Loader 组合测试：** 仅用于测试的 cordis.yml 通过真实 Loader 启动 stdio 应用，并省略后端的 `cwd`；脚本化模型委派一次，脚本化子进程则证明它在父会话工作区中运行，且 ACP 也对外公布了该工作区，从而端到端覆盖 cwd 继承分支。
 - **需要密钥的 e2e 测试：** 后端 spawn 真实的 ACP 示例；其模型回答 `PONG`，写入 `proof.txt`，父进程验证该文件。
-- **快照缺口：** 每个 ACP 子 agent 是独立进程，拥有自己的回放会话，不同于进程内的按会话回放。确定性 mock 服务器覆盖率已具备；`TODO(acp-subagent-replay)` 跟踪父进程对回放中子 agent 的回放支持。
+- **快照缺口：** 每个 ACP 子 agent 是独立进程，拥有自己的回放会话，不同于进程内的按会话回放。已有确定性 mock 服务器覆盖；`TODO(acp-subagent-replay)` 跟踪父进程对回放中子 agent 的回放支持。
 
 ## 曾考虑的替代方案
 
@@ -57,6 +57,6 @@ ACP `StopReason` → harness `SubagentStopReason`：`end_turn`→`completed`、`
 
 每次运行都要付出一个全新子进程的代价（spawn + `initialize` + `newSession`）。父进程仅暴露子 agent 的最终回答：`session/update` 中的思考和工具调用卡片被消费后丢弃，权限提示从不到达人类——由配置的策略应答。子进程环境默认经过凭证清洗，因此其自身的模型密钥需通过 `config.env` 显式提供。
 
-## 后续提供方
+## 兄弟产品提供方
 
-同样的进程外 spawn/prompt/stream/cancel 形态可泛化到 seam Agent Note 中列出的其他传输方式——A2A、Codex app-server 和 Claude Code Agent SDK——每个都是按名称注册的兄弟提供方。ACP 后端证明了 seam 支持跨进程边界；其余在机制上类似。
+[Codex app-server 与 Claude Code Agent SDK 提供方](2026-08-04-claude-code-and-codex-subagent-backends.md)作为按名称注册的兄弟提供方，采用同样的进程外启动/提示词/结算/取消边界。A2A 仍是未来的兄弟传输方式；ACP 后端证明了 subagent seam 能够支持这项边界，而无需负责产品私有协议。

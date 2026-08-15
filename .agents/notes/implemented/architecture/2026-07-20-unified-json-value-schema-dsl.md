@@ -21,6 +21,7 @@ Object-rooting is a consumer rule rather than a vocabulary restriction. Subagent
 ## Alternatives considered
 
 - **Keep separate parameter and structured-output schema systems:** rejected because every added output construct would require parallel inference, compilation, validation, and code-generation changes with no useful ownership boundary.
+- **Use Schemastery for tool parameters:** rejected because Schemastery targets validation and transformation through Standard Schema rather than JSON Schema generation. It would add an adapter layer without producing the model-facing wire schema or the shared output vocabulary.
 - **Adopt full JSON Schema or Ajv:** rejected because the harness must fail on every construct it cannot project into its generated SDK and validators; accepting a larger language would make enforcement and model guidance dishonest.
 - **Make every object implicitly open or closed:** rejected because either choice hides a consequential author decision. Only the legacy-shaped implicit parameter root and external raw schema retain an intentional default.
 - **Define `oneOf` as first-match:** rejected because branch ordering would change validation semantics and allow overlapping branches to hide ambiguous values.
@@ -32,4 +33,5 @@ Object-rooting is a consumer rule rather than a vocabulary restriction. Subagent
 - Explicit object openness and type-correct literal constraints make malformed declarations fail during authoring or registration rather than during a later model call.
 - Bounded type inference retains useful exact types for ordinary declarations and degrades unusually deep tails to `JsonValue`; runtime schema enforcement remains exact at every depth.
 - Raw tools may still register broader JSON Schema directly, but unified code generation treats unsupported schemas as unknown instead of pretending to enforce them.
+- Per-property `required: true` remains the tool-author contract, and type-level regression coverage pins required keys as non-optional after the original inference path exposed an optionality bug.
 - Runtime and compile-time tests cover every root, exact-one overlap/no-match behavior, raw open defaults, explicit openness, lossy JSON values, inference, deep nesting across core and dynamic projections, JSON-invisible dynamic keys, and exotic schema arrays.

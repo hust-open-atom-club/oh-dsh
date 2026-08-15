@@ -2,9 +2,11 @@
 
 Status: proposed
 
+English | [中文](2026-06-30-pre-tool-input-rewrite.zh.md)
+
 ## Problem
 
-The [interception-seams Agent Note](../../implemented/feature/2026-06-30-interception-seams.md) defines `tools/pre-execute` as an allow/deny/ask gate over an execution whose identity is already protected and whose arguments are deeply frozen. Claude Code's `PreToolUse` hook also offers `updatedInput`, so a faithful bridge needs an explicit rewrite mechanism. A rewrite cannot be a mutation escape hatch on the existing execution object: it must keep the durable history, audit record, presentation, and executed value consistent.
+The [interception extension-points Agent Note](../../implemented/feature/2026-06-30-interception-extension-points.md) defines `tools/pre-execute` as an allow/deny/ask gate over an execution whose identity is already protected and whose arguments are deeply frozen. Claude Code's `PreToolUse` hook also offers `updatedInput`, so a faithful bridge needs an explicit rewrite mechanism. A rewrite cannot be a mutation escape hatch on the existing execution object: it must keep the durable history, audit record, presentation, and executed value consistent.
 
 ## The problem: three readers of pre-execution arguments
 
@@ -12,7 +14,7 @@ In the loop, a tool call's arguments are committed to the log and read by live c
 
 1. **`assistant/message`** is appended before tool dispatch — it is the model-history source `deriveMessages()` replays, so it carries the tool-call arguments the model itself emitted.
 2. **`tool/call`** is the durable AUDIT record, appended before `ctx.tools.execute()`.
-3. **Live presentation reads `tool/call.arguments`**: the ACP bridge remembers them and passes them to `presentResult`; `dsh-tool-bash` derives the card title, the rawInput, the cwd, and the terminal-vs-background treatment from them.
+3. **Human-facing presentation reads `tool/call.arguments`**: UI renderers pass them to `presentResult`; `dsh-tool-bash` derives the card title, the rawInput, the cwd, and the terminal-vs-background treatment from them.
 
 An execution-only rewrite would make the UI show one command while another ran and render the result against the wrong arguments. The registry prevents that failure mode today: it structured-clones and deep-freezes `arguments`, makes the execution identity properties non-writable, and exposes no test shim or listener path that can replace them. The rewrite design must preserve that protected-identity boundary rather than weaken it.
 
@@ -47,5 +49,5 @@ Allowing a pre-execute listener to assign `exec.arguments` would provide only an
 
 - Does rewriting the `assistant/message` tool-call block corrupt any provider's expectation on replay, or is a separate correction safer?
 - Should the original arguments be preserved on the `tool/call` event (audit) and, if so, under what field?
-- Does the rewrite decision move before the log commit or become a dedicated earlier seam, and how do existing pre-tool allow/deny hooks avoid running twice?
+- Does the rewrite decision move before the log commit or become a dedicated earlier extension point, and how do existing pre-tool allow/deny hooks avoid running twice?
 - How does this interact with a future permission `ask` flow (a user approving a rewritten call)?

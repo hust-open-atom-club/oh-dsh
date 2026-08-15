@@ -6,7 +6,7 @@ English | [中文](2026-07-21-local-instruction-overlay.zh.md)
 
 ## Problem
 
-Personal, git-ignored guidance (`AGENTS.local.md` / `CLAUDE.local.md`) is a Claude Code convention for per-developer overrides that are deliberately not committed. The [workspace-context plugin](2026-06-24-workspace-context.md) loaded only one candidate per directory, so a `.local.` name could only be reached by adding it to `instructionFileCandidates`, where — because a directory has one winner — it would *shadow* the committed base file instead of supplementing it. That inverts the additive "base plus personal overlay" model the names evoke, and it was off by default.
+Personal, git-ignored guidance (`AGENTS.local.md` / `CLAUDE.local.md`) is a Claude Code convention for per-developer overrides that are deliberately not committed. The [agent-instructions plugin](2026-06-24-workspace-context.md) loaded only one candidate per directory, so a `.local.` name could only be reached by adding it to `instructionFileCandidates`, where — because a directory has one winner — it would *shadow* the committed base file instead of supplementing it. That inverts the additive "base plus personal overlay" model the names evoke, and it was off by default.
 
 ## Decision
 
@@ -26,7 +26,7 @@ The base and local candidates in one directory must stay independent across base
 
 **Keep it opt-in through `instructionFileCandidates`.** Rejected: one directory has a single winner, so a `.local.` name added to that list shadows the base file rather than supplementing it. The packages guidance to keep opt-ins out of shipped defaults is outweighed here by strong prior art and the user-facing expectation that `.local.` files are always read.
 
-**Default at the product `cordis.yml` level instead of the plugin schema.** Rejected: it would enable `.local.` only for whichever front door remembered to opt in, splitting behavior across TUI/ACP/headless and duplicating a value that belongs beside the existing candidate default.
+**Default at the product `cordis.yml` level instead of the plugin schema.** Rejected: it would enable `.local.` only for whichever entry point remembered to opt in, splitting behavior across TUI/ACP/headless and duplicating a value that belongs beside the existing candidate default.
 
 **Reuse the bare directory as the scope key for base and local files.** Rejected: base and local files in one directory would collide in every scope-keyed map, so a change to one would suppress or overwrite the other. A distinct scope key per candidate keeps them independent without widening the persisted metadata shape.
 

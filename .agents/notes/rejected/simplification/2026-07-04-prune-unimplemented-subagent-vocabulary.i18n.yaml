@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-04-prune-unimplemented-subagent-vocabulary.md: f99a33163b48735f9634b5bb3dcac5c24eb893f8
-2026-07-04-prune-unimplemented-subagent-vocabulary.zh.md: 15368b0a8abb2980af255827498803b8bb6645f7

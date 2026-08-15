@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-22-installer-in-repo-skip-clone.md: f63c438205f7bd6aeb8dd78941bbe0880a8e31a1
-2026-07-22-installer-in-repo-skip-clone.zh.md: f9fe4865ad1090211c094fc8fba843b623512cc9

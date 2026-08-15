@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-12-scoped-layers-store.md: b850b6bcbb22401b386b4458b6d5c65a160c85cd
-2026-07-12-scoped-layers-store.zh.md: 8bfc0a0e8ec1e3de624ff8d9e48b7517833fc025
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-12-scoped-layers-store.md
+2026-07-12-scoped-layers-store.md: 221711748007d5f909aec3fdfcf3919884d11cdb
+2026-07-12-scoped-layers-store.zh.md: 7f3ad11e23f02eeafe955efe08525bda8a9e9996

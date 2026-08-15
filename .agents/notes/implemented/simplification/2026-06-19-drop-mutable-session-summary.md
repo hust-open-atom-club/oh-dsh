@@ -2,16 +2,18 @@
 
 Status: implemented
 
+English | [中文](2026-06-19-drop-mutable-session-summary.zh.md)
+
 ## Problem
 
 The [session-persistence seam](../architecture/2026-06-14-session-persistence.md) split a session's out-of-log metadata into two types owned by `dsh-session`: an immutable `SessionHeader` (`version`, `id`, `createdAt`, `cwd?`, `parentSession?`) written once at creation, and a mutable `SessionSummary` (`updatedAt`, `title?`, `firstPrompt?`) "updateable without touching the append-only log". Their union was `SessionMeta = SessionHeader & SessionSummary`, and the abstract `SessionPersistence` service carried a seventh method — `update(id, summary)` — for rewriting the summary. Each backend implemented the mutable store its own way: JSONL wrote a separate atomic `.summary.json` **sidecar** beside the log (temp-write + rename, best-effort), SQLite kept `updated_at`/`title`/`first_prompt` **columns** bumped inside the append transaction.
 
-The summary was designed for a future session picker (recency ordering via `updatedAt`, a `title`/`firstPrompt` preview). That picker was never built. An audit of the whole repo found the entire `SessionSummary` surface is **dead state**:
+The summary was designed for a future session picker (recency ordering via `updatedAt`, a `title`/`firstPrompt` preview). That picker was never built. An audit of the whole repo found the entire `SessionSummary` API is **dead state**:
 
 - `SessionPersistence.update()` has **zero production callers** (every `.update(` hit is `createHash().update()` or a test).
 - `firstPrompt` is **never read** anywhere in production.
-- `title` *is* read in the ACP bridge — but from a tool-call **presenter** (`present.title`), never from stored session metadata.
-- `updatedAt` has **no consumer**: the only production caller of `list()` reads `meta.cwd` (a `SessionHeader` field) to validate a workspace on `session/load`; resume reads `createdAt`/`cwd`/`parentSession` — all header fields.
+- Session titles come from durable `session/title` events, while tool-card titles come from tool presenters; neither reads mutable session metadata.
+- Persistence-list consumers use immutable header identity, creation, lineage, and cwd fields. Recency and previews derive from the log rather than an `updatedAt` summary.
 - Decisively: the live `Session.header` was already typed `SessionHeader`, not `SessionMeta` — the summary never existed on the live session object; it lived only in the persistence layer, written and read by nothing but its own contract test.
 
 ## Decision
@@ -20,7 +22,7 @@ Delete the mutable session summary entirely. `SessionSummary` and the `SessionMe
 
 Anything the summary was meant to provide is **derivable from the append-only log** when a consumer actually needs it (`firstPrompt` = first `user/message`; recency = the last event's `time` or the file mtime) or already lives in the immutable header (`createdAt`, `cwd`). The one thing *not* derivable — a user-*edited* title — had no implementation and is pure YAGNI; it can return as its own log event or header field if a real feature ever needs it.
 
-This is recorded as a decision because it is **durable** (it narrows a public service contract and an on-disk format across two backends), **contested** (the summary was a deliberate forward-looking design, not an accident), and **surprising** (a future reader finding `SessionHeader` where the original Agent Note describes `SessionMeta` would otherwise ask why the summary vanished). It also unblocks the [shared persistence write coordinator](../architecture/2026-06-18-shared-persistence-write-coordinator.md): with no mutable summary, the coordinator's hook interface needs no `updateSummary` hook and the JSONL-sidecar-vs-SQLite-column durability divergence disappears, so the two backends' write paths converge.
+The removal narrows a public service contract and an on-disk format across two backends; the summary was a deliberate forward-looking design, not an accident; and `SessionHeader` now stands where the original Agent Note described `SessionMeta`, which is why the summary vanished. It also unblocks the [shared persistence write coordinator](../architecture/2026-06-18-shared-persistence-write-coordinator.md): with no mutable summary, the coordinator's hook interface needs no `updateSummary` hook and the JSONL-sidecar-vs-SQLite-column durability divergence disappears, so the two backends' write paths converge.
 
 ## No migration
 

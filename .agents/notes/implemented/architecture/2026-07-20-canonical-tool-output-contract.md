@@ -24,7 +24,7 @@ output: {
 
 `defineTool` infers the body return and both projectors from the unified `ValueSchemaSpec`. Raw and dynamic definitions provide the compiled `JsonSchemaNode` form. Registration rejects a missing declaration or unsupported raw schema; there is no content-return compatibility path.
 
-For each successful dispatch the registry snapshots the returned value as lossless `JsonValue`, validates it against `output.schema`, deep-freezes it, then invokes the pure renderer and, for a direct surface call, the optional metadata projector. Renderer, projector, schema, or lossless-JSON failures are contained as ordinary `ToolOutputError` results. An around `tools/execute` wrapper receives and returns the canonical success/failure union; a wrapper-authored success is normalized again through the resolved tool's output declaration instead of trusting independently authored content. Canonical-result provenance is scoped to the immutable dispatch token, so returning a cached result from another call or tool triggers normalization under the active declaration rather than bypassing it.
+For each successful dispatch the registry snapshots the returned value as lossless `JsonValue`, validates it against `output.schema`, deep-freezes it, then invokes the pure renderer and, for a direct surface call, the optional metadata projector. Renderer, projector, schema, or lossless-JSON failures are contained as ordinary `ToolOutputError` results. An around `tools/execute` wrapper receives and returns the canonical success/failure union; a wrapper-authored success is normalized again through the resolved tool's output declaration instead of trusting independently authored content. Each canonical result is tied to the immutable dispatch token that created it, so returning a cached result from another call or tool triggers normalization under the active declaration rather than bypassing it.
 
 ```ts ignore-check
 type ToolExecutionResult =
@@ -34,7 +34,7 @@ type ToolExecutionResult =
 
 `tools/post-execute` has two mutually exclusive successful projections. Replacing `content` changes only Native/model presentation and preserves the canonical value and metadata. Replacing `value` revalidates the replacement and recomputes both presentation projections. A block removes the value and becomes a failure. Content replacement is therefore not a confidentiality mechanism: policy that must prevent programmatic access blocks the call or replaces the value.
 
-Canonical values are execution-local. The agent loop persists `tool/result` with only `content`, `error`, and optional `meta`; Code Mode's `tool/code-dispatch` persists only its bounded summary. Neither event stores the intermediate value, so replay reproduces presentation but cannot reconstruct the programmatic result. When a tool declares `presentationMeta`, it is computed only for a direct surface call; a nested Code dispatch gets no metadata or result card. The outer `run_code` card instead reads final post-policy content and declares no presentation metadata. Generic and tool-owned spill projections similarly skip nested dispatches, whose canonical value never enters model context.
+Canonical values are execution-local. The agent loop persists `tool/result` with only `content`, `error`, and optional `meta`; Code Mode's `tool/code-dispatch` persists the sub-call's rendered `content` and `isError`. Neither event stores the canonical intermediate value, so replay reproduces presentation but cannot reconstruct the programmatic result. When a tool declares `presentationMeta`, it is computed only for a direct surface call; a nested Code dispatch gets no metadata or result card. The outer `run_code` card instead reads final post-policy content and declares no presentation metadata. Generic and tool-owned spill projections similarly skip nested dispatches, whose canonical value never enters model context.
 
 The first-party tools preserve their existing Native text while returning domain DTOs:
 
@@ -46,17 +46,17 @@ The first-party tools preserve their existing Native text while returning domain
 | `glob` | `{ paths: string[] }` |
 | `grep` | `{ matches: [{ path, lineNumber, line }] }` |
 | `web_search` / `web_fetch` | The normalized `WebSearchResult` / `WebFetchResult` |
-| `lsp` | `{ kind: "locations", locations, resolvedWorkspaceRoot }` or `{ kind: "hover", hover }` |
-| `bash` | `{ kind: "background", taskId }` or `{ kind: "foreground" } & BashRunResult` |
-| `terminal_open` / `terminal_list` / `terminal_send` / `terminal_read` / `terminal_signal` / `terminal_close` | Public session snapshots, bounded read/send DTOs, signal/close outcomes, or a background task handle |
-| `task_output` / `task_list` / `task_kill` | Public task snapshots without owner or notification bookkeeping |
-| `subagent` | Background task handle or `{ kind: "foreground", runId, output: JsonValue[] }` |
+| `lsp` | `{ kind: "locations", locations, resolvedWorkspaceUri }` or `{ kind: "hover", hover }` |
+| `bash` | `{ kind: "background", jobId }` or `{ kind: "foreground" } & ShellRunResult` |
+| `terminal_open` / `terminal_list` / `terminal_send` / `terminal_read` / `terminal_signal` / `terminal_close` | Public session snapshots, bounded read/send DTOs, signal/close outcomes, or a background job handle |
+| `job_output` / `job_list` / `job_kill` | Public task snapshots without owner or notification bookkeeping |
+| `subagent` | Background job handle or `{ kind: "foreground", runId, output: JsonValue[] }` |
 | `workflow` / `ralph` | `{ runId, agentsStarted, result: JsonValue }` |
 | `skill` | `{ name, provider, resourceBase?, content }` |
 | `todo_write` | `{ todos, counts }` |
 | `ask_user_question` | `{ answers: [{ id, selected, custom? }] }` |
 | `exit_plan_mode` | `{ approved: true }` |
-| `cordis_inspect` / `cordis_mount` / `cordis_unmount` | Inspection text or typed dynamic-mount handles |
+| `cordis_inspect` / `cordis_mount` / `cordis_unmount` | Inspection text or typed temporary-Plugin handles |
 | `structured_output` | `{ recorded: true }` |
 | `run_code` | `{ logs: string[], result?: JsonValue }` |
 
@@ -66,7 +66,7 @@ MCP bridges preserve protocol blocks through `McpResult<{...}> = { content: Json
 
 ## Alternatives considered
 
-- **Return rendered text to Code Mode:** rejected because callers would continue scraping prose for task ids, mount ids, paths, and structured provider results.
+- **Return rendered text to Code Mode:** rejected because callers would continue scraping prose for job ids, mount ids, paths, and structured provider results.
 - **Persist canonical values on `tool/result`:** rejected because nested execution values are not model history, need not survive replay, and would create a session-format and storage commitment unrelated to Native reconstruction.
 - **Let tools return both value and content:** rejected because two author-owned results can disagree and policy cannot state which one is authoritative. The renderer makes presentation a deterministic projection of the validated value.
 - **Treat content replacement as value redaction:** rejected because presentation and programmatic access are different consumers; hiding only the former would create a false security boundary.

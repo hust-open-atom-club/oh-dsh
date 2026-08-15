@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-06-20-drop-bash-output-spill-files.md: b2bd1a04ee1524bab29814ffa7c22712a83ee5f7
-2026-06-20-drop-bash-output-spill-files.zh.md: 4a2a8e7d3b0477c0a221e9fe6abe879cfa513aeb
+#   pnpm run verify-translation-pairing --write .agents/notes/rejected/simplification/2026-06-20-drop-bash-output-spill-files.md
+2026-06-20-drop-bash-output-spill-files.md: 55bd0dff02f5a09ceb5e557bbe6ddcf36f7791fe
+2026-06-20-drop-bash-output-spill-files.zh.md: ce12eb919c728d856926d6b2441abc26548b615e

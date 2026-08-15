@@ -2,6 +2,8 @@
 
 Status: proposed
 
+English | [中文](2026-06-16-typed-event-schemas.zh.md)
+
 ## Problem
 
 The harness models its core vocabulary — content blocks, message sources, finish reasons, turn triggers, turn-end reasons, and session events — as **merge-extensible maps**: a TypeScript `interface` (e.g. `SessionEventMap`, `ContentBlockMap`) that plugins augment via declaration merging, with the public union derived as `Map[keyof Map]`. This is the repo's universal extension pattern, documented in [docs/architecture.md](../../../../docs/architecture.md) ("The same merge-extensible-map pattern is used for `MessageSource`, `FinishReason`, `TurnTrigger`, and `TurnEndReason`") and relied on by the `defineTool` `InferArgs` DSL and the `assertNever` exhaustiveness convention.
@@ -13,8 +15,6 @@ The pattern is **compile-time only**. The types vanish at runtime: there is no s
 
 This raises whether the event vocabulary should move to **Zod** or another runtime-schema library so durable and plugin boundaries have runtime schemas rather than erased types.
 
-This Agent Note scopes that question without proposing an implementation.
-
 ## Why this is not a persistence change
 
 It is tempting to read "use Zod for serialization" as a local change to `dsh-session-persistence-jsonl/src/format.ts`. It is not, for one structural reason: **a plugin cannot declaration-merge a Zod schema.** Declaration merging is a TypeScript compile-time mechanism; a Zod schema is a runtime value. To validate events with Zod you need a **runtime registry** that every event-producing package contributes its schema to (e.g. `ctx.sessionEvents.register('compaction/marker', z.object({…}))`), and every consumer reads from. That registry — not the persistence backend — becomes the source of truth for the vocabulary, replacing the merge-extensible interface.
@@ -23,10 +23,10 @@ So the real proposal is: **replace the compile-time merge-extensible-map pattern
 
 ## Blast radius (measured)
 
-A migration of the event/vocabulary surface to runtime schemas touches, at minimum:
+A migration of the event/vocabulary API to runtime schemas touches, at minimum:
 
 - **Six merge-extensible maps** (~370 LOC of core types): `ContentBlockMap`, `MessageSourceMap`, `FinishReasonMap` (in `dsh-llm`); `TurnTriggerMap`, `TurnEndReasonMap`, `SessionEventMap` (in `dsh-session`).
-- **~10 `declare module` augmentation sites** across `dsh-agent`, `dsh-agent-loop`, `dsh-bash`, `dsh-llm`, `dsh-session`, `dsh-session-persistence`, `dsh-system-prompt`, `dsh-tools` — each would move from declaration merging to a runtime `register()` call.
+- **~10 `declare module` augmentation sites** across `dsh-agent`, `dsh-agent-loop`, `dsh-shell`, `dsh-llm`, `dsh-session`, `dsh-session-persistence`, `dsh-system-prompt`, `dsh-tools` — each would move from declaration merging to a runtime `register()` call.
 - **The event producers** — 16 `session.append(...)` call sites in the loop — unchanged in shape but now validated at the boundary.
 - **~7 switch-consumers** that branch on these unions: `deriveMessages` and the package-owned invariant companion (`dsh-session`), `BlockAssembler` (`dsh-llm`), both LLM adapters (`dsh-llm-deepseek`, `dsh-llm-pi-ai`), and the tool schema layer (`dsh-tools`). The `assertNever`-on-closed-unions vs fall-through-on-extensible-unions convention (a documented lint rule) would need rethinking — runtime variants are not statically exhaustive.
 - **The `defineTool` `InferArgs` DSL** (`dsh-tools`), which derives zero-cast `execute` arg types from a compile-time schema spec — the showcase of the current approach.
@@ -40,7 +40,7 @@ This is a repository-wide vocabulary redesign, not a persistence implementation 
 Keep the compile-time pattern. Persistence stays opaque-JSON + serializability guard. Plugins extend via declaration merging; correctness of event *shape* is the producer's responsibility and is enforced by TypeScript at compile time. Package-owned invariant companions check selected cross-record relationships when enabled but do not provide general runtime shape schemas.
 
 - **Pros**: zero churn; plugin extension is a one-line `interface` augmentation with full type inference and no runtime registration ceremony; no new runtime dependency; the `defineTool` DSL and `assertNever` exhaustiveness keep working.
-- **Cons**: no runtime structural validation at the persistence boundary or at plugin seams; a malformed-but-JSON datum is caught late.
+- **Cons**: no runtime structural validation at the persistence boundary or at plugin boundaries; a malformed-but-JSON datum is caught late.
 
 ### B. Header/closed-shape validation only (schemastery), events stay opaque
 Tighten only the genuinely-closed shapes that already have hand-rolled type guards — e.g. the JSONL `HeaderLine` guard (`isHeaderLine`) — using **schemastery** (the repo's existing schema library, already used for every plugin `static Config`). Leave the merge-extensible event union as-is.
@@ -51,7 +51,7 @@ Tighten only the genuinely-closed shapes that already have hand-rolled type guar
 ### C. Runtime schema registry for the whole vocabulary (Zod or schemastery)
 Replace the merge-extensible maps with a runtime registry the producers contribute to and the persistence/consumer paths validate against.
 
-- **Pros**: real runtime validation at the durable boundary and at plugin seams; one source of truth; enables generic tooling (auto-generated docs, fuzzing, wire-format checks).
+- **Pros**: real runtime validation at the durable boundary and at plugin boundaries; one source of truth; enables generic tooling (auto-generated docs, fuzzing, wire-format checks).
 - **Cons**: the full blast radius above; **Zod is not currently a direct dependency** (only a transitive dep of `@earendil-works/pi-ai`) and the repo's chosen schema lib is **schemastery** — adopting Zod broadly is itself a dependency decision; declaration-merge ergonomics (one-line plugin extension, full inference) are replaced by runtime registration + manual type wiring; the `assertNever` exhaustiveness guarantee weakens (runtime variants aren't statically exhaustive).
 
 ## Proposal

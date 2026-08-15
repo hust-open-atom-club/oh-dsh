@@ -2,13 +2,15 @@
 
 Status: implemented
 
+English | [中文](2026-07-05-prompt-variables-and-tool-guidance-ownership.zh.md)
+
 ## Problem
 
 The assembled system prompt had four defects, all of one family: facts the harness already knows were restated by hand somewhere else, and drifted.
 
 **The model could not know its own name.** `AgentOptions.model` drives every request, but no prompt text carried it — and nothing COULD carry it: sections in `dsh-system-prompt` were context-global while the model name is per-agent, and `assemble()` took no per-agent input at all.
 
-**Tool guidance was hand-written prose in leaf YAML.** The bash/subagent/todo_write usage guidance lived in the coding-agent and ACP persona strings — two drifting copies (the ACP one was already abridged) — while `dsh-tool-fs` and `dsh-tool-web` owned their guidance as `ctx.systemPrompt.section()` contributions. Loading or dropping a tool plugin meant editing every deployment's persona by hand; both YAMLs carried a `FIXME(config-comments)` apologizing for a symptom of the split, and the old terminal welcome banner hand-enumerated the tool set too.
+**Tool guidance was hand-written prose in leaf YAML.** The shell/subagent/todo_write usage guidance lived in the coding-agent and ACP persona strings — two drifting copies (the ACP one was already abridged) — while `dsh-tool-fs` and `dsh-tool-web` owned their guidance as `ctx.systemPrompt.section()` contributions. Loading or dropping a tool plugin meant editing every deployment's persona by hand, and the old terminal welcome banner hand-enumerated the tool set too.
 
 **The persona rendered after tool guidance.** The loop string-joined `agent.options.systemPrompt` AFTER the assembled sections, so the model read "Use the read tool…" before "You are a coding agent" — backwards relative to the identity-first convention (Claude Code, Codex) and a second composition path besides the section pipeline.
 
@@ -16,7 +18,7 @@ The assembled system prompt had four defects, all of one family: facts the harne
 
 ## Decision
 
-**One principle: every fact in the prompt has exactly one owner.** The model name and workspace are config/session facts → the harness exposes them as variables and the persona references them. Per-tool semantics and when-to-use → the tool's `description`. Cross-call habits a description cannot carry → the tool package's prompt section. Harness provenance → the static `harness:identity` section. Deployment role and behavior → the deployment's persona.
+**One principle: every fact in the prompt has exactly one owner.** The model name and workspace are config/session facts → the harness exposes them as variables and the persona references them. Per-tool semantics and when-to-use → the tool's `description`. Cross-call habits a description cannot carry → the tool package's prompt section. The product name and SDK identity line → the static `harness:identity` section. Deployment role and behavior → the deployment's persona.
 
 ### Assemble context
 
@@ -44,9 +46,9 @@ Per-tool semantics and selection guidance live in tool descriptions. Prompt sect
 
 - **The loop composes an identity line itself** — hardcodes model-facing prose in the one package that must stay thin ("plugins, not loop changes"), and outside the section pipeline it would be a second composition path. (The identity DOES ship as a code literal — but as an ordinary section registered by `dsh-system-prompt`, whose `system-prompt/assemble` waterfall remains the escape valve for a deployment that must drop it.)
 - **Inject the model name via the `agent/request` waterfall** — prompt text would be composed in two places and the earlier rendered persona could disagree with the final routed header. The request plugin that owns late routing must also own any earlier prompt claim about that model.
-- **Hand-write the model name in each persona** — duplicates the `model:` key one line above and silently lies after a config edit; the exact disease this Agent Note cures.
+- **Hand-write the model name in each persona** — duplicates the `model:` key one line above and silently lies after a config edit; the exact disease this decision cures.
 - **Lenient interpolation (leave unknown refs verbatim, or substitute empty)** — a typo ships `{{modle}}` (or a hole) to the model and nobody notices until transcript review.
-- **Per-instance subagent wording in config** — returns model-facing prose to every deployment × instance, the P2 disease again. **Keying wording off the provider NAME** — `providerName` is itself config, so a renamed provider silently gets the wrong words.
+- **Per-instance subagent wording in config** — returns model-facing prose to every deployment × instance, reviving the hand-written-guidance-in-leaf-YAML drift. **Keying wording off the provider NAME** — `providerName` is itself config, so a renamed provider silently gets the wrong words.
 - **Resolving the provider at `apply` time (a load-order requirement)** and **section-only subagent wording (lazily resolved at assemble)** — the alternatives to the provider-lifecycle events; both rejected in [the provider-lifecycle-events Agent Note](2026-07-05-subagent-provider-lifecycle-events.md).
 
 ## Out of scope
@@ -56,7 +58,7 @@ Per-tool semantics and selection guidance live in tool descriptions. Prompt sect
 
 ## Shipped invariants
 
-- The tui-agent prompt renders identity, persona with the interpolated model, then fs/bash/web guidance through one assembly path.
+- The tui-agent prompt renders identity, persona with the interpolated model, then fs/shell/web guidance through one assembly path.
 - Fork and fresh subagent descriptions reflect whether the provider inherits completed conversation turns; the tool appears, disappears, and is reworded with provider lifecycle changes.
 - Unknown, valueless, malformed, or unbalanced variable references name the section and throw; duplicate section, variable, and tool registrations also throw.
 - Snapshot replay is prompt-independent: it keys recorded chunk streams by turn and step without comparing the outgoing request.

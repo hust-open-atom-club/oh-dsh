@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-21-semantic-session-checkpoints.md: 4bca02fe3893ac39621ed79a000ca8f86db4ff67
-2026-07-21-semantic-session-checkpoints.zh.md: 1f187eb6448a3c9ca6784ec2bddd7295be2706d7
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-21-semantic-session-checkpoints.md
+2026-07-21-semantic-session-checkpoints.md: 697d878dccbfab1ded9f73e134d594ba6f0665e1
+2026-07-21-semantic-session-checkpoints.zh.md: c72f2bbad33967f54013f05568b9d1082d549357

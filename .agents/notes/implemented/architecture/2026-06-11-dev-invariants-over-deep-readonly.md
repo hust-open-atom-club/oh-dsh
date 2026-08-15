@@ -2,9 +2,11 @@
 
 Status: implemented
 
+English | [中文](2026-06-11-dev-invariants-over-deep-readonly.zh.md)
+
 ## Problem
 
-The session log needs two different protections: immutable ownership of each stored fact, and checks for relationships among facts across time and service seams. Conflating them in an optional development plugin would leave production history vulnerable; trying to express both through TypeScript readonly types would not create a runtime boundary or describe relational rules.
+The session log needs two different protections: immutable ownership of each stored fact, and checks for relationships among facts across time and service contracts. Conflating them in an optional development plugin would leave production history vulnerable; trying to express both through TypeScript readonly types would not create a runtime boundary or describe relational rules.
 
 The session log is the durable source of truth for replay, request reconstruction, persistence, and user-visible history. Code outside the session package must be able to inspect that history without retaining a reference that can rewrite it later, and inputs accepted from callers must not remain connected to caller-owned mutable objects.
 
@@ -38,7 +40,7 @@ When the session companion attaches to an existing or seeded session, it replays
 
 ### Pervasive deep-readonly types
 
-[The rejected immutable-public-surfaces proposal](../../rejected/architecture/2026-06-11-immutable-public-surfaces.md) would apply a recursive readonly type across public log and message surfaces. That provides editor feedback but not a runtime guarantee: TypeScript types are erased and plugin code can cast through them. It also pushes readonly types into consumers where mutation is intentional. Runtime ownership at the `Session` boundary protects every caller without that type propagation.
+A rejected companion proposal would apply a recursive `DeepReadonly<T>` type across public log and message surfaces, flipping session read paths (`events`, `session/event` listeners, `deriveMessages()`) to deep-readonly while keeping in-flight waterfalls mutable. That provides editor feedback but not a runtime guarantee: TypeScript types are erased and plugin code can cast through them. It also pushes readonly types into consumers where mutation is intentional. Runtime ownership at the `Session` boundary protects every caller without that type propagation.
 
 ### Development-only freezing
 

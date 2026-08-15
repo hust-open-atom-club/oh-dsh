@@ -8,11 +8,11 @@ English | [中文](2026-07-19-same-session-goal-round-driver.zh.md)
 
 The goal domain can retain an objective and the model-facing tools can mutate its lifecycle, but neither should decide when another model turn begins. A continuation driver must bridge active goal state to the ordinary agent loop without adding goal-specific branches to `dsh-agent-loop`, inventing a second conversation, or treating every human turn as an autonomous iteration.
 
-That bridge has concurrency and durability obligations. Human input, cancellation, a goal edit, persistence failure, session restart, plugin unload, and a downstream prompt policy can all race a pending continuation. A naive `goal/changed -> agent.send()` listener can admit obsolete work, run alongside a human prompt, spend beyond the cap, or restart from replay without new authority.
+That bridge has concurrency and durability obligations. Human input, cancellation, a goal edit, persistence failure, session restart, plugin unload, and a downstream prompt policy can all race a pending continuation. A naive `goal/changed -> agent.followup()` listener can admit obsolete work, run alongside a human prompt, spend beyond the cap, or restart from replay without new authority.
 
 ## Decision
 
-`@deepseek-ai/dsh-goal-session` in `packages/goal/goal-session/` is a policy plugin over `ctx.goals`, the public `Agent` interface, and durable session events. It imports no concrete agent-loop implementation. For each exact live `Agent`, it owns process-local scheduling state and may reserve at most one automatic round.
+`@deepseek-ai/dsh-goal-round-driver` in `packages/goal/goal-round-driver/` is a policy plugin over `ctx.goals`, the public `Agent` interface, and durable session events. It imports no concrete agent-loop implementation. For each exact live `Agent`, it owns process-local scheduling state and may reserve at most one automatic round.
 
 The hierarchy is Goal → Goal Round → Turn → Step. A goal round is the outer continuation policy iteration; it becomes one goal-sourced session turn, and that turn can contain any number of ordinary model/tool steps. Human turns in the same session are not goal rounds and never increment `roundsStarted`.
 
@@ -20,15 +20,15 @@ The plugin has no configuration. `maxGoalRounds` is resolved and persisted by `d
 
 ### Reservation and admission
 
-When an agent is idle, has no competing queued work, and its current goal is `active` plus `armed`, the driver checkpoints pending goal mutations and rechecks every predicate after the await. If `roundsStarted` already equals `maxGoalRounds`, it records `blocked` with code `round-limit`. Otherwise it reserves the exact identity `{ goalId, revision, round: roundsStarted + 1 }` and the complete rendered prompt before calling `Agent.send()` with `GoalMessageSource`. The prompt JSON-quotes the objective so multiline or tag-like text remains an unambiguous data value inside the familiar frame.
+When an agent is idle, has no competing queued work, and its current goal is `active` plus `armed`, the driver checkpoints pending goal mutations and rechecks every predicate after the await. If `roundsStarted` already equals `maxGoalRounds`, it records `blocked` with code `round-limit`. Otherwise it reserves the exact identity `{ goalId, revision, round: roundsStarted + 1 }` and the complete rendered prompt before calling `Agent.followup()` with `GoalMessageSource`. The prompt JSON-quotes the objective so multiline or tag-like text remains an unambiguous data value inside the familiar frame.
 
-The `agent/prompt-submit` waterfall is the admission fence. A positive goal source is allowed only when it exactly matches the driver's pending identity and content, the live goal still has that id and revision, activation remains armed, and the round is still the next number. The plugin checks once before delegating and again after downstream hooks return. This second check prevents an async hook from editing or pausing the goal while still admitting the old prompt.
+The `agent/pre-step` waterfall is the entry fence. A positive goal source enters only when it exactly matches the driver's pending identity and content, the live goal still has that id and revision, activation remains armed, and the round is still the next number. The plugin checks once before delegating and again after downstream listeners return. This second check prevents an async listener from editing or pausing the goal while still entering the old prompt.
 
-Only the resulting `user/message` is an admitted round and advances the goal fold. A stale reservation becomes a durable `prompt/blocked` plus zero-step rejected turn, but the driver marks it stale and does not charge the round. A downstream policy rejection that is not caused by staleness blocks the goal rather than retrying around policy.
+Only the resulting `user/message` is an entered round and advances the goal fold. A stale reservation closes a blocked no-step turn; the driver marks it stale and does not charge the round. A downstream policy rejection that is not caused by staleness blocks the goal rather than retrying around policy.
 
 ### Human work and revision races
 
-`agent/queued` distinguishes the driver's complete accepted record from every other prompt. Ordinary work already queued before a reservation prevents scheduling. Ordinary work queued while an automatic prompt is pending makes that reservation stale, so a mixed batch admits the human prompt but rejects the automatic one. Ordinary work arriving after the goal round was admitted remains queued for its own next turn; continuation is reconsidered only when the agent later becomes idle.
+The reserved `MessageId` distinguishes the driver's complete record from every other prompt. Ordinary work already queued before a reservation prevents scheduling. Ordinary work queued while an automatic prompt is pending makes that reservation stale, so a mixed claimed batch rejects the automatic proposal. Ordinary work arriving after the goal round entered remains queued for its own next turn; continuation is reconsidered only when the agent later becomes idle.
 
 A goal mutation during a round advances its durable revision. Settlement of the older revision cannot overwrite that mutation. The driver discards the old attempt outcome, reads the new projection, and continues only if the new revision is still active and armed. This makes model-recorded completion, pause, block, and edit authoritative over the physical turn's later close reason.
 
@@ -43,20 +43,19 @@ The driver classifies one closed goal-owned turn as follows:
 | `error` with code `RATE_LIMIT` or `QUOTA` | block with code `usage-limited` |
 | other `error` | block with code `turn-error` |
 | `max-tokens` | block with code `max-tokens` |
-| non-stale `rejected` | block with code `prompt-rejected` |
 | failed durability checkpoint | disarm without changing durable phase |
 | `disposed` or `interrupted` | disarm |
 | plugin-added unknown result | block for inspection |
 
 No abnormal outcome requests an automatic retry. A later human prompt can ask to continue in any language; the model reads the stopped goal and uses the goal tool's resume action, which records a new revision and arms continuation.
 
-### Durability and cancellation seam
+### Durability and cancellation contract
 
 Every `goal/changed` notification creates a checkpoint obligation. The driver awaits `ctx.sessions.flush(session)` before reserving work, then checks for a newer mutation, agent lifecycle change, or competing prompt. Turn-end flush failure is reported by the existing `agent/error` notification after `turn/end`; the driver finds that exact closed turn even when a concurrent one-shot injection appended a later turn, associates the failure with the exact attempt, and disarms before the next idle decision.
 
-Broad cancellation previously exposed only its effects after queues were cleared or the request aborted. The public agent vocabulary now includes observe-only `agent/cancel-requested(agent, reason)`. The concrete loop emits it for effective cancellation before either action; fused notification containment means a broken listener cannot veto cancellation. The goal driver uses this edge to clear its reservation before the loop destroys the queued-work evidence. When that reservation is a queued or admitted goal attempt, cancellation durably pauses the goal; when cancellation belongs to unrelated human work with no goal attempt, it only removes process-local activation. If the pause mutation throws, the driver falls back to disarming rather than allowing cancelled automatic work to restart.
+Broad cancellation clears pending inbox work and aborts the active loop phase. The goal driver follows the reserved message through inbox claim/discard events and the durable aborted turn ending. Because a turn now opens before its initial claim, cancellation can close a claimed no-step attempt; the driver marks that attempt cancelled and lets the following idle edge pause the goal, just as it does for an admitted attempt. Cancellation with no matching goal attempt only removes process-local activation. If the pause mutation throws, the driver falls back to disarming rather than allowing cancelled automatic work to restart.
 
-This is a coordination notification, not a second stop API. `Agent.cancel()` remains the only public broad cancellation verb, idle calls remain no-ops, and custom `Agent` implementations that claim the interface must honor the event ordering if consumers depend on it.
+`Agent.cancel()` remains the only public broad cancellation verb. Custom `Agent` implementations that claim the interface must honor the inbox, turn-ending, status, and quiescence ordering if consumers depend on it.
 
 ### Process lifecycle
 
@@ -70,13 +69,13 @@ An inbox acceptance can win the microtask race immediately before plugin unload 
 
 The unit suite uses the real agent loop and session service with only the model scripted. It covers exact sequential admission and cap enforcement, load/resume inertness, every outcome classification, rate limiting, request errors, max tokens, downstream prompt veto, pre-admission and in-flight cancellation, unrelated-human cancellation, failed-pause fallback, human-input ordering, queued and downstream revision races, forged goal attribution, failed mutation and turn checkpoints including a later one-shot injection, scheduler and custom-agent failures, session-start reset, exact lifecycle retirement, and queued/running plugin teardown. The new driver source has per-file 100% statement, branch, function, and line coverage.
 
-A keyless ACP snapshot mounts the shipped editor app with the real goal domain, goal tools, goal driver, agent loop, persistence, and replay adapter through `cordis.yml`. One human turn creates and inspects a two-round goal, the first automatic turn stops normally, and ACP cancellation of a deliberately stalled second round records a durable pause. The normalized wire transcript and external JSONL assertions prove one session, round sources `1, 2`, the lifecycle mutation, and exact replay accounting without using `echo-agent` as an application surrogate.
+A keyless ACP snapshot mounts the shipped automation app with the real goal domain, goal tools, goal driver, agent loop, persistence, and replay adapter through `cordis.yml`. One human-originated turn creates and inspects a two-round goal, the first automatic turn stops normally, and ACP cancellation of a deliberately stalled second round records a durable pause. The normalized wire transcript and external JSONL assertions prove one session, round sources `1, 2`, the lifecycle mutation, and exact replay accounting without using `echo-agent` as an application surrogate.
 
 The core cancellation test proves notification order and containment: observers run only for effective cancellation, can queue replacement work before the inbox clear, cannot veto later observers by throwing, and an idle call emits nothing.
 
 ## Alternatives considered
 
-- **Add a goal loop inside `dsh-agent-loop`** — rejected because the public queue, prompt, session, cancellation, and status seams are sufficient, and a concrete-loop branch would privilege one policy.
+- **Add a goal loop inside `dsh-agent-loop`** — rejected because the public queue, prompt, session, cancellation, and status contracts are sufficient, and a concrete-loop branch would privilege one policy.
 - **Use `agent/turn-continuation` to make every round another step** — rejected because a goal round is an outer policy iteration and must have its own durable user prompt, turn boundary, round count, and failure settlement.
 - **Persist a pending reservation** — rejected because a crash cannot prove that queued process memory had reached admission; only the durable `user/message` consumes the round.
 - **Retry provider or persistence errors automatically** — rejected because retry policy spends resources and needs explicit authority; stopped phases plus later human resume are simpler and observable.

@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-20-code-mode-typed-tool-returns.md: 29f139a7e965de3a374d195ecc205210e6ae7e93
-2026-07-20-code-mode-typed-tool-returns.zh.md: 431c0b1717c6783771255ce8291c241f8f92c30b
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-20-code-mode-typed-tool-returns.md
+2026-07-20-code-mode-typed-tool-returns.md: 747b33384238957190932e07a5f41d01cf1b65b6
+2026-07-20-code-mode-typed-tool-returns.zh.md: 9ad41285ca76427c39a63ae54f80fe34e62f2520

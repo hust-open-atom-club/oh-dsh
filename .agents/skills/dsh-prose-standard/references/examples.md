@@ -40,13 +40,13 @@ Keep the test tiers, required action, real entry path, and observable verificati
 
 **Over-detailed:** A chronological account of every promise and callback used to implement teardown.
 
-The actor, ordering, ownership boundary, and completion guarantee are separate factual clauses.
+The actor, ordering, point where ownership changes, and completion guarantee are separate factual clauses.
 
 ## Event JSDoc preserves boundary timing
 
 **Over-trimmed:** “Composes and caches the session prefix.”
 
-**Balanced:** “Composes the session prefix once before the first pre-step and request boundary. Listener appends join the current request, and pre-step pressure accounting receives the composed prefix.”
+**Balanced:** “Composes the session prefix once before the first pre-step and model request. Listener appends join the current request, and pre-step pressure accounting receives the composed prefix.”
 
 **Over-detailed:** A walkthrough of the loop helpers, cache fields, and promise callbacks that implement the ordering.
 
@@ -60,7 +60,7 @@ Event order and its current-request consequence are caller-visible behavior, not
 
 **Over-detailed:** A paragraph-by-paragraph preview of the classes and helper functions below.
 
-Keep role, boundaries, and non-obvious lifecycle behavior. Link architecture rationale and let the code show local control flow.
+Keep the module's role, dependencies, responsibilities, and non-obvious lifecycle behavior. Link architecture rationale and let the code show local control flow.
 
 ## Public JSDoc includes failures
 
@@ -76,11 +76,11 @@ Throws and state preconditions are caller-visible contract facts.
 
 **Over-trimmed:** “Search provider backed by an external API.”
 
-**Balanced:** “Maps each provider result to the shared search-result shape, preserving the title, URL, and text while omitting provider-only ranking metadata.”
+**Balanced:** “Maps each provider result to the shared search-result fields, preserving the title, URL, and text while omitting provider-only ranking metadata.”
 
 **Over-detailed:** A field-by-field restatement of the mapping code, including fields with identical names and obvious assignments.
 
-Keep mapping details that explain an abstraction boundary or intentional information loss.
+Keep mapping details that explain where an adapter drops or changes information.
 
 ## Link rationale while keeping the local contract
 
@@ -106,11 +106,11 @@ Remove migration tasks and test narration. Keep the tiers, behaviors they pin, r
 
 **Over-trimmed:** “Mounted plugins share the host's authority.”
 
-**Balanced:** “Mounted plugins share the host's authority; for example, access to `ctx.bash` permits commands with the host executor's privileges.”
+**Balanced:** “Mounted plugins share the host's authority; for example, access to `ctx.shell` permits commands with the host executor's privileges.”
 
 **Over-detailed:** A list of every service a plugin could misuse and every hypothetical exploit.
 
-Keep one example when it makes an otherwise abstract boundary operationally clear.
+Keep one example when it makes an otherwise abstract security limit operationally clear.
 
 ## Delete reasoning transcripts entirely
 
@@ -134,7 +134,7 @@ Keep the consequence of order, a surprising scope rule, or a security boundary. 
 
 **Shorter but worse:** “The adapter normalizes provider errors.”
 
-**Balanced decision:** Keep the current sentence unless a link or surrounding contract already carries the failure categories. The shorter version loses the consequence and distinctions without improving structure.
+**Balanced decision:** Keep the current sentence unless a link or surrounding contract already lists the failure categories. The shorter version loses the consequence and distinctions without improving structure.
 
 ## Model-visible text follows ownership
 
@@ -154,7 +154,7 @@ Wording that reaches a model is behavior, but duplication still drifts. Exactnes
 
 **Balanced:** “Approval service that applies session policy before answerers and logs every ask/outcome pair to the requesting session.” Keep non-catalog detail in later sentences.
 
-Know what the generator extracts. That fragment must preserve the contract needed on its generated surface.
+Know what the generator extracts. That fragment must preserve the contract needed on its generated output.
 
 ## Limitations are contracts, not debt inventories
 

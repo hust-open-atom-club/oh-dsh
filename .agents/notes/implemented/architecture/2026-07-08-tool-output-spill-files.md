@@ -2,13 +2,15 @@
 
 Status: implemented
 
+English | [中文](2026-07-08-tool-output-spill-files.zh.md)
+
 ## Problem
 
 Tool outputs need bounded model-facing previews, but some oversized results are still useful later. A fetched page body or a verbose tool response should not consume the next model request in full, but the model should be able to inspect the complete formatted result later with existing file-reading tools.
 
 Before this change the behavior was uneven. `dsh-bash-local` already writes complete stdout/stderr streams to private temp spill files when its in-memory tail overflows, but ordinary text tool results were returned inline unless the tool hand-rolled its own cap. The [tool result retention library](2026-07-06-tool-result-retention-library.md) owns preview mechanics, but it does not own storage or an execution-pipeline policy that applies those mechanics to final tool results.
 
-The shape matches the timeout policy design: a tool author normally returns the text result, and a policy plugin enforces the deployment's default context budget. Tool-specific early spill remains possible later for outputs that do not survive to the final `ToolExecutionResult`; the first cut proves the default final-result path.
+The shape matches the timeout policy design: a tool author declares a canonical value plus Native renderer, and a policy plugin enforces the deployment's default context budget on rendered content. Tool-specific early spill remains possible for provider acquisition bounds; tool-owned presentation spill may retain a complete acquired canonical value while replacing only presentation. The [canonical tool-output contract](2026-07-20-canonical-tool-output-contract.md) owns that split.
 
 ## Decision
 
@@ -20,7 +22,7 @@ A thin spill storage seam plus a default spill policy plugin, in a new `packages
 | `@deepseek-ai/dsh-spill-local` | Local backend: private, session-scoped file storage on the host filesystem. |
 | `@deepseek-ai/dsh-spill-policy` | Tool-result policy plugin: wraps final text results after dispatch and replaces oversized results with a retained preview plus a spill locator. |
 
-There is no dedicated model-facing consumer package. The consumer is the existing `ctx.tools` execution pipeline: `dsh-spill-policy` consumes final tool results through the `tools/post-execute` waterfall, and the model follows the backend-supplied retrieval hint for the returned locator.
+There is no dedicated model-facing Consumer package. The Consumer is the existing `ctx.tools` execution pipeline: `dsh-spill-policy` consumes final tool results through the `tools/post-execute` waterfall, and the model follows the backend-supplied retrieval hint for the returned locator.
 
 ### Spill seam
 
@@ -97,9 +99,13 @@ The policy skips `read` to avoid a circular `read -> spill file -> read again` l
 ```ts ignore-check
 ctx.tools.register(defineTool({
   name: 'web_fetch',
+  output: {
+    schema: WEB_FETCH_RESULT_SCHEMA,
+    render: (_args, value) => [{ type: 'text', text: formatFetchOutput(value) }],
+  },
   async execute(args, exec) {
     const result = await ctx.web.fetch({ url: args.url }, exec.signal ? { signal: exec.signal } : undefined)
-    return [{ type: 'text', text: formatFetchOutput(result) }]
+    return result
   },
 }))
 ```
@@ -107,8 +113,8 @@ ctx.tools.register(defineTool({
 With `dsh-spill-policy` configured, a large formatted fetch result is automatically retained and spilled. A deployment demonstrates the behavior by setting the provider resource cap higher than the policy cap:
 
 ```yaml
-- id: web-fetch-local
-  name: '@deepseek-ai/dsh-web-fetch-local'
+- id: web-fetch-http
+  name: '@deepseek-ai/dsh-web-fetch-http'
   config:
     maxBodyChars: 500000
 
@@ -121,13 +127,13 @@ With `dsh-spill-policy` configured, a large formatted fetch result is automatica
     maxInlineBytes: 50000
 ```
 
-This separation is important. `web-fetch-local` still owns resource caps (`maxResponseBytes`, `maxBodyChars`) to protect network, memory, and decoding work. `spill-policy` owns only the model-facing context cap after the result already exists. If the provider already returned `truncated: true`, the spill file contains the full formatted result the tool returned, not the full original webpage; the policy does not claim otherwise.
+This separation is important. `web-fetch-http` still owns resource caps (`maxResponseBytes`, `maxBodyChars`) to protect network, memory, and decoding work. `spill-policy` owns only the model-facing context cap after the result already exists. If the provider already returned `truncated: true`, the spill file contains the full formatted result the tool returned, not the full original webpage; the policy does not claim otherwise.
 
 ## Relationship to retention and early spill
 
 Retention is separate from spill storage:
 
-- `@deepseek-ai/dsh-retention` owns preview mechanics (`TextRetainer`, `ItemRetainer`, and omitted metadata).
+- `@deepseek-ai/dsh-output-retention` owns preview mechanics (`TextRetainer`, `ItemRetainer`, and omitted metadata).
 - `@deepseek-ai/dsh-spill` owns saving final text and returning a locator plus retrieval hint.
 - `@deepseek-ai/dsh-spill-policy` applies the default final-result policy in the tool pipeline, composing the two.
 
@@ -145,7 +151,7 @@ Those cases can consume `ctx.spillStore` directly in later work. They are not pa
 - No per-tool retention configuration in v1.
 - No model-facing timeout/truncation arguments.
 - No migration of `read` output into spill files.
-- No replacement for provider/resource caps such as `web-fetch-local.maxBodyChars`.
+- No replacement for provider/resource caps such as `web-fetch-http.maxBodyChars`.
 - No bash temp-file normalization or subagent rollout capture in the first cut.
 
 ## Deferred
@@ -184,6 +190,6 @@ The policy can become too large if it starts owning tool-specific semantics. It 
 
 **Use `ctx.fs.writeText` or the model-facing `write` tool.** Rejected: workspace filesystem writes carry project-file semantics, write/edit policy, observation state, and user-facing side effects. Spill files are runtime artifacts, not model-authored workspace edits. The existing `read` tool may inspect them later, but creation belongs to the runtime spill seam.
 
-**Let `web-fetch-local` fetch without caps and rely on spill-policy.** Rejected: spill-policy runs after the final tool result exists and cannot protect network, memory, or decoding resources. Provider resource caps stay mandatory.
+**Let `web-fetch-http` fetch without caps and rely on spill-policy.** Rejected: spill-policy runs after the final tool result exists and cannot protect network, memory, or decoding resources. Provider resource caps stay mandatory.
 
 **Merge retention into spill.** Rejected: retention and spill have different responsibilities. `TextRetainer`/`ItemRetainer` decide what preview is kept and what was omitted; spill storage only saves the final text the policy asks it to save.

@@ -12,7 +12,7 @@ Repository translations follow the sibling pairing contract: English `foo.md`, C
 ## Read the owning contracts
 
 - Read [docs/AGENTS.md](../../../docs/AGENTS.md) and use [dsh-doc-standards](../dsh-doc-standards/SKILL.md) when deciding where content belongs or changing product documentation prose.
-- Use [dsh-translate-docs](../dsh-translate-docs/SKILL.md) whenever an edited source has a bilingual counterpart.
+- For an edited bilingual source, follow the lightweight routine path in [docs/AGENTS.md](../../../docs/AGENTS.md#writing-rules) and the [pairing contract](../../../docs/i18n/README.md); never invoke the extended translation skill automatically.
 - Read the current `DocsPage` type and entries in [website/docs.ts](../../../website/docs.ts) before changing the manifest; do not rely on a remembered field set.
 - Read [website/.vitepress/config.ts](../../../website/.vitepress/config.ts) before adding a new section, sidebar collection, locale, or top-level navigation item.
 
@@ -38,7 +38,7 @@ Set every `DocsPage` field deliberately:
 - `order`: stable order within the section.
 - `sourceAliases`: optional additional repository paths that should resolve to this page when links are projected. It does not create another public route.
 
-Use `mirroredPages()` only for a source that intentionally falls back to the same available language in both route trees. Convert that entry to `pairedPages()` when its counterpart is added. Keep the manifest an explicit public allowlist. Do not publish RFCs, postmortems, testing guides, `AGENTS.md`, or maintainer workflows merely because they exist under `docs/`; add internal material only when the user explicitly changes the publication boundary.
+Use `mirroredPages()` only for a source that intentionally falls back to the same available language in both route trees. Convert that entry to `pairedPages()` when its counterpart is added. Keep the manifest an explicit public allowlist. Do not publish RFCs, postmortems, testing guides, `AGENTS.md`, or maintainer workflows merely because they exist under `docs/`; add internal material only when the user explicitly expands what the site publishes.
 
 ## Preserve link behavior
 
@@ -46,8 +46,10 @@ Write normal repository-relative Markdown links in canonical docs. The projector
 
 - A target present in the manifest becomes a site-relative route.
 - An existing target outside the manifest becomes a GitHub source link, including supported line suffixes.
+- An image is the exception: its file is copied into the generated tree and referenced from there, so the site serves it regardless of repository visibility. It must be a regular file inside the repository.
 - External URLs, site-absolute URLs, email links, and fragment-only links remain unchanged.
 - A missing repository-relative target fails projection instead of silently producing a broken link.
+- Cross-page fragments use the English GitHub heading id as their canonical id. If an authored heading emits a different VitePress id, place an explicit `<a id="..."></a>` immediately before it; add generated aliases in the owning generator.
 
 Do not write website-specific routes into canonical Markdown just to satisfy VitePress. Use `sourceAliases` for directory-style repository links that should resolve to a mapped index page.
 
@@ -66,6 +68,8 @@ Run the focused website gate before treating the mapping as valid:
 ```sh
 pnpm docs:check
 ```
+
+If Markdown link checks pass but the site build reports a missing fragment, follow the `verify-doc-site-fragments` source and target paths. Preserve the English GitHub id with an explicit alias in authored Markdown or in the owning generator.
 
 Before committing a documentation-site change, run:
 

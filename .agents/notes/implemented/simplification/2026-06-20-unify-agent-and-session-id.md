@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-unify-agent-and-session-id.zh.md)
+
 ## Problem
 
 A live agent/session pair needs one identity for registry routing, event sourcing, and persistence. Giving the factory independent `agentId` and `sessionId` inputs would permit pairings no production path can use, while forcing every consumer to choose or translate between two names for the same lifecycle.
@@ -31,7 +33,6 @@ The config-driven path keeps `agents[].id` as a stable configuration label, not 
 - ACP, stdio, hooks, bash ownership, persistence, and lineage use the shared `SessionId` directly. The ACP subagent backend mints its lifecycle id in the parent namespace because a child server's returned session id is only server-local; the ACP bridge verifies exact `Agent` ownership from the forward session map; and JSON-RPC forwards only lifecycle events whose service-snapshotted `local` flag is true, obtains the delegating parent from the scoped event carrier, and keeps no child identity or lineage cache.
 - The config-driven resume-or-create policy is explicit and covered across a durable restart.
 - A production listener search kept `agent/created`/`agent/disposed` and their publication semantics.
-- Typecheck, coverage, snapshots, doc-sync, module-graph verification, build, and hygiene pass.
 
 ## Consequences
 

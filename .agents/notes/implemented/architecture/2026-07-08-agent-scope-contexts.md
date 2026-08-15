@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-08-agent-scope-contexts.zh.md)
+
 ## Problem
 
 One application needs to share infrastructure across many agents while letting each agent have its own tools, prompt contributions, policies, and listeners. Shared adapters, persistence, and user interfaces belong to the deployment; a persona, tool variant, or listener often belongs to one agent.
@@ -102,15 +104,15 @@ An event about Agent A normally reaches unscoped listeners and A-scoped listener
 
 At the Cordis level, `Scoped<T>` is an opaque routing receiver. It carries the filter used to choose listeners but is not the domain object. Event signatures therefore keep the real `Agent`, tool execution, approval request, or other subject as an explicit argument that listeners can inspect.
 
-A listener registered with `{ global: true }` deliberately bypasses contextual audience filtering while its cleanup still follows the registering context. Registry-membership notifications remain unfiltered because they describe shared registry state rather than one agent's operation. The generated [event catalog](../../../../docs/cordis-catalog/events.md) is the exhaustive event reference.
+A listener registered with `{ global: true }` deliberately bypasses contextual audience filtering while its cleanup still follows the registering context. Registry-membership notifications remain unfiltered because they describe shared registry state rather than one agent's operation. The exhaustive event reference is the set of generated `cordis-surface` regions across the [subsystem pages](../../../../docs/subsystems/core.md) — each event scope on its owning page (`agent/*` and `agent-loop/*` on core.md itself).
 
 ### Creation publishes last and disposal revokes last
 
-`ctx.agents.create()` and `resume()` build an unpublished session, scope, agent, and driver. They await `setup`, admit the final session and agent entries, announce them in order, start the loop, and only then return a handle.
+`ctx.agents.create()` and `resume()` build an unpublished session, scope, agent, and driver. They await `setup`, synchronously invoke its optional `AgentSetupCommit`, admit the final session and agent entries, announce them in order, start the loop, and only then return a handle. The commit lets mutable provisioning revalidate at the exact publication boundary after every setup await; a throw rolls the private transaction back before either identity is announced, while revocation after a successful commit is ordinary live teardown.
 
 An optional creation signal cancels work only while create or resume is pending. After the promise resolves, the returned `AgentHandle` owns explicit disposal.
 
-If loading, setup, admission, or publication fails, the private transaction rolls back everything it prepared. Concurrent operations using the same caller-supplied live ID may both reach setup, but final registry entry admits only one; every loser rejects and cleans its private resources. Sequential reuse after awaited disposal remains valid.
+If loading, setup, the optional setup commit, admission, or publication fails, the private transaction rolls back everything it prepared. Concurrent operations using the same caller-supplied live ID may both reach setup, but final registry entry admits only one; every loser rejects and cleans its private resources. Sequential reuse after awaited disposal remains valid.
 
 `AgentHandle.dispose()` reverses the boundary. It deactivates creation or driving, waits for synchronous publication to unwind, stops and drains the driver and final session flushes, detaches the agent and session, and finally disposes the scope. Repeated or racing disposal requests join one completion promise.
 
@@ -120,12 +122,14 @@ The calling Cordis context and the concrete AgentLoop factory are structural co-
 flowchart TB
   request["Create or resume"] --> privateWorld["Build private session, scope, agent, and driver"]
   privateWorld --> setup["Await composition through agent.ctx"]
-  setup --> admission["Admit final session and agent entries"]
+  setup --> setupCommit["Commit optional mutable provisioning"]
+  setupCommit --> admission["Admit final session and agent entries"]
   admission --> publish["Announce lifecycle and start the driver"]
   publish --> live["Return AgentHandle"]
 
   privateWorld -->|"failure, cancellation, or owner loss"| rollback["Rollback private work"]
   setup -->|"failure, cancellation, or owner loss"| rollback
+  setupCommit -->|"revalidation failure or owner loss"| rollback
   admission -->|"duplicate or owner loss"| rollback
   publish -->|"listener failure or owner loss"| rollback
   live -->|"handle or owner disposal"| quiesce["Stop and drain work"]
@@ -164,6 +168,6 @@ Parentage describes lifetime and conversation lineage, not a universal merge pol
 
 ## Consequences
 
-Contributors use one familiar pattern: register shared behavior through a plugin context, register local behavior through `agent.ctx`, select the real agent on operations, and dispose the returned handle. Setup is atomic from an observer's perspective, and teardown preserves local behavior until work stops.
+Contributors use one familiar pattern: register shared behavior through a plugin context, register local behavior through `agent.ctx`, select the real agent on operations, and dispose the returned handle. Setup and its optional publication commit are atomic from an observer's perspective, and teardown preserves local behavior until work stops.
 
 The cost is explicit subject selection, asynchronous programmatic creation, and service-specific scope adoption. Flat registration scope is intentionally not authority, and subagent composition controls remain a separate feature rather than hidden scope semantics.

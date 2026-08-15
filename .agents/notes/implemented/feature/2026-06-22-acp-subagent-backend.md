@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-06-22-acp-subagent-backend.zh.md)
+
 ## Problem
 
 The subagent seam ([the seam Agent Note](2026-06-21-subagent-capability-seam.md)) was built so multiple backends coexist by name on `ctx.subagents`. The in-process backends (`-spawn`/`-fork`) run a child as a second `Agent` on the SAME cordis context — cheap, but the child shares the parent's process, model client, and tools. The seam's whole point was to also support an OUT-OF-PROCESS child reached over a protocol, proving the abstraction generalizes across a process boundary. This Agent Note adds the first such backend: an Agent Client Protocol (ACP) client.
@@ -16,7 +18,7 @@ Each `start` spawns a new child, runs exactly one ACP session (`initialize` → 
 
 ### Minimal client stub
 
-The client advertises NO optional capabilities (no `fs`, no `terminal`): the child self-serves file/terminal access in its own process. `session/update` notifications are consumed — the backend accumulates `agent_message_chunk` text as the result output and ignores the rest (thoughts, tool-call cards) in this cut, which surfaces only the child's final answer. `session/request_permission` is auto-answered by a configured policy (`reject` declines every prompt, `allow` approves via the first allow-shaped option) — the first cut surfaces no prompt to a human. Proxying `fs`/`terminal` back to the parent (a shared-workspace mode) remains future work, as the seam Agent Note noted.
+The client advertises NO optional capabilities (no `fs`, no `terminal`): the child self-serves file/terminal access in its own process. `session/update` notifications are consumed — the backend accumulates `agent_message_chunk` text as the result output and ignores the rest (thoughts, tool-call cards), so only the child's final answer surfaces. `session/request_permission` is auto-answered by a configured policy (`reject` declines every prompt, `allow` approves via the first allow-shaped option) — no prompt is surfaced to a human. Proxying `fs`/`terminal` back to the parent (a shared-workspace mode) remains future work, as the seam Agent Note noted.
 
 ### No start-time capabilities
 
@@ -32,7 +34,7 @@ ACP `StopReason` → harness `SubagentStopReason`: `end_turn`→`completed`, `ma
 
 ### Security: scrubbed child environment
 
-The child is a separate process, so it inherits an environment. Credential-shaped ambient vars (`/KEY|SECRET|TOKEN/i`) are NOT forwarded by default — the parent harness's own secrets must not leak into a spawned process implicitly (the same policy the bash executor applies). The child's OWN credentials (it needs a model key) are supplied EXPLICITLY via `config.env`, layered AFTER the scrub, so an intended `DEEPSEEK_API_KEY` survives while an incidental `AWS_SECRET_ACCESS_KEY` does not. Child stderr is inherited to the parent's stderr (diagnostics surface naturally); a spawn-level `error` event (e.g. ENOENT for a bad command) is captured and raced against the ACP drive, so a bad command settles `error` instead of crashing the parent with an unhandled error.
+The child is a separate process, so it inherits an environment. Credential-shaped ambient vars (`/KEY|PASSWORD|SECRET|TOKEN/i`) are NOT forwarded by default — the parent harness's own secrets must not leak into a spawned process implicitly (the same policy the bash executor applies). The child's OWN credentials (it needs a model key) are supplied EXPLICITLY via `config.env`, layered AFTER the scrub, so an intended `DEEPSEEK_API_KEY` survives while an incidental `AWS_SECRET_ACCESS_KEY` does not. Child stderr is inherited to the parent's stderr (diagnostics surface naturally); a spawn-level `error` event (e.g. ENOENT for a bad command) is captured and raced against the ACP drive, so a bad command settles `error` instead of crashing the parent with an unhandled error.
 
 ## Testing
 
@@ -55,6 +57,6 @@ Persistent-process pooling (reuse a warm child across runs) is a performance opt
 
 Every run pays a fresh subprocess (spawn + `initialize` + `newSession`). The parent surfaces only the child's final answer: `session/update` thoughts and tool-call cards are consumed and dropped, and permission prompts never reach a human — the configured policy answers them. The child's environment is credential-scrubbed by default, so its own model key is supplied explicitly via `config.env`.
 
-## Future providers
+## Product-provider siblings
 
-The same out-of-process spawn/prompt/stream/cancel shape generalizes to other transports named in the seam Agent Note — A2A, the Codex app-server, and the Claude Code Agent SDK — each a sibling provider registered by name. The ACP backend is the proof that the seam supports the boundary; those are mechanically similar.
+The [Codex app-server and Claude Code Agent SDK providers](2026-08-04-claude-code-and-codex-subagent-backends.md) apply the same out-of-process spawn/prompt/settle/cancel boundary as siblings registered by name. A2A remains a future sibling transport; the ACP backend proves that the subagent seam supports this boundary without owning product-private protocols.

@@ -2,9 +2,11 @@
 
 Status: implemented
 
+English | [中文](2026-06-20-collapse-trace-only-session-events.zh.md)
+
 ## Problem
 
-The session event vocabulary includes first-class events that are not part of replayable conversation history and have little or no production consumption. `usage` is already present as a model stream chunk before the loop also appends a separate `usage` event. `error` duplicates the `turn/end { kind: 'error', message, code }` reason for loop failures; ACP settlement reads the turn-end reason, ACP rendering ignores the `error` event, and `deriveMessages()` skips it.
+The session event vocabulary includes first-class events that are not part of replayable conversation history and have little or no production consumption. `usage` is already present as a model stream chunk before the loop also appends a separate `usage` event. `error` duplicates the `turn/end { kind: 'error', message, code }` reason for loop failures; ACP settlement reads the turn-end reason, while message and UI projections skip the standalone `error` event.
 
 These events make the canonical transcript look more useful as telemetry than it currently is. They add event variants, invariants, tests, snapshots, and persistence cases, but they are not load-bearing as separate records. The facts they carry can still be useful: token usage should remain available for accounting, and an error's step number should not silently disappear. The simplification is to fold those facts into nearby events consumers already must understand, not to record less information.
 
@@ -13,7 +15,7 @@ These events make the canonical transcript look more useful as telemetry than it
 Standalone trace-only events are removed exactly where their information is preserved without a parallel record:
 
 - Successful-step usage folds into the matching `assistant/message` (`assistant/message { turn, step, content, usage? }`), so the assembled model output and its accounting travel together.
-- A failed or aborted step that has usage but no assistant content carries the usage on an empty-content `assistant/message` (the implementation note below carries the no-information-loss proof) — no persisted usage chunk goes unrepresented.
+- A failed or aborted step that has usage but no assistant content carries the usage on an empty-content `assistant/message { content: [], usage }` — no persisted usage chunk goes unrepresented. The no-information-loss case is the max-tokens path: a step cut off with usage but empty content (e.g. only a dropped tool call) previously emitted a standalone `usage`. To keep the empty-content event from injecting a spurious content-less assistant turn into the provider transcript, `deriveMessages()` skips empty-content `assistant/message` events; a regression test asserts usage stays represented AND derived history stays uncorrupted.
 - The step number from the standalone `error` event folds into `turn/end.reason` for `kind: 'error'` (`{ kind: 'error', step, message, code? }`) — `turn/end` is the durable turn outcome ACP and resume already consume.
 - `agent/error` and logging stay for live diagnostics; there is no second session-log error record after `turn/end`.
 
@@ -29,13 +31,9 @@ The user conversation log contains what is needed to render, resume, audit, and 
 
 ## Consequences
 
-A consumer can no longer filter the canonical log for standalone `usage` or step-level `error` rows. It must read those facts from the assistant/failure events that carry them. That is a reasonable simplification only if the implementing PR proves the same facts remain present; otherwise the standalone events should stay.
+A consumer can no longer filter the canonical log for standalone `usage` or step-level `error` rows. It must read those facts from the assistant/failure events that carry them. That is a reasonable simplification because the same facts remain present, as the Verification section proves.
 
 ## Implementation note
-
-Shipped as proposed, with one scope refinement (per AGENTS.md "Agent Notes are proposals, not golden truth"):
-
-- **Empty-content `assistant/message` hosts usage with no data loss.** The proof the proposal demanded (no persisted usage chunk becomes unrepresented) lands on the max-tokens path: a step cut off with usage but empty content (e.g. only a dropped tool call) previously emitted a standalone `usage`. It now records an empty-content `assistant/message { content: [], usage }`. To keep that from injecting a spurious content-less assistant turn into the provider transcript, `deriveMessages()` skips empty-content `assistant/message` events. A regression test asserts usage stays represented AND derived history is uncorrupted.
 
 **Format version.** This changes persisted events, but the pre-release session format remains pinned at `0` and rejects any other version without migration. `dsh-session` owns the constant used by writers and load validation. Monotonic format versions begin at the first release.
 

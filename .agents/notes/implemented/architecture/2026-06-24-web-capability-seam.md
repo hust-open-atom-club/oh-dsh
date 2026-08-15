@@ -2,11 +2,13 @@
 
 Status: implemented
 
+English | [中文](2026-06-24-web-capability-seam.zh.md)
+
 ## Problem
 
-The harness needs model-facing web tools without binding the model contract to one vendor's API shape. Search is the immediate pressure point: supporting both Exa search and Perplexity search from the start — two deliberately different provider shapes (Exa returns a flat `results[]` of `{title, url, highlights, publishedDate}`; Perplexity returns a generated answer plus citations) — is what proves the normalized seam does not just mirror one vendor. Fetch is a separate capability: an anonymous public HTTP(S) fetch backend has transport, security, redirect, decoding, and size-limit concerns that are not the same as provider-backed search.
+The harness needs model-facing web tools without binding the model contract to one vendor's API shape. Search is the immediate pressure point: supporting both Exa search and Perplexity search from the start — two deliberately different provider shapes (Exa returns a flat `results[]` of `{title, url, highlights, publishedDate}`; Perplexity returns a generated answer plus citations) — is what proves the normalized web contract does not just mirror one vendor. Fetch is a separate operation: an anonymous public HTTP(S) fetch backend has transport, security, redirect, decoding, and size-limit concerns that are not the same as provider-backed search.
 
-The model-facing surface must stay stable while backends change. A search provider swap should not change how the model asks for a query, and a fetch implementation swap should not change how the model asks for a URL. Conversely, a provider package should not expose its own model-facing tool schema just because it has extra provider-specific knobs.
+The model-facing API must stay stable while backends change. A search provider swap should not change how the model asks for a query, and a fetch implementation swap should not change how the model asks for a URL. Conversely, a provider package should not expose its own model-facing tool schema just because it has extra provider-specific knobs.
 
 Putting search and fetch directly in `dsh-tool-web` would make the model-facing tool own provider selection, backend request mapping, transport policy, result normalization, prompt guidance, presentation, and schema registration at once. Letting each provider register its own tool has the opposite problem: tool availability, names, descriptions, and parameters would depend on whichever provider packages happen to load, and provider-specific fields would leak into the model contract.
 
@@ -17,7 +19,7 @@ There is also a provider-selection question. Existing `tool-bash` and `tool-fs` 
 Web access is a first-class capability seam following [the capability-seam Agent Note](2026-06-13-capability-seams.md):
 
 1. `@deepseek-ai/dsh-web` (`packages/web/web`) owns `ctx.web`, provider registration, provider selection, shared request/result vocabulary, and web-specific errors.
-2. Provider packages implement concrete backends and register capabilities with `ctx.web`, for example `@deepseek-ai/dsh-web-search-exa`, `@deepseek-ai/dsh-web-search-perplexity`, `@deepseek-ai/dsh-web-search-deepseek`, and `@deepseek-ai/dsh-web-fetch-local`.
+2. Provider packages implement concrete backends and register capabilities with `ctx.web`, for example `@deepseek-ai/dsh-web-search-exa`, `@deepseek-ai/dsh-web-search-perplexity`, `@deepseek-ai/dsh-web-search-deepseek`, and `@deepseek-ai/dsh-web-fetch-http`.
 3. `@deepseek-ai/dsh-tool-web` (`packages/web/tool-web`) owns the model-facing `web_search` and `web_fetch` tool schemas, prompt sections, argument validation, result formatting, and tool-owned presentation over `ctx.web`.
 
 Providers do not register tools. Providers register capabilities. `dsh-tool-web` is the only owner of model-facing names, descriptions, prompt guidance, JSON schemas, and presentation.
@@ -32,11 +34,11 @@ Search and fetch are separate tools but one web-access seam. `ctx.web` owns prov
 
 This keeps the model schema stable without making plugin load order, credential state, or HMR timing part of the model-facing contract. If web search is enabled but no usable search provider exists, `web_search` remains visible and execution fails with a structured `WebError` such as `WEB_PROVIDER_UNAVAILABLE` or `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`. If a provider appears after `dsh-tool-web`, the next execution can use it without changing the schema. If a provider disappears mid-call, execution fails with a structured `WebError` instead of silently choosing another provider or falling through to `UNKNOWN_TOOL`.
 
-The seam deliberately exposes no observation surface — no registry-change event and no aggregated capability-status query. Unavailability is a fact a caller observes by executing: `search()`/`fetch()` resolve the provider at call time and throw the structured `WebError` that names what failed. [The observation-surface Agent Note](../simplification/2026-07-04-drop-unconsumed-web-observation-surface.md) records that judgment: derived-on-call selection and enablement-based registration leave no consumer that needs a change signal or an availability probe distinct from executing and routing the error, and a future provider-status panel reintroduces the smallest signal or query it actually consumes.
+The seam deliberately exposes no observation surface — no registry-change event and no aggregated capability-status query. Unavailability is a fact a caller observes by executing: `search()`/`fetch()` resolve the provider at call time and throw the structured `WebError` that names what failed. [The observation-surface Agent Note](../../archived/simplification/2026-07-04-drop-unconsumed-web-observation-surface.md) records that judgment: derived-on-call selection and enablement-based registration leave no consumer that needs a change signal or an availability probe distinct from executing and routing the error, and a future provider-status panel reintroduces the smallest signal or query it actually consumes.
 
 ## Package topology
 
-The three-package interface/implementation/consumer split follows bash and filesystem, but the *interface* package is closer to the LLM seam. `LlmService` (`packages/llm/llm/src/index.ts`) is a name-keyed provider registry: `registerAdapter(models, adapter)` stores adapters in a `Map`, returns a disposer, throws `DUPLICATE_ADAPTER` on duplicate keys, and throws `NO_ADAPTER` at resolution time. `ctx.web` follows that registry shape, but has two capability kinds and a richer selection policy (a configured provider id, or auto-select when exactly one usable provider is registered), so the `WebError` an execution throws can explain why a search or fetch capability cannot run.
+The three-package Service Definition / Service Provider / Consumer split follows bash and filesystem, but the *interface* package is closer to the LLM seam. `LlmRuntime` (`packages/llm/llm/src/index.ts`) is a name-keyed provider registry: `registerAdapter(models, adapter)` stores adapters in a `Map`, returns a disposer, throws `DUPLICATE_ADAPTER` on duplicate keys, and throws `NO_ADAPTER` at resolution time. `ctx.web` follows that registry shape, but has two capability kinds and a richer selection policy (a configured provider id, or auto-select when exactly one usable provider is registered), so the `WebError` an execution throws can explain why a search or fetch capability cannot run.
 
 The dependency direction mirrors bash and filesystem:
 
@@ -47,7 +49,7 @@ The dependency direction mirrors bash and filesystem:
                                                                                   implementation
                                                                  <--depends on--  @deepseek-ai/dsh-web-search-deepseek
                                                                                   implementation
-                                                                 <--depends on--  @deepseek-ai/dsh-web-fetch-local
+                                                                 <--depends on--  @deepseek-ai/dsh-web-fetch-http
                                                                                   implementation
 ```
 
@@ -58,7 +60,7 @@ flowchart LR
   exa["@deepseek-ai/dsh-web-search-exa"] -->|registerSearchProvider| web["@deepseek-ai/dsh-web / ctx.web"]
   perplexity["@deepseek-ai/dsh-web-search-perplexity"] -->|registerSearchProvider| web
   deepseek["@deepseek-ai/dsh-web-search-deepseek"] -->|registerSearchProvider| web
-  fetchLocal["@deepseek-ai/dsh-web-fetch-local"] -->|registerFetchProvider| web
+  fetchLocal["@deepseek-ai/dsh-web-fetch-http"] -->|registerFetchProvider| web
   toolWeb["@deepseek-ai/dsh-tool-web"] -->|search/fetch| web
   toolWeb -->|ctx.tools.register| webSearch["tool: web_search"]
   toolWeb -->|ctx.tools.register| webFetch["tool: web_fetch"]
@@ -72,9 +74,11 @@ Provider packages depend only on `dsh-web` and Cordis. They own credentials, end
 
 ## `ctx.web` contract
 
-`ctx.web` is a provider registry plus a provider-selecting execution surface. The registry half stays close to `LlmService`: a `Map<id, provider>` per capability kind, `registerSearchProvider` / `registerFetchProvider` methods that return disposers, duplicate ids that throw `WebError`, and execution-time resolution that throws when the selected provider is absent or unusable. The authoritative signatures live in `packages/web/web/src/types.ts`; the seam's shape:
+`ctx.web` is a provider registry plus a provider-selecting execution API. The registry half stays close to `LlmRuntime`: a `Map<id, provider>` per capability kind, `registerSearchProvider` / `registerFetchProvider` methods that return disposers, duplicate ids that throw `WebError`, and execution-time resolution that throws when the selected provider is absent or unusable. The authoritative signatures live in `packages/web/web/src/types.ts`; the seam's shape:
 
 ```ts
+import type { WebFetchRequest, WebFetchResult, WebSearchRequest, WebSearchResult } from '@deepseek-ai/dsh-web'
+
 interface WebSearchProvider {
   readonly id: string
   available(): boolean
@@ -87,7 +91,7 @@ interface WebFetchProvider {
   fetch(request: WebFetchRequest, signal?: AbortSignal): Promise<WebFetchResult>
 }
 
-interface WebService {
+interface WebRuntime {
   registerSearchProvider(provider: WebSearchProvider): () => void
   registerFetchProvider(provider: WebFetchProvider): () => void
 
@@ -104,7 +108,7 @@ Provider ids are stable strings and unique within their capability kind. Registe
 
 Provider availability and capability selection are separate concepts, but both stay minimal. A provider reports only whether that concrete implementation is usable by cheap local checks such as credential presence or parseable endpoint config. A provider `available()` must not make network calls.
 
-`LlmService` has no status type at all: availability is expressed as registry membership plus a resolution-time throw. `ctx.web` follows the same discipline. The seam exposes no aggregated capability-status query — `search()` / `fetch()` derive the selection on each call from the configured provider id, the registered providers, and each provider's cheap local `available()` boolean, and a selection failure is the structured `WebError` thrown at execution time. A caller that needs to know whether a capability can run executes and routes that error; nothing is stored as mutable service state.
+`LlmRuntime` has no status type at all: availability is expressed as registry membership plus a resolution-time throw. `ctx.web` follows the same discipline. The seam exposes no aggregated capability-status query — `search()` / `fetch()` derive the selection on each call from the configured provider id, the registered providers, and each provider's cheap local `available()` boolean, and a selection failure is the structured `WebError` thrown at execution time. A caller that needs to know whether a capability can run executes and routes that error; nothing is stored as mutable service state.
 
 The boolean is an input to selection, not a health system. `tool-web` never calls a provider's `available()` directly — its only path into the seam is `search()` / `fetch()` — so selection policy has one owner.
 
@@ -127,7 +131,7 @@ The "single provider auto-selects" rule is for tests, demos, and simple deployme
   name: '@deepseek-ai/dsh-web'
   config:
     searchProvider: exa
-    fetchProvider: local-http
+    fetchProvider: http
 
 - id: web-search-exa
   name: '@deepseek-ai/dsh-web-search-exa'
@@ -138,8 +142,8 @@ The "single provider auto-selects" rule is for tests, demos, and simple deployme
 - id: web-search-deepseek
   name: '@deepseek-ai/dsh-web-search-deepseek'
 
-- id: web-fetch-local
-  name: '@deepseek-ai/dsh-web-fetch-local'
+- id: web-fetch-http
+  name: '@deepseek-ai/dsh-web-fetch-http'
 
 - id: tool-web
   name: '@deepseek-ai/dsh-tool-web'
@@ -187,7 +191,7 @@ interface WebSearchSource {
 }
 ```
 
-`content` is optional provider-generated answer text, search context, or summary. `sources[]` is the portable citation surface. A source always has a URL; title, snippet, and `publishedAt` are optional because not every provider returns them. `title` is not required: Perplexity-style citations may provide only URLs, and forcing adapters to invent titles would make the seam lie. `dsh-tool-web` renders a `title ?? hostname(url)`-style fallback label for display. `publishedAt` is an optional publication/crawl timestamp as an ISO-8601 string — Exa returns it as `publishedDate` on each result and Perplexity returns a `date` on search results, so it is real provider data, not derived; the seam carries it as a string and leaves date parsing to the consumer.
+`content` is optional provider-generated answer text, search context, or summary. `sources[]` is the portable citation shape. A source always has a URL; title, snippet, and `publishedAt` are optional because not every provider returns them. `title` is not required: Perplexity-style citations may provide only URLs, and forcing adapters to invent titles would make the seam lie. `dsh-tool-web` renders a `title ?? hostname(url)`-style fallback label for display. `publishedAt` is an optional publication/crawl timestamp as an ISO-8601 string — Exa returns it as `publishedDate` on each result and Perplexity returns a `date` on search results, so it is real provider data, not derived; the seam carries it as a string and leaves date parsing to the consumer.
 
 Exa search maps each entry of the provider's flat `results[]` into a `WebSearchSource`: `url` ← `url`, `title` ← `title`, `snippet` ← the first `highlights[]` entry (an entry with no highlight has no portable snippet and is dropped), `publishedAt` ← `publishedDate`. Exa returns no provider-generated answer, so `content` is omitted. Perplexity search maps `choices[0].message.content` to `content` and prefers the structured top-level `search_results[]` for `sources[]` — `url` ← `url`, `title` ← `title`, `snippet` ← `snippet` (often empty), `publishedAt` ← `date` — falling back to the URL-only `citations[]` array only when `search_results` is absent (those sources carry just a `url`). If a provider returns fewer structured fields than the seam supports, the adapter omits those optional fields.
 
@@ -195,7 +199,7 @@ Full page retrieval remains the job of `web_fetch(url)`. Search snippets are dis
 
 ## Fetch request and result schema
 
-The `web_fetch` implementation is an anonymous public HTTP(S) fetch provider, `local-http`. It fetches bytes from a concrete URL, applies the basic transport hygiene below (http/https-only, credential rejection, byte/time caps, cross-origin redirect blocking), decodes textual content, and returns only the minimal model-useful result: final URL, status code, body, and truncation. It carries no browser cookies, editor credentials, git credentials, internal auth tokens, or implicit access to private services. (Full SSRF / private-network blocking is deferred — see [Deferred work](#deferred-work).)
+The `web_fetch` implementation is an anonymous public HTTP(S) fetch provider, `http`. It fetches bytes from a concrete URL, applies the basic transport hygiene below (http/https-only, credential rejection, byte/time caps, cross-origin redirect blocking), decodes textual content, and returns only the minimal model-useful result: final URL, status code, body, and truncation. It carries no browser cookies, editor credentials, git credentials, internal auth tokens, or implicit access to private services. (Full SSRF / private-network blocking is deferred — see [Deferred work](#deferred-work).)
 
 The seam request stays smaller than OpenCode's model-facing tool:
 
@@ -206,18 +210,18 @@ The seam request deliberately does not include a per-call timeout, `format`, `pr
 HTTP status is part of the fetched resource state, not automatically a tool failure. A successful network fetch of a `404` or `500` response returns `WebFetchResult` with the status code and a bounded decoded body when the content type is supported. `WebError` is for failures to safely retrieve or represent the resource: invalid or blocked URL, redirect policy violation, timeout, abort, response too large, unsupported content type, provider failure, or network failure.
 
 ```ts
-interface WebFetchRequest {
+export interface WebFetchRequest {
   readonly url: string
 }
 
-interface WebFetchResult {
+export interface WebFetchResult {
   readonly url: string
   readonly statusCode: number
   readonly body: WebFetchBody
   readonly truncated: boolean
 }
 
-type WebFetchBody =
+export type WebFetchBody =
   | { readonly kind: 'html'; readonly content: string }
   | { readonly kind: 'text'; readonly content: string }
 ```
@@ -270,13 +274,13 @@ The model-facing output is text-first because tool results are `ContentBlock[]`,
 - `WEB_UNSUPPORTED_CONTENT_TYPE`
 - `WEB_PROVIDER_ERROR`
 
-`WEB_DUPLICATE_PROVIDER` is thrown synchronously from `registerSearchProvider` / `registerFetchProvider` when an id is already registered for that capability kind (the analogue of `LlmService`'s `DUPLICATE_ADAPTER`); it is a registration-time programming error, not an execution outcome, but shares the `WebError` code space so callers see one taxonomy. `WEB_PROVIDER_ERROR` is the catch-all for a provider's own failure surfaced through the seam, including network/transport failure in `web-fetch-local` (DNS, connection refused, TLS); there is deliberately no separate `WEB_NETWORK` code — the provider sets a descriptive message so the model and logs can tell a network failure from a provider API failure.
+`WEB_DUPLICATE_PROVIDER` is thrown synchronously from `registerSearchProvider` / `registerFetchProvider` when an id is already registered for that capability kind (the analogue of `LlmRuntime`'s `DUPLICATE_ADAPTER`); it is a registration-time programming error, not an execution outcome, but shares the `WebError` code space so callers see one taxonomy. `WEB_PROVIDER_ERROR` is the catch-all for a provider's own failure surfaced through the seam, including network/transport failure in `web-fetch-http` (DNS, connection refused, TLS); there is deliberately no separate `WEB_NETWORK` code — the provider sets a descriptive message so the model and logs can tell a network failure from a provider API failure.
 
-Tool execution lets these errors flow through `ToolRegistry.execute()`, which already converts `HarnessError` into an error tool result with structured metadata. The model gets a readable error message; hooks, tests, and UI code can route on the stable code.
+Tool execution lets these errors flow through `ToolRuntime.execute()`, which already converts `HarnessError` into an error tool result with structured metadata. The model gets a readable error message; hooks, tests, and UI code can route on the stable code.
 
 ## Testing
 
-Each layer is pinned at its own seam: the registry/selection/truncation/abort contract and the `WebError` codes in `dsh-web`; per-provider request/response mapping over recorded fixtures (Perplexity fixtures include URL-only citations so the optional source fields stay honest) plus a self-skipping with-key smoke per real provider; real local-HTTP behavior in `web-fetch-local`; and enablement-driven registration, structured execution errors, and result formatting through the real tool registry in `dsh-tool-web`. A real-Loader smoke guards the two export shapes ([postmortem 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)): `dsh-web` is a default-exported service, while the providers and `tool-web` are namespace plugins where a stray `export default` would drop `inject`.
+Each layer is pinned at its own boundary: the registry/selection/truncation/abort contract and the `WebError` codes in `dsh-web`; per-provider request/response mapping over recorded fixtures (Perplexity fixtures include URL-only citations so the optional source fields stay honest) plus a self-skipping with-key smoke per real provider; real local-HTTP behavior in `web-fetch-http`; and enablement-driven registration, structured execution errors, and result formatting through the real tool registry in `dsh-tool-web`. A real-Loader smoke guards the two export shapes ([postmortem 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)): `dsh-web` is a default-exported service, while the providers and `tool-web` are namespace plugins where a stray `export default` would drop `inject`.
 
 ## Alternatives considered
 
@@ -290,7 +294,7 @@ This resembles OpenCode's local web search: one stable `websearch` tool dispatch
 
 ### Split search and fetch into two seams (`dsh-search`, `dsh-fetch`)
 
-Tempting because the two halves share no request schema and no business logic, so each would map cleanly onto the bash/fs three-package template, and the `Search`/`Fetch` method-pair duplication on `WebService` would disappear. Rejected because the shared machinery — provider-id registry, registration-order-independent selection policy, abort propagation, the `WebError` taxonomy, and the product-facing "how this harness reaches the web" config surface — is real and would otherwise be duplicated across two near-identical seams. One `ctx.web` middle layer gives the product a single thing to inject and configure and gives provider selection one owner. The price is the parallel `searchX`/`fetchX` method pairs, which is accepted deliberately.
+Tempting because the two halves share no request schema and no business logic, so each would map cleanly onto the shell/fs three-package template, and the `Search`/`Fetch` method-pair duplication on `WebRuntime` would disappear. Rejected because the shared machinery — provider-id registry, registration-order-independent selection policy, abort propagation, the `WebError` taxonomy, and the product-facing "how this harness reaches the web" configuration API — is real and would otherwise be duplicated across two near-identical seams. One `ctx.web` middle layer gives the product a single thing to inject and configure and gives provider selection one owner. The price is the parallel `searchX`/`fetchX` method pairs, which is accepted deliberately.
 
 ### Choose the first registered provider
 
@@ -298,7 +302,7 @@ Rejected. Registration order is not a product policy. It can change with config 
 
 ### Treat Firecrawl/Exa/Tavily/Parallel extraction as fetch
 
-Rejected for the first version. Those providers often return extracted or summarized content rather than a concrete HTTP response. If the product needs extraction, design `web_extract` or deliberately widen the fetch seam later.
+Rejected for the first version. Those providers often return extracted or summarized content rather than a concrete HTTP response. If the product needs extraction, design `web_extract` or deliberately widen the fetch operation later.
 
 ### Mirror Claude Code's `url + prompt` WebFetch shape
 
@@ -321,12 +325,12 @@ Rejected for the seam. `prompt` turns fetch into LLM summarization and couples p
 ## Deferred work
 
 - SSRF / private-network protection for `web_fetch`: block private, loopback, link-local, multicast, and otherwise non-public destinations so `web_fetch` is not an SSRF primitive. Doing it correctly is more than a URL-string check — it needs DNS-resolve-then-connect-to-the-validated-IP (to defeat DNS rebinding / TOCTOU), per-hop re-validation across redirects, and IPv6 edge handling (private ranges, IPv4-mapped addresses). Neither reference implementation surveyed does IP-level blocking (OpenCode does a prefix check then fetches; Claude Code relies on a centralized hostname blocklist plus a "private URLs will fail" prompt), so there is no implementation to copy and this is the harness's only SSRF defense — it warrants its own focused design/spike. Until it lands, `web_fetch` must only be enabled in deployments that cannot reach sensitive internal targets.
-- A `pdf` `WebFetchBody` kind: the `local-http` provider decodes text-extractable PDFs (best-effort, capped, `truncated`) into a `{ kind: 'pdf'; content; pageCount? }` arm, and `tool-web` renders it. This is fetch, not `web_extract` — PDF retrieval is a concrete HTTP 200 plus deterministic local decoding, not provider-side extraction of a non-HTTP resource. Adding it is a coordinated change across `dsh-web` (declare the arm), the provider (decode + narrow "binary rejection" to "reject binary except text-extractable PDF"; scanned/image PDFs needing OCR stay out of scope), and `tool-web` (render). The closed `WebFetchBody` union makes the consumer side fail to compile until the new arm is handled.
+- A `pdf` `WebFetchBody` kind: the `http` provider decodes text-extractable PDFs (best-effort, capped, `truncated`) into a `{ kind: 'pdf'; content; pageCount? }` arm, and `tool-web` renders it. This is fetch, not `web_extract` — PDF retrieval is a concrete HTTP 200 plus deterministic local decoding, not provider-side extraction of a non-HTTP resource. Adding it is a coordinated change across `dsh-web` (declare the arm), the provider (decode + narrow "binary rejection" to "reject binary except text-extractable PDF"; scanned/image PDFs needing OCR stay out of scope), and `tool-web` (render). The closed `WebFetchBody` union makes the consumer side fail to compile until the new arm is handled.
 - Provider-backed extraction as a separate `web_extract` capability, rather than widening `web_fetch` silently.
-- Permission policy integration once the deferred permission system lands.
+- Permission policy integration: the permission system now exists ([sandbox and approval](../feature/2026-07-06-sandbox.md), [web permission presets](../feature/2026-07-23-web-permission-and-approval.md)) but bundles only sandbox mode and approval policy; web permission policy remains unintegrated.
 - Provider-neutral search controls beyond `query` and `maxResults`, once Exa and Perplexity can both honor them honestly.
 
 ## Open questions
 
 - Should product app packages probe web configuration at startup (treating `WEB_PROVIDER_CONFIGURED_MISSING`, `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`, and `WEB_PROVIDER_AMBIGUOUS` as fatal when web is explicitly configured), or leave misconfiguration to surface at the first execution?
-- Where should permission policy for public web access live once the deferred permission system lands: a dedicated web permission plugin on `tools/execute`, provider config, or both?
+- Where should permission policy for public web access live in the shipped permission system ([sandbox and approval](../feature/2026-07-06-sandbox.md), [web permission presets](../feature/2026-07-23-web-permission-and-approval.md)): a dedicated web permission plugin on `tools/execute`, provider config, or both?

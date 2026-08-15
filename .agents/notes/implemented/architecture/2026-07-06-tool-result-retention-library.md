@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-06-tool-result-retention-library.zh.md)
+
 ## Problem
 
 Several model-facing tools already bound the amount of context they return, but each one owns a different local mechanism and vocabulary: bash keeps a tail plus spill files, web search caps source lists, web fetch caps body content, and `glob` / `grep` discovery needs an inline first page while keeping exact omission metadata for the full result set. A single `truncate(text)` helper cannot cover those cases: item tools need item counts and grouping outside the primitive, while text tools need byte budgets and UTF-8-safe head/tail cuts.
@@ -10,7 +12,7 @@ The shared abstraction the tools need is **retention**, not generic collection. 
 
 ## Decision
 
-`@deepseek-ai/dsh-retention` lives under `packages/util/` (peer to `dsh-brand` and `dsh-timeout`) and owns bounded model-facing output. It is a library of pure classes and functions, **not** a Cordis service or plugin: it takes no `ctx`, registers nothing, holds no cross-call state, and emits no events. Tool packages import it directly when they need bounded output.
+`@deepseek-ai/dsh-output-retention` lives under `packages/util/` (peer to `dsh-brand` and `dsh-timeout`) and owns bounded model-facing output. It is a library of pure classes and functions, **not** a Cordis service or plugin: it takes no `ctx`, registers nothing, holds no cross-call state, and emits no events. Tool packages import it directly when they need bounded output.
 
 The library has two independent retainers:
 
@@ -101,7 +103,7 @@ type TextRetentionStrategy =
 
 `grep` uses `ItemRetainer<FlatGrepMatch>` with `{ kind: 'head', maxItems: grepMaxMatches }` before grouping. The executor parses ripgrep output, maps paths, applies per-line preview truncation, and pushes flat matches. After `finish()`, the tool groups retained matches by file and can save the full match list through the spill seam when the inline result is capped. Grouping is not part of the retainer because the cap is total matches, not files; per-match preview truncation and `incomplete` are also separate from result-level retention.
 
-`bash` can use `TextRetainer` with `tail` or `headTail` and reads to process completion. The bash executor still owns spill files, exit status, signal, timeout, and background-task behavior; the retention helper only replaces ad hoc in-memory head/tail accounting where that behavior is desired. Long-running task ownership remains orthogonal to the [generic long-running tool runtime](2026-06-20-generic-long-running-tool-runtime.md).
+`bash` can use `TextRetainer` with `tail` or `headTail` and reads to process completion. The bash executor still owns spill files, exit status, signal, timeout, and background-job behavior; the retention helper only replaces ad hoc in-memory head/tail accounting where that behavior is desired. Long-running job ownership remains orthogonal to the [generic long-running tool runtime](2026-06-20-generic-long-running-tool-runtime.md).
 
 `web_fetch` can use `TextRetainer` with `head` or `headTail`, or keep provider-owned body caps when the provider must read and decode internally. Either way, the fetch result's `truncated` remains a provider/tool fact, and the library only supplies retained text and omission metadata.
 
@@ -134,13 +136,13 @@ The formatter hook is deliberately small: a tool turns a `RetentionNotice` into 
 
 ## Consequences
 
-**What shipped.** `@deepseek-ai/dsh-retention` exports `ItemRetainer`, `TextRetainer`, the result types (`RetainedItems`, `RetainedText`), the strategy types (`ItemRetentionStrategy`, `TextRetentionStrategy`), `Omitted`, `PushDecision`, `RetentionNotice`, and the neutral notice helpers `describeOmitted` / `formatRetentionNotice` — with no dependency on Cordis or any tool package. Unit tests cover item-head retention with exact omission counts, text-head retention, text-tail retention, head-tail byte retention, zero budgets, UTF-8 boundary handling (2-, 3-, and 4-byte codepoints and invalid lead bytes at each cut), and unknown omission wording.
+**What shipped.** `@deepseek-ai/dsh-output-retention` exports `ItemRetainer`, `TextRetainer`, the result types (`RetainedItems`, `RetainedText`), the strategy types (`ItemRetentionStrategy`, `TextRetentionStrategy`), `Omitted`, `PushDecision`, `RetentionNotice`, and the neutral notice helpers `describeOmitted` / `formatRetentionNotice` — with no dependency on Cordis or any tool package. Unit tests cover item-head retention with exact omission counts, text-head retention, text-tail retention, head-tail byte retention, zero budgets, UTF-8 boundary handling (2-, 3-, and 4-byte codepoints and invalid lead bytes at each cut), and unknown omission wording.
 
-**What is documented but not yet migrated.** `glob`, `grep`, `bash`, `web_fetch`, and `web_search` have their mappings documented in the [package README](../../../../packages/util/retention/README.md), but not every tool has been migrated onto the library in this change; migration is deliberately separate follow-up work. `read` is documented as intentionally out of scope: its `read-render` line-window contract (`offset`/`limit`, `totalLines`, offset-range errors, per-line preview truncation, a byte cap over the selected window) is not generic retention, and one `Omitted` count cannot represent both sides of a line window.
+**What is documented but not yet migrated.** `glob`, `grep`, `bash`, `web_fetch`, and `web_search` have their mappings documented in the [package README](../../../../packages/util/output-retention/README.md), but not every tool has been migrated onto the library in this change; migration is deliberately separate follow-up work. `read` is documented as intentionally out of scope: its `read-render` line-window contract (`offset`/`limit`, `totalLines`, offset-range errors, per-line preview truncation, a byte cap over the selected window) is not generic retention, and one `Omitted` count cannot represent both sides of a line window.
 
 **Boundaries the library holds.** `truncated` means the retainer omitted otherwise-available content because of a budget; it never means the upstream was incomplete. Tool-specific states — `incomplete`, permission failures, provider partial failures, binary skips, bash spill-path recovery, invalid UTF-8 — stay in tool-domain fields, outside the retainer. When a future change migrates a tool, that package's README and tests must prove the model-facing result text is unchanged except for deliberate notice wording.
 
-**Tradeoffs accepted.** The v1 surface deliberately supports only item `head` retention and text `head` / `tail` / `headTail`; windows, grouped budgets, sort-aware caps, and upstream-stop control wait until a second consumer proves the need. Text retention counts bytes for process/body safety, leaving character- and line-level preview budgets as separate tool-owned concerns.
+**Tradeoffs accepted.** The v1 API deliberately supports only item `head` retention and text `head` / `tail` / `headTail`; windows, grouped budgets, sort-aware caps, and upstream-stop control wait until a second consumer proves the need. Text retention counts bytes for process/body safety, leaving character- and line-level preview budgets as separate tool-owned concerns.
 
 ## Alternatives considered
 
@@ -150,6 +152,6 @@ The formatter hook is deliberately small: a tool turns a `RetentionNotice` into 
 
 **Put `read` windowing behind `ItemRetainer`.** Rejected for v1: `read` is the only current window consumer, and its semantics are file pagination rather than generic retention. A single `Omitted` count cannot represent both sides of a line window, and `read` also carries `totalLines`, offset-range errors, per-line preview truncation, and a byte cap over selected output. Keeping `read-render` tool-owned avoids growing the shared library around one special case.
 
-**Make truncation part of `ToolExecutionResult`.** Rejected: the tool registry would have to understand tool-specific recovery guidance, grouping, line numbering, exit status, and provider semantics. Retention is a library used before a tool returns `ContentBlock[]`; the model-facing result remains tool-owned.
+**Make truncation part of `ToolExecutionResult`.** Rejected: the tool registry would have to understand tool-specific recovery guidance, grouping, line numbering, exit status, and provider semantics. Retention is a library used by a tool's Native renderer; the model-facing projection remains tool-owned while the [canonical value](2026-07-20-canonical-tool-output-contract.md) may retain the complete acquired result.
 
 **Expose limits in every model-facing tool schema.** Rejected as the default: Claude Code's grep exposes `head_limit` / `offset`, but this harness keeps routine budgets as deployment config unless the model genuinely needs pagination control. A future read-like continuation field can be added per tool; it does not belong in the shared retention primitive.

@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write
-2026-07-20-retire-readline-front-door.md: 7ebcfdc246bdf6971418609c61acbd4019aa90cb
-2026-07-20-retire-readline-front-door.zh.md: cf4d03594ed3a0cf31bed96eb2133bd37959084a

@@ -6,7 +6,7 @@ English | [中文](2026-07-21-instruction-load-all-dedup.zh.md)
 
 ## Problem
 
-The [workspace-context plugin](2026-06-24-workspace-context.md) resolved one winning file per candidate list per directory: the first existing name in `instructionFileCandidates` won the base slot, and the [local overlay](2026-07-21-local-instruction-overlay.md) added one more winner. But `AGENTS.md` and `CLAUDE.md` routinely coexist in the same directory. In most repositories one is a symlink to the other, so they carry identical content; in repositories mid-migration they are two distinct real files that have drifted apart. First-wins silently dropped the non-winning committed file, so a directory that legitimately carried two distinct instruction files only ever surfaced one — and which one depended on candidate order, not on content. The request was to read both and deduplicate only when they are effectively the same file.
+The [agent-instructions plugin](2026-06-24-workspace-context.md) resolved one winning file per candidate list per directory: the first existing name in `instructionFileCandidates` won the base slot, and the [local overlay](2026-07-21-local-instruction-overlay.md) added one more winner. But `AGENTS.md` and `CLAUDE.md` routinely coexist in the same directory. In most repositories one is a symlink to the other, so they carry identical content; in repositories mid-migration they are two distinct real files that have drifted apart. First-wins silently dropped the non-winning committed file, so a directory that legitimately carried two distinct instruction files only ever surfaced one — and which one depended on candidate order, not on content. The request was to read both and deduplicate only when they are effectively the same file.
 
 ## Decision
 

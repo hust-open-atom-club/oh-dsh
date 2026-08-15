@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-07-12-simplify-session-log-representation.zh.md)
+
 ## Problem
 
 The session log maintains two representations that cost more machinery than their consumers require: a pseudo-linked surface and custom request-header deltas.
@@ -10,7 +12,7 @@ The session log maintains two representations that cost more machinery than thei
 
 The request-header subsystem implements a custom system/tool delta codec and transmission-decision layer even though its contract says deltas are an encoding optimization, not a reconstructability requirement. Retaining the initial/resume full snapshot at each loop-instance boundary, then writing a canonical full `request/header` whenever that instance's assembled header changes, preserves replay while deleting `SystemDelta`, `ToolsDelta`, round-trip fallback, and the durable `request/header-delta` variant. Codec-only vocabulary disappears with the codec, not because its individual arms were invalid.
 
-The implementation retains append and replacement `sourceEventSeqs`, crash-repair provenance, and all `SessionStartSource` variants because those fields have an audit/interception role that zero current readers does not overturn.
+The implementation retains append and replacement `sourceEventSeqs`, the `tool/call` seq cited by crash-repaired results, and all `SessionStartSource` variants because those fields have an audit/interception role that zero current readers does not overturn.
 
 ## Decision
 
