@@ -169,6 +169,37 @@ test('injector stores canonical approved packages and rejects changed restore ta
   }
 })
 
+test('injector fingerprints executable package files outside lib', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-fingerprint-'))
+  try {
+    const plugin = packageAt(temporary, 'external-entry-plugin')
+    writeFileSync(
+      join(plugin, 'package.json'),
+      JSON.stringify({ main: 'entry.js', name: 'external-entry-plugin', version: '1.0.0' }),
+    )
+    writeFileSync(join(plugin, 'entry.js'), 'export function apply() { return 1 }\n')
+    const home = join(temporary, 'home')
+    const injector = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await injector.ready
+    await injector.inject(plugin)
+
+    writeFileSync(join(plugin, 'entry.js'), 'export function apply() { return 2 }\n')
+    const restored = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await restored.ready
+    assert.deepEqual(restored.snapshot().inactive, {
+      'external-entry-plugin': 'approved package fingerprint changed',
+    })
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
 test('injector contains registry parse failures and repairs them after approval', async () => {
   const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-corrupt-'))
   try {

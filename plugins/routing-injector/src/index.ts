@@ -161,26 +161,25 @@ function lockOwnerIsAlive(path: string): boolean {
 
 function pluginFingerprint(root: string): string {
   const hash = createHash('sha256')
-  const files: string[] = [join(root, 'package.json')]
-  const lib = join(root, 'lib')
+  const files: string[] = []
   let bytes = 0
 
   const visit = (directory: string): void => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name)
       const real = realpathSync(path)
-      if (!isWithin(root, real)) throw new Error('plugin lib cannot contain links outside its package')
+      if (!isWithin(root, real)) throw new Error('plugin package cannot contain links outside its root')
       if (entry.isDirectory()) {
         visit(real)
       } else if (entry.isFile()) {
         files.push(real)
       } else {
-        throw new Error('plugin lib contains an unsupported filesystem entry')
+        throw new Error('plugin package contains an unsupported filesystem entry')
       }
     }
   }
 
-  visit(lib)
+  visit(root)
   if (files.length > MAX_PLUGIN_FILES) throw new Error('plugin package contains too many files')
   for (const file of files.sort()) {
     const content = readFileSync(file)
