@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -247,6 +248,51 @@ test('inactive injector records can be replaced or explicitly removed', async ()
     await inactive.uninject('recoverable-plugin')
     assert.deepEqual(JSON.parse(readFileSync(join(home, 'routing-injector', 'registry.json'), 'utf8')).records, [])
     assert.equal(existsSync(join(home, 'profiles', 'desktop', 'node_modules', 'recoverable-plugin')), false)
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
+test('inactive recovery removes dangling injector-owned links', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-dangling-'))
+  try {
+    const originalRoot = join(temporary, 'original')
+    const recoverable = packageAt(originalRoot, 'recoverable-plugin')
+    const removable = packageAt(originalRoot, 'removable-plugin')
+    const home = join(temporary, 'home')
+    const injector = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await injector.ready
+    await injector.inject(recoverable)
+    await injector.inject(removable)
+    rmSync(originalRoot, { force: true, recursive: true })
+
+    const restored = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await restored.ready
+    const replacement = packageAt(join(temporary, 'replacement'), 'recoverable-plugin')
+    await restored.inject(replacement)
+    assert.equal(realpathSync(join(
+      home,
+      'profiles',
+      'desktop',
+      'node_modules',
+      'recoverable-plugin',
+    )), realpathSync(replacement))
+
+    const removableLink = join(
+      home,
+      'profiles',
+      'desktop',
+      'node_modules',
+      'removable-plugin',
+    )
+    await restored.uninject('removable-plugin')
+    assert.throws(() => lstatSync(removableLink), { code: 'ENOENT' })
   } finally {
     rmSync(temporary, { force: true, recursive: true })
   }

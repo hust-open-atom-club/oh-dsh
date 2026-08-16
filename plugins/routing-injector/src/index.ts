@@ -140,6 +140,10 @@ function loadJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown
 }
 
+function entryExists(path: string): boolean {
+  return lstatSync(path, { throwIfNoEntry: false }) !== undefined
+}
+
 function delay(milliseconds: number): Promise<void> {
   return new Promise(resolve => { setTimeout(resolve, milliseconds) })
 }
@@ -333,8 +337,14 @@ export class RoutingInjector {
 
   private ensureLink(record: RegistryEntry): boolean {
     const link = this.profileLink(record.packageName)
-    if (existsSync(link)) {
-      if (realpathSync(link) !== record.path) {
+    if (entryExists(link)) {
+      let target: string
+      try {
+        target = realpathSync(link)
+      } catch {
+        throw new Error(`${record.packageName} already has a dangling profile-local package link`)
+      }
+      if (target !== record.path) {
         throw new Error(`${record.packageName} already has a different profile-local package link`)
       }
       return false
@@ -347,8 +357,19 @@ export class RoutingInjector {
   private removeOwnedLink(record: RegistryEntry): void {
     if (!record.linkOwned) return
     const link = this.profileLink(record.packageName)
-    if (!existsSync(link)) return
-    if (realpathSync(link) !== record.path) {
+    const entry = lstatSync(link, { throwIfNoEntry: false })
+    if (entry === undefined) return
+    let target: string
+    try {
+      target = realpathSync(link)
+    } catch {
+      if (!entry.isSymbolicLink()) {
+        throw new Error(`${record.packageName} package link is not an injector-owned link`)
+      }
+      rmSync(link, { force: true, recursive: true })
+      return
+    }
+    if (target !== record.path) {
       throw new Error(`${record.packageName} package link no longer matches its approved path`)
     }
     rmSync(link, { force: true, recursive: true })
@@ -455,7 +476,7 @@ export class RoutingInjector {
         return active.record
       } catch (error) {
         if (active !== undefined) await this.unload(active).catch(() => undefined)
-        if (previous?.linkOwned === true && !existsSync(this.profileLink(previous.packageName))) {
+        if (previous?.linkOwned === true && !entryExists(this.profileLink(previous.packageName))) {
           try { this.ensureLink(previous) } catch { /* preserve the original failure */ }
         }
         throw error
