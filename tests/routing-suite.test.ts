@@ -24,6 +24,7 @@ import { apply as applyRouter } from '../plugins/routing/src/index.ts'
 import { apply as applyInjectorTools } from '../plugins/routing-injector/src/index.ts'
 import { apply as applyInjectorHost } from '../plugins/routing-injector-host/src/index.ts'
 import { RoutingInjector } from '../plugins/routing-injector/src/index.ts'
+import { ensureDesktopProfile } from '../src/profile.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -314,6 +315,84 @@ test('injector registry writes preserve records from concurrent profiles', async
       'desktop-plugin',
       'web-plugin',
     ])
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
+test('injector promotion rolls back the profile when registry commit fails', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-promote-'))
+  try {
+    const home = join(temporary, 'home')
+    const { profileDir } = ensureDesktopProfile(home)
+    const manifestPath = join(profileDir, 'package.json')
+    const injector = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await injector.ready
+    await injector.inject(packageAt(temporary, 'promoted-plugin'))
+    const profileBefore = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    const registryBefore = JSON.parse(readFileSync(injector.registryPath, 'utf8'))
+    const registryTemporary = `${injector.registryPath}.tmp-${String(process.pid)}`
+    mkdirSync(registryTemporary)
+
+    await assert.rejects(injector.promote('promoted-plugin'))
+    assert.deepEqual(JSON.parse(readFileSync(manifestPath, 'utf8')), profileBefore)
+    assert.deepEqual(JSON.parse(readFileSync(injector.registryPath, 'utf8')), registryBefore)
+
+    rmSync(registryTemporary, { force: true, recursive: true })
+    const promoted = await injector.promote('promoted-plugin')
+    assert.equal(promoted.promoted, true)
+    assert.equal(
+      JSON.parse(readFileSync(manifestPath, 'utf8')).dsh.profile.bundles.includes('promoted-plugin'),
+      true,
+    )
+    assert.equal(
+      JSON.parse(readFileSync(injector.registryPath, 'utf8')).records[0].promoted,
+      true,
+    )
+    assert.equal(existsSync(injector.promotionJournalPath), false)
+  } finally {
+    rmSync(temporary, { force: true, recursive: true })
+  }
+})
+
+test('injector recovers an interrupted profile promotion on startup', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'oh-dsh-routing-injector-journal-'))
+  try {
+    const home = join(temporary, 'home')
+    const { profileDir } = ensureDesktopProfile(home)
+    const manifestPath = join(profileDir, 'package.json')
+    const injector = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await injector.ready
+    const record = await injector.inject(packageAt(temporary, 'interrupted-plugin'))
+    const previousProfile = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    const previousRegistry = JSON.parse(readFileSync(injector.registryPath, 'utf8'))
+    const interruptedProfile = structuredClone(previousProfile)
+    interruptedProfile.dependencies['interrupted-plugin'] = `file:${record.path}`
+    interruptedProfile.dsh.profile.bundles.push('interrupted-plugin')
+    writeFileSync(injector.promotionJournalPath, JSON.stringify({
+      packageName: 'interrupted-plugin',
+      previousProfile,
+      previousRegistry,
+      profile: 'desktop',
+      version: 1,
+    }))
+    writeFileSync(manifestPath, JSON.stringify(interruptedProfile))
+
+    const restored = new RoutingInjector(new FakeLoader(), {
+      OH_DSH_HOME: home,
+      OH_DSH_PROFILE: 'desktop',
+    })
+    await restored.ready
+    assert.deepEqual(JSON.parse(readFileSync(manifestPath, 'utf8')), previousProfile)
+    assert.deepEqual(JSON.parse(readFileSync(injector.registryPath, 'utf8')), previousRegistry)
+    assert.equal(existsSync(injector.promotionJournalPath), false)
+    assert.equal((restored.snapshot().active as unknown[]).length, 1)
   } finally {
     rmSync(temporary, { force: true, recursive: true })
   }

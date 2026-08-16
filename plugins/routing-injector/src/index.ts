@@ -14,6 +14,11 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import {
+  planProfilePackagePromotion,
+  writeProfileManifest,
+  type ProfileManifest,
+} from '../../../src/profile.ts'
 
 export const MUTATING_TOOLS = new Set([
   'dev_inject_plugin',
@@ -26,6 +31,7 @@ const SAFE_PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/
 const INTERNAL_PACKAGE_NAME = /^@(oh-dsh|deepseek-ai)\//
 const MAX_PLUGIN_BYTES = 32 * 1024 * 1024
 const MAX_PLUGIN_FILES = 2_000
+const PROMOTION_STATUS_KEY = '__promotion__'
 const REGISTRY_STATUS_KEY = '__registry__'
 const REGISTRY_LOCK_TIMEOUT_MS = 10_000
 const REGISTRY_LOCK_STALE_MS = 60_000
@@ -75,6 +81,14 @@ export interface RoutingInjectorService {
 
 interface Registry {
   records: RegistryEntry[]
+  version: 1
+}
+
+interface PromotionJournal {
+  packageName: string
+  previousProfile: ProfileManifest
+  previousRegistry: Registry
+  profile: BrowserProfile
   version: 1
 }
 
@@ -233,6 +247,28 @@ function validateRegistry(value: unknown): Registry {
   return { records, version: 1 }
 }
 
+function validatePromotionJournal(value: unknown, profile: BrowserProfile): PromotionJournal {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('injector promotion journal must be an object')
+  }
+  const journal = value as Record<string, unknown>
+  if (journal.version !== 1 || journal.profile !== profile
+    || typeof journal.packageName !== 'string'
+    || !SAFE_PACKAGE_NAME.test(journal.packageName)
+    || journal.previousProfile === null
+    || typeof journal.previousProfile !== 'object'
+    || Array.isArray(journal.previousProfile)) {
+    throw new Error('injector promotion journal has an unsupported schema')
+  }
+  return {
+    packageName: journal.packageName,
+    previousProfile: journal.previousProfile as ProfileManifest,
+    previousRegistry: validateRegistry(journal.previousRegistry),
+    profile,
+    version: 1,
+  }
+}
+
 /**
  * Profile-local, approval-gated runtime injector. It does not own a server,
  * timer, client bundle, or external API; its entire mutable surface is tools.
@@ -243,6 +279,7 @@ export class RoutingInjector {
   private readonly loader: Loader
   readonly profile: BrowserProfile
   readonly profileDir: string
+  readonly promotionJournalPath: string
   readonly registryPath: string
   readonly ready: Promise<void>
   private readonly registryLockPath: string
@@ -257,6 +294,7 @@ export class RoutingInjector {
     this.profile = resolveProfile(environment)
     this.profileDir = join(home, 'profiles', this.profile)
     this.registryPath = join(home, 'routing-injector', 'registry.json')
+    this.promotionJournalPath = join(home, 'routing-injector', `promotion-${this.profile}.json`)
     this.registryLockPath = `${this.registryPath}.lock`
     this.ready = this.restore().catch(error => {
       this.inactive.set(REGISTRY_STATUS_KEY, error instanceof Error ? error.message : String(error))
@@ -269,6 +307,10 @@ export class RoutingInjector {
   }
 
   private registryForMutation(): Registry {
+    const promotionError = this.inactive.get(PROMOTION_STATUS_KEY)
+    if (promotionError !== undefined) {
+      throw new Error(`pending profile promotion recovery failed: ${promotionError}`)
+    }
     try {
       return this.registry()
     } catch (error) {
@@ -329,6 +371,29 @@ export class RoutingInjector {
     const temporary = `${this.registryPath}.tmp-${String(process.pid)}`
     writeFileSync(temporary, `${JSON.stringify(registry, undefined, 2)}\n`, { mode: 0o600 })
     renameSync(temporary, this.registryPath)
+  }
+
+  private writePromotionJournal(journal: PromotionJournal): void {
+    const directory = dirname(this.promotionJournalPath)
+    mkdirSync(directory, { mode: 0o700, recursive: true })
+    const temporary = `${this.promotionJournalPath}.tmp-${String(process.pid)}`
+    writeFileSync(temporary, `${JSON.stringify(journal, undefined, 2)}\n`, { mode: 0o600 })
+    renameSync(temporary, this.promotionJournalPath)
+  }
+
+  private recoverPromotion(): void {
+    if (!existsSync(this.promotionJournalPath)) return
+    const journal = validatePromotionJournal(loadJson(this.promotionJournalPath), this.profile)
+    writeProfileManifest(this.profileDir, journal.previousProfile)
+    let registryMatches = false
+    try {
+      registryMatches = JSON.stringify(this.registry()) === JSON.stringify(journal.previousRegistry)
+    } catch {
+      // Replace unreadable or partially committed state with the journal copy.
+    }
+    if (!registryMatches) this.writeRegistry(journal.previousRegistry)
+    rmSync(this.promotionJournalPath, { force: true })
+    this.inactive.delete(PROMOTION_STATUS_KEY)
   }
 
   private profileLink(packageName: string): string {
@@ -423,6 +488,12 @@ export class RoutingInjector {
 
   async restore(): Promise<void> {
     await this.withRegistryLock(async () => {
+      try {
+        this.recoverPromotion()
+      } catch (error) {
+        this.inactive.set(PROMOTION_STATUS_KEY, error instanceof Error ? error.message : String(error))
+        return
+      }
       let registry: Registry
       try {
         registry = this.registry()
@@ -515,44 +586,47 @@ export class RoutingInjector {
     return await this.withRegistryLock(async () => {
       const active = this.active.get(packageName)
       if (active === undefined) throw new Error(`${packageName} is not an active injected package`)
-      const manifestPath = join(this.profileDir, 'package.json')
-      const manifest = loadJson(manifestPath)
-      if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
-        throw new Error('current profile manifest is invalid')
-      }
-      const profile = manifest as Record<string, unknown>
-      const dsh = profile.dsh !== null && typeof profile.dsh === 'object' && !Array.isArray(profile.dsh)
-        ? profile.dsh as Record<string, unknown>
-        : {}
-      const profileConfig = dsh.profile !== null && typeof dsh.profile === 'object' && !Array.isArray(dsh.profile)
-        ? dsh.profile as Record<string, unknown>
-        : {}
-      const bundles = Array.isArray(profileConfig.bundles)
-        ? profileConfig.bundles.filter((value): value is string => typeof value === 'string')
-        : []
-      const dependencies = profile.dependencies !== null && typeof profile.dependencies === 'object'
-        && !Array.isArray(profile.dependencies)
-        ? profile.dependencies as Record<string, unknown>
-        : {}
-      const next = {
-        ...profile,
-        dependencies: { ...dependencies, [packageName]: `file:${active.record.path}` },
-        dsh: {
-          ...dsh,
-          profile: { ...profileConfig, bundles: bundles.includes(packageName) ? bundles : [...bundles, packageName] },
-        },
-      }
-      const temporary = `${manifestPath}.injector-tmp-${String(process.pid)}`
-      writeFileSync(temporary, `${JSON.stringify(next, undefined, 2)}\n`, { mode: 0o600 })
-      renameSync(temporary, manifestPath)
       const registry = this.registryForMutation()
+      const registered = registry.records.some(record => record.packageName === packageName
+        && record.profile === this.profile)
+      if (!registered) throw new Error(`${packageName} is missing from the injector registry`)
+      const promotion = planProfilePackagePromotion(
+        this.profileDir,
+        packageName,
+        active.record.path,
+      )
       const promoted = { ...active.record, promoted: true }
-      this.writeRegistry({
+      const nextRegistry: Registry = {
         ...registry,
         records: registry.records.map(record => record.packageName === packageName
           && record.profile === this.profile ? promoted : record),
+      }
+      this.writePromotionJournal({
+        packageName,
+        previousProfile: promotion.previous,
+        previousRegistry: registry,
+        profile: this.profile,
+        version: 1,
       })
+      try {
+        writeProfileManifest(this.profileDir, promotion.next)
+        this.writeRegistry(nextRegistry)
+        rmSync(this.promotionJournalPath, { force: true })
+      } catch (error) {
+        try {
+          this.recoverPromotion()
+        } catch (recoveryError) {
+          const message = recoveryError instanceof Error ? recoveryError.message : String(recoveryError)
+          this.inactive.set(PROMOTION_STATUS_KEY, message)
+          throw new AggregateError(
+            [error, recoveryError],
+            'profile promotion failed and automatic recovery remains pending',
+          )
+        }
+        throw error
+      }
       this.active.set(packageName, { ...active, record: promoted })
+      this.inactive.delete(PROMOTION_STATUS_KEY)
       this.inactive.delete(REGISTRY_STATUS_KEY)
       return promoted
     })

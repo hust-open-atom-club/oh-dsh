@@ -54,7 +54,7 @@ export const TUI_BUNDLES = [
   '@oh-dsh/tui',
 ] as const
 
-interface ProfileManifest {
+export interface ProfileManifest {
   name?: string
   private?: boolean
   dependencies?: Record<string, string>
@@ -95,6 +95,56 @@ function writeJsonAtomic(path: string, value: unknown): void {
 function requiredBundles(existing: readonly string[], owned: readonly string[]): string[] {
   const required = new Set<string>(owned)
   return [...owned, ...existing.filter(bundle => !required.has(bundle))]
+}
+
+/** A profile manifest update planned before any persistent state is changed. */
+export interface ProfilePackagePromotion {
+  next: ProfileManifest
+  previous: ProfileManifest
+}
+
+/** Plan one persistent package addition while preserving profile-owned data. */
+export function planProfilePackagePromotion(
+  profileDir: string,
+  packageName: string,
+  packagePath: string,
+): ProfilePackagePromotion {
+  const previous = readManifest(join(profileDir, 'package.json'))
+  const dsh = previous.dsh !== null && typeof previous.dsh === 'object'
+    && !Array.isArray(previous.dsh)
+    ? previous.dsh as Record<string, unknown>
+    : {}
+  const profile = dsh.profile !== null && typeof dsh.profile === 'object'
+    && !Array.isArray(dsh.profile)
+    ? dsh.profile as Record<string, unknown>
+    : {}
+  const bundles = Array.isArray(profile.bundles)
+    ? profile.bundles.filter((value): value is string => typeof value === 'string')
+    : []
+  const dependencies = previous.dependencies !== null
+    && typeof previous.dependencies === 'object'
+    && !Array.isArray(previous.dependencies)
+    ? previous.dependencies
+    : {}
+  return {
+    next: {
+      ...previous,
+      dependencies: { ...dependencies, [packageName]: `file:${packagePath}` },
+      dsh: {
+        ...dsh,
+        profile: {
+          ...profile,
+          bundles: bundles.includes(packageName) ? bundles : [...bundles, packageName],
+        },
+      },
+    },
+    previous,
+  }
+}
+
+/** Atomically replace the manifest for one application-owned profile. */
+export function writeProfileManifest(profileDir: string, manifest: ProfileManifest): void {
+  writeJsonAtomic(join(profileDir, 'package.json'), manifest)
 }
 
 /** One packaged distribution surface: its profile name, bundles, and manifest identity. */
