@@ -9,11 +9,11 @@ test('desktop release source pins the published DSH npm package', () => {
   assert.equal(DSH_SOURCE_SPEC.source, 'npm')
   if (DSH_SOURCE_SPEC.source !== 'npm') throw new Error('unreachable')
   assert.equal(DSH_SOURCE_SPEC.package, '@deepseek-ai/dsh')
-  assert.equal(DSH_SOURCE_SPEC.version, '0.1.0-rc.6')
+  assert.equal(DSH_SOURCE_SPEC.version, '0.1.0-rc.7')
   assert.match(DSH_SOURCE_SPEC.integrity, /^sha512-[A-Za-z0-9+/=]+$/)
   assert.equal(
     DSH_SOURCE_SPEC.tarball,
-    'https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.1.0-rc.6.tgz',
+    'https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.1.0-rc.7.tgz',
   )
   assert.match(DSH_SOURCE_SPEC.packageManager, /^pnpm@\d+\.\d+\.\d+$/)
 })
@@ -36,7 +36,7 @@ test('DSH source override must match the pinned package version', () => {
       name: DSH_SOURCE_SPEC.package,
       version: '0.0.0',
     }))
-    assert.throws(() => resolveDshSource(), /0\.1\.0-rc\.6 is required/)
+    assert.throws(() => resolveDshSource(), /0\.1\.0-rc\.7 is required/)
   } finally {
     if (previous === undefined) delete process.env.DSH_SOURCE
     else process.env.DSH_SOURCE = previous

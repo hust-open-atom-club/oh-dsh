@@ -264,7 +264,10 @@ function resolveNpmAssembly() {
   acquireNpmAssembly(target, archive)
   writeFileSync(
     join(target, 'pnpm-workspace.yaml'),
-    'packages:\n  - .\n',
+    // Mirror the repository policy: freshly published rc releases sit inside
+    // pnpm's minimumReleaseAge window, and the pinned assembly must install
+    // them without waiting for the age cutoff.
+    'packages:\n  - .\n\nminimumReleaseAgeExclude:\n  - \'@deepseek-ai/*\'\n',
   )
   validateSource(target)
   return target

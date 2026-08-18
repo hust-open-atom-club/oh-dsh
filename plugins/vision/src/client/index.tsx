@@ -674,9 +674,8 @@ export function apply(ctx: Context): void {
   )
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
     name: 'settings.plugin.item',
-    id: 'vision',
-    order: 30,
-    label: () => t('title'),
+    key: 'oh-dsh-vision',
+    priority: 30,
     locale: 'oh-dsh-vision',
     inject: () => controller.inject(),
   }, VisionCard))
