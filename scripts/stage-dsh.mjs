@@ -1073,6 +1073,89 @@ function ensureLinuxLandlockLauncher() {
   console.log(`Restored Linux Landlock launcher: ${launcher}`)
 }
 
+/**
+ * Restore the configuration-client boundary for the pinned rc.7 release.
+ * rc7's dsh-host-apiproxy removed the fixed WEB_SETTINGS_NAMESPACES
+ * allowlist and serves every registered settings namespace; Oh-DSH keeps
+ * the explicit allowlist so a registering plugin cannot become remotely
+ * readable or writable by default. Model-provider namespaces (the settingsNs
+ * llm.providers lists) stay exposed, mirroring rc6's exposedNamespaces()
+ * union; every other namespace answers `settings-not-exposed` on describe
+ * and on each settings write. This extends the rc.6 npm-release patch
+ * (exposeVisionSettingsNamespace) from one namespace to the whole boundary.
+ */
+function restoreSettingsBoundary() {
+  const store = join(runtime, 'node_modules', '.pnpm')
+  const entry = readdirSync(store, { withFileTypes: true })
+    .find(candidate => candidate.isDirectory() && candidate.name.startsWith('@deepseek-ai+dsh-host-apiproxy@'))
+  if (entry === undefined) {
+    throw new Error('dsh-host-apiproxy is missing from the staged runtime')
+  }
+  const indexPath = join(store, entry.name, 'node_modules', '@deepseek-ai', 'dsh-host-apiproxy', 'lib', 'index.js')
+  const source = readFileSync(indexPath, 'utf8')
+  if (source.includes('WEB_SETTINGS_NAMESPACES')) {
+    throw new Error('dsh-host-apiproxy settings boundary has an unexpected shape; review needed')
+  }
+  const allowlist = [
+    'agent-loop',
+    'shell',
+    'locale',
+    'permission',
+    'ui-conversation',
+    'ui-theme',
+    'web-search-deepseek',
+    'ui-onboarding',
+    'settings',
+    'oh-dsh-vision',
+  ]
+  const constant = [
+    '\n/**',
+    ' * Downstream configuration-client boundary restored for the pinned rc.7',
+    ' * release: settings.describe filters and every settings write refuse',
+    ' * namespaces outside this allowlist with `settings-not-exposed`.',
+    ' * Model-provider namespaces remain exposed.',
+    ' */',
+    'const WEB_SETTINGS_NAMESPACES = new Set([',
+    ...allowlist.map((ns) => `\t"${ns}",`),
+    ']);\n',
+  ].join('\n')
+  if (source.includes(constant)) {
+    console.log('Settings namespace boundary already restored')
+    return
+  }
+  const describeAnchor = 'namespaces: settings.describe({ redactSecrets: true }).map(namespaceView)'
+  const describeReplacement = [
+    'namespaces: settings.describe({ redactSecrets: true }).filter((descriptor) => {',
+    '\t\t\t\t\tif (WEB_SETTINGS_NAMESPACES.has(String(descriptor.ns))) return true',
+    '\t\t\t\t\tfor (const entry of ctx.llm.listConfigurableProviders()) {',
+    '\t\t\t\t\t\tif (entry.settingsNs === String(descriptor.ns)) return true',
+    '\t\t\t\t\t}',
+    '\t\t\t\t\treturn false',
+    '\t\t\t\t}).map(namespaceView)',
+  ].join('\n')
+  const writeAnchor = 'branded = settingsNamespace(ns);'
+  const writeGuard = [
+    '\t\tif (WEB_SETTINGS_NAMESPACES.has(ns) === false && ctx.llm.listConfigurableProviders().every((entry) => entry.settingsNs !== ns)) {',
+    '\t\t\treturn err(request, {',
+    '\t\t\t\tcode: "settings-not-exposed",',
+    '\t\t\t\tmessage: `settings namespace "${ns}" is not exposed to configuration clients`,',
+    '\t\t\t\tdetails: { ns },',
+    '\t\t\t})',
+    '\t\t}',
+  ].join('\n')
+  const constantAnchor = 'const DEFAULT_MAX_MESSAGES = 50;'
+  for (const anchor of [constantAnchor, describeAnchor, writeAnchor]) {
+    if (source.includes(anchor) === false) {
+      throw new Error(`dsh-host-apiproxy settings boundary anchor missing: ${anchor}`)
+    }
+  }
+  let next = source.replace(constantAnchor, constantAnchor + constant)
+  next = next.replace(describeAnchor, describeReplacement)
+  next = next.replace(writeAnchor, writeAnchor + '\n' + writeGuard)
+  writeFileSync(indexPath, next)
+  console.log('Restored the settings namespace boundary on the staged api-proxy')
+}
+
 if (!npmRelease && !existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
   throw new Error(`DSH source checkout not found: ${dshSource}`)
 }
@@ -1175,6 +1258,7 @@ if (npmRelease) {
 restoreExecutableHelpers()
 console.log('Normalizing runtime links')
 normalizeRuntimeLinks()
+restoreSettingsBoundary()
 ensureLinuxLandlockLauncher()
 assertSelfContained(runtime, 'DSH runtime')
 ensureNodeRuntime()
