@@ -152,16 +152,28 @@ void app.whenReady().then(async () => {
               )].find(element => element instanceof HTMLTextAreaElement
                 && element.getClientRects().length > 0)
               if (workspaceTrigger instanceof HTMLTextAreaElement
+                && workspaceTrigger.getAttribute('aria-expanded') !== 'true'
                 && Date.now() - (window.__OH_DSH_SMOKE_WORKSPACE_REQUESTED_AT__ ?? 0) > 500) {
                 window.__OH_DSH_SMOKE_WORKSPACE_REQUESTED_AT__ = Date.now()
-                window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ =
-                  (window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ ?? 0) + 1
-                const card = workspaceTrigger.closest('[data-composer-card]')
-                card?.dispatchEvent(new PointerEvent('pointerdown', {
+                const count = (window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ ?? 0) + 1
+                window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ = count
+                // rc.7 binds the hero picker open on the trigger textarea itself
+                // (a card-level click no longer lands) and the untrusted click
+                // lands only intermittently, so alternate between the card and
+                // the textarea and keep trying until aria-expanded flips
+                // instead of toggling an open picker shut on the next poll.
+                const target = count % 2 === 1
+                  ? (workspaceTrigger.closest('[data-composer-card]') ?? workspaceTrigger)
+                  : workspaceTrigger
+                target.dispatchEvent(new PointerEvent('pointerdown', {
                   bubbles: true,
                   cancelable: true,
                 }))
-                card?.click()
+                target.dispatchEvent(new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                }))
               }
               const directoryDialog = [...document.querySelectorAll('[role="dialog"]')]
                 .find(dialog => /^(Select Workspace Directory|选择工作区目录)$/i.test(
