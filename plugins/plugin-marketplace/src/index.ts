@@ -50,8 +50,10 @@ export function apply(ctx: HostContext): void {
       return
     }
     if (process.env.OH_DSH_READ_ONLY === '1') {
-      surfaceCtx.logger.warn('plugin-marketplace: disabled in read-only viewer mode')
-      return
+      // Viewer mode keeps the shared pluginMarketplace service available so
+      // dependent surfaces (for example the TUI marketplace scene) still
+      // activate; the manager refuses every mutating transaction.
+      surfaceCtx.logger.warn('plugin-marketplace: read-only viewer mode; transactions disabled')
     }
     if (surface.dataRoot === '') {
       surfaceCtx.logger.warn('plugin-marketplace: no writable data root; host disabled')
@@ -63,6 +65,7 @@ export function apply(ctx: HostContext): void {
         environment: process.env,
         kind: surface.kind,
         onLog: line => surfaceCtx.logger.warn(`[marketplace] ${line}`),
+        ...(process.env.OH_DSH_READ_ONLY === '1' ? { readOnly: true } : {}),
         surface,
       })
     } catch (error) {

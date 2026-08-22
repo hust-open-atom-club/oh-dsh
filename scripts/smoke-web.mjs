@@ -54,7 +54,7 @@ const lines = []
 
 /** One boot entry of the DSH client graph. */
 function parseBootEntries(index) {
-  const marker = 'window.__DSH_BOOT__ = '
+  const marker = 'globalThis["__DSH_BOOT__"] = '
   const start = index.indexOf(marker)
   assert.notEqual(start, -1, 'DSH index did not contain a client boot graph')
   const end = index.indexOf('</script>', start)

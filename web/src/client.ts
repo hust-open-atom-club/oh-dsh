@@ -116,7 +116,20 @@ export function apply(ctx: ClientContext): void {
     const removeChrome = installWebChrome()
     const originalTitle = document.title
     document.title = 'Oh-DSH Web'
+    // rc.2's dsh-client-ui-renderer owns document.title and rewrites it to
+    // its own product title on view and session changes; reassert the
+    // Oh-DSH identity after each rewrite instead of racing one assignment.
+    const synchronizeTitle = (): void => {
+      if (document.title !== 'Oh-DSH Web') document.title = 'Oh-DSH Web'
+    }
+    const titleObserver = new MutationObserver(synchronizeTitle)
+    titleObserver.observe(document.head, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    })
     return () => {
+      titleObserver.disconnect()
       removeChrome()
       document.title = originalTitle
     }

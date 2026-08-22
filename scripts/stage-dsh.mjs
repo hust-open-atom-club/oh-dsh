@@ -938,7 +938,7 @@ function installDesktopPackages() {
       manifest: join(root, 'upstream', 'dsh-TUI', 'package.json'),
       files: [
         [join(root, 'upstream', 'dsh-TUI', 'lib'), 'lib'],
-        [join(root, 'upstream', 'dsh-TUI', 'ecosystem-spec'), 'ecosystem-spec'],
+        [join(root, 'upstream', 'dsh-TUI', 'dsh-ecosystem-spec'), 'dsh-ecosystem-spec'],
         [join(root, 'upstream', 'dsh-TUI', 'presets'), 'presets'],
         [join(root, 'upstream', 'dsh-TUI', 'skills'), 'skills'],
         [join(root, 'upstream', 'dsh-TUI', 'cordis.patch.yml'), 'cordis.patch.yml'],

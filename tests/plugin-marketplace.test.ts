@@ -1765,3 +1765,46 @@ test('discover updates remove an old bundle before switching to a repository plu
     setup.cleanup()
   }
 })
+
+test('read-only viewer manager browses without writing or transacting', async () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-readonly-'))
+  const dshHome = join(appDataPath, 'dsh')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  mkdirSync(profileDir, { recursive: true })
+  writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+    name: 'desktop',
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles: ['@oh-dsh/desktop'] } },
+  }, undefined, 2) + '\n')
+  const platform = new FakePlatform()
+  const runtime = new FakeRuntime()
+  const manager = new PluginMarketplaceManager({
+    appDataPath,
+    dshHome,
+    platform,
+    profile: 'desktop',
+    readOnly: true,
+    runtime,
+  })
+  try {
+    // Viewer mode shares a data root with the lock holder: no preview or
+    // rollback directories may be created on construction.
+    assert.equal(existsSync(join(appDataPath, 'plugin-marketplace', 'previews')), false)
+    assert.equal(existsSync(join(appDataPath, 'plugin-marketplace', 'rollbacks')), false)
+
+    const snapshot = await manager.dispatch({ type: 'refresh' })
+    assert.equal(snapshot.error, null)
+    assert.ok(snapshot.catalog.length > 0)
+
+    const refused = await manager.dispatch({
+      type: 'inspect',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    assert.match(refused.error ?? '', /read-only/)
+    assert.equal(platform.builds.length, 0)
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})

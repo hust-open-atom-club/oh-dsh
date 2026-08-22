@@ -669,7 +669,7 @@ export function apply(ctx: Context): void {
     api,
   )
   ctx.effect(
-    () => ctx.remote.$on('credentials/updated', (ref: string) => { controller.refreshCredential(ref) }),
+    () => ctx.remote.$on('credentials/reference-updated', (ref: string) => { controller.refreshCredential(ref) }),
     'oh-dsh-vision: credential invalidations',
   )
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({

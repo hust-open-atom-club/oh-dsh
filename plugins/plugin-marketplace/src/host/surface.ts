@@ -220,11 +220,15 @@ export function createSurfaceMarketplaceHost(input: {
   environment: NodeJS.ProcessEnv
   kind: MarketplaceHostSurfaceKind
   onLog?: (message: string) => void
+  /** Viewer mode: browse the catalog, refuse every mutating transaction. */
+  readOnly?: boolean
   surface: OhDshSurface
 }): SurfaceMarketplaceHost {
   const paths = marketplaceHostPaths(input.surface, input.environment)
   const workingDirectory = join(paths.appDataPath, 'plugin-marketplace')
-  mkdirSync(workingDirectory, { recursive: true, mode: 0o700 })
+  if (input.readOnly !== true) {
+    mkdirSync(workingDirectory, { recursive: true, mode: 0o700 })
+  }
   const platform = new ProductionMarketplacePlatform({
     appDataPath: paths.appDataPath,
     cliEntry: paths.cliEntry,
@@ -240,6 +244,7 @@ export function createSurfaceMarketplaceHost(input: {
   const manager = new PluginMarketplaceManager({
     appDataPath: paths.appDataPath,
     dshHome: input.environment.DSH_HOME ?? input.surface.dataRoot,
+    ...(input.readOnly === true ? { readOnly: true } : {}),
     ...(input.onLog === undefined
       ? {}
       : { onWarn: input.onLog }),

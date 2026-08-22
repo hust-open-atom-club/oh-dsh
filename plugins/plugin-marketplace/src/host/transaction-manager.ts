@@ -90,6 +90,8 @@ export interface PluginMarketplaceOptions {
   onWarn?: (message: string) => void
   platform: MarketplacePlatform
   profile: string
+  /** Viewer mode: browse snapshots, refuse every mutating dispatch. */
+  readOnly?: boolean
   runtime: MarketplaceRuntime
 }
 
@@ -669,9 +671,13 @@ export class PluginMarketplaceManager {
     this.#previewsRoot = join(this.#root, 'previews')
     this.#rollbacksRoot = join(this.#root, 'rollbacks')
     this.#rollbackStatePath = join(this.#rollbacksRoot, 'current.json')
-    removeTree(this.#previewsRoot, this.#warn)
-    mkdirSync(this.#previewsRoot, { recursive: true, mode: 0o700 })
-    mkdirSync(this.#rollbacksRoot, { recursive: true, mode: 0o700 })
+    // Viewer mode shares the data root with the surface holding the runtime
+    // lock, so it must not recreate preview or rollback directories.
+    if (options.readOnly !== true) {
+      removeTree(this.#previewsRoot, this.#warn)
+      mkdirSync(this.#previewsRoot, { recursive: true, mode: 0o700 })
+      mkdirSync(this.#rollbacksRoot, { recursive: true, mode: 0o700 })
+    }
     this.#rollback = this.readRollback()
   }
 
@@ -728,6 +734,11 @@ export class PluginMarketplaceManager {
 
   async dispatch(command: MarketplaceCommand): Promise<MarketplaceSnapshot> {
     if (this.#busy) return this.getSnapshot()
+    if (this.#options.readOnly === true && command.type !== 'refresh') {
+      this.#lastAction = command.type
+      this.#error = 'The marketplace is read-only while another Oh-DSH surface holds the runtime lock.'
+      return this.getSnapshot()
+    }
     this.#busy = true
     this.#error = null
     try {

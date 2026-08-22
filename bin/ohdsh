@@ -1,7 +1,18 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+# Resolve $0 through symlinks (macOS readlink has no -f) so an
+# /usr/local/bin link still finds the installed application.
+SCRIPT=$0
+while [ -L "$SCRIPT" ]; do
+  TARGET=$(readlink "$SCRIPT")
+  case $TARGET in
+    /*) SCRIPT=$TARGET ;;
+    *) SCRIPT=$(dirname -- "$SCRIPT")/$TARGET ;;
+  esac
+done
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$SCRIPT")/.." && pwd -P)
 
 if [ -x "$ROOT/node-runtime/bin/node" ] && [ -f "$ROOT/lib/oh-dsh/cli.js" ]; then
   export DSH_OH_WEB_ROOT="$ROOT"

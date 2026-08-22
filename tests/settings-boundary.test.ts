@@ -26,7 +26,7 @@ function fixture(layout = 'pnpm') {
       root,
       'node_modules',
       '.pnpm',
-      '@deepseek-ai+dsh-host-apiproxy@0.1.0-rc.7',
+      '@deepseek-ai+dsh-host-apiproxy@0.1.1-rc.2',
       'node_modules',
       '@deepseek-ai',
       'dsh-host-apiproxy',

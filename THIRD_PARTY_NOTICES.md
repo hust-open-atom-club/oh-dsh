@@ -11,12 +11,12 @@ releases and features are reviewed regularly.
 ## DeepSeek Harness
 
 - Project: <https://github.com/deepseek-ai/deepseek-harness>
-- Pinned npm release: `@deepseek-ai/dsh@0.1.0-rc.7`
+- Pinned npm release: `@deepseek-ai/dsh@0.1.1-rc.2`
 - Declared license: MIT
 
 Oh-DSH packages the published DSH CLI release as its runtime. The release
 tarball and SHA-512 integrity are pinned in `dsh-source.json`; the dependency
-closure is pinned in `scripts/dsh-runtime-0.1.0-rc.7-lock.yaml`.
+closure is pinned in `scripts/dsh-runtime-0.1.1-rc.2-lock.yaml`.
 
 ## dsh-web-panel
 
