@@ -10,3 +10,4 @@ tmp/
 result
 result-*
 .agent-workflows/
+coverage/
