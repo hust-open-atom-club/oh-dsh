@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-08-31-coverage-collection-and-stability-regression.md
+2026-08-31-coverage-collection-and-stability-regression.md: a81388c54935feda1feb899457e219cf36952382
+2026-08-31-coverage-collection-and-stability-regression.zh.md: 4f62179c8e54d8d8d354ad2a965f2b3ebc42f3e8

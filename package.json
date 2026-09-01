@@ -64,7 +64,7 @@
     "start": "pnpm run build && pnpm run stage:dsh && electron .",
     "check:screenshot": "electron scripts/check-screenshot-corners.cjs assets/oh-dsh-desktop-ui.png",
     "test": "node --test tests/*.test.ts",
-    "test:coverage": "node -e \"require('node:fs').mkdirSync('coverage', { recursive: true })\" && node --test --experimental-test-coverage --test-reporter lcov --test-reporter-destination coverage/lcov.info --test-reporter spec --test-reporter-destination stdout tests/*.test.ts",
+    "test:coverage": "node -e \"require('node:fs').mkdirSync('coverage', { recursive: true })\" && node --test --experimental-test-coverage --test-coverage-exclude='tests/**' --test-reporter lcov --test-reporter-destination coverage/lcov.info --test-reporter spec --test-reporter-destination stdout tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "verify-agent-note-classification": "node scripts/verify-agent-note-classification.ts",
     "verify-agent-note-format": "node scripts/verify-agent-note-format.ts",

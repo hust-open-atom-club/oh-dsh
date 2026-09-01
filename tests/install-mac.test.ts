@@ -101,13 +101,15 @@ test('a mac bundle replace fails when every backup name is already taken', async
   await makeBundle(destination, 'old')
 
   const now = Date.now()
-  for (let offset = -1; offset <= 5; offset += 1) {
+  const reserved: string[] = []
+  for (let offset = -5; offset <= 30; offset += 1) {
     const stem = `Oh-DSH Desktop-before-${macTimestamp(new Date(now + offset * 1000))}`
     for (let suffix = 0; suffix < 100; suffix += 1) {
-      await mkdir(join(backups, suffix === 0 ? `${stem}.app` : `${stem}-${suffix}.app`), { recursive: true })
+      reserved.push(join(backups, suffix === 0 ? `${stem}.app` : `${stem}-${suffix}.app`))
     }
   }
-  const seeded = (await readdir(backups)).length
+  await Promise.all(reserved.map(path => mkdir(path, { recursive: true })))
+  const seeded = reserved.length
 
   await assert.rejects(
     replaceMacBundle({
