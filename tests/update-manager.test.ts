@@ -500,3 +500,120 @@ test('manager deduplicates concurrent checks', async () => {
   assert.equal(a, b)
   assert.equal(a.status, 'available')
 })
+
+test('command dispatch routes each type to the matching operation exactly once', async t => {
+  const scenarios: Array<{ type: string; run: () => Promise<void> }> = [
+    {
+      type: 'check',
+      run: async () => {
+        const updater = new FakeUpdater()
+        updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+        let checkCalls = 0
+        const original = updater.checkForUpdates.bind(updater)
+        updater.checkForUpdates = async () => { checkCalls += 1; return await original() }
+        const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+        assert.equal((await manager.command({ type: 'check' })).status, 'available')
+        assert.equal(checkCalls, 1)
+      },
+    },
+    {
+      type: 'download',
+      run: async () => {
+        const updater = new FakeUpdater()
+        updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+        let downloadCalls = 0
+        const original = updater.downloadUpdate.bind(updater)
+        updater.downloadUpdate = async token => { downloadCalls += 1; return await original(token) }
+        const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+        await manager.command({ type: 'check' })
+        assert.equal((await manager.command({ type: 'download' })).status, 'downloaded')
+        assert.equal(downloadCalls, 1)
+      },
+    },
+    {
+      type: 'cancel',
+      run: async () => {
+        const updater = new FakeUpdater()
+        updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+        const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+        await manager.command({ type: 'check' })
+        const state = await manager.command({ type: 'cancel' })
+        assert.equal(state.status, 'cancelled')
+        if (state.status === 'cancelled') assert.equal(state.latestVersion, '1.2.0')
+      },
+    },
+    {
+      type: 'retry',
+      run: async () => {
+        const updater = new FakeUpdater()
+        updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+        let downloadCalls = 0
+        updater.downloadUpdate = async () => {
+          downloadCalls += 1
+          if (downloadCalls === 1) throw Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' })
+          updater.emit('download-progress', { percent: 50, transferred: 50, total: 100, bytesPerSecond: 10 })
+          updater.emit('update-downloaded', { downloadedFile: '/tmp/Oh-DSH-Desktop-update.zip' })
+          return ['/tmp/Oh-DSH-Desktop-update.zip']
+        }
+        const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+        await manager.command({ type: 'check' })
+        assert.equal((await manager.command({ type: 'download' })).status, 'error')
+        assert.equal((await manager.command({ type: 'retry' })).status, 'downloaded')
+        assert.equal(downloadCalls, 2)
+      },
+    },
+    {
+      type: 'install-now',
+      run: async () => {
+        const updater = new FakeUpdater()
+        updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+        const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+        await manager.command({ type: 'check' })
+        await manager.command({ type: 'download' })
+        assert.equal((await manager.command({ type: 'install-now' })).status, 'scheduled')
+        assert.equal(updater.quitCalls, 1)
+      },
+    },
+    {
+      type: 'install-on-quit',
+      run: async () => {
+        const updater = new FakeUpdater()
+        updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+        const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+        await manager.command({ type: 'check' })
+        await manager.command({ type: 'download' })
+        assert.equal((await manager.command({ type: 'install-on-quit' })).status, 'scheduled')
+        assert.equal(manager.shouldInstallOnQuit(), true)
+        assert.equal(updater.autoInstallOnAppQuit, true)
+      },
+    },
+    {
+      type: 'open-release',
+      run: async () => {
+        const updater = new FakeUpdater()
+        updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+        const opened: string[] = []
+        const manager = new DesktopUpdateManager({
+          currentVersion: '1.1.0',
+          platform: 'darwin',
+          arch: 'arm64',
+          updater,
+          onOpenRelease: url => { opened.push(url) },
+        })
+        await manager.command({ type: 'check' })
+        await manager.command({ type: 'open-release' })
+        assert.deepEqual(opened, ['https://github.com/hust-open-atom-club/oh-dsh/releases/tag/v1.2.0'])
+      },
+    },
+  ]
+
+  for (const scenario of scenarios) {
+    await t.test(`routes ${scenario.type} to its operation`, scenario.run)
+  }
+})
+
+test('command rejects unknown types as unsupported', async () => {
+  const updater = new FakeUpdater()
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+  await assert.rejects(manager.command({ type: 'bogus' }), /unsupported update command: bogus/)
+})
