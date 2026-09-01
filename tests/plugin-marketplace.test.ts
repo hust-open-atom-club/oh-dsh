@@ -2105,3 +2105,120 @@ test('read-only viewers load the catalog without writing the shared cache', asyn
     rmSync(appDataPath, { recursive: true, force: true })
   }
 })
+
+test('the marketplace refuses to uninstall a protected plugin', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    for (const type of ['inspect', 'prepare'] as const) {
+      const snapshot = await setup.manager.dispatch({
+        type,
+        action: 'uninstall',
+        pluginId: 'oh-dsh-desktop',
+      })
+      assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
+      assert.equal(snapshot.preview, null)
+    }
+    assert.equal(setup.platform.commands.length, 0)
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('the marketplace refuses to enable or disable a protected plugin', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    for (const action of ['enable', 'disable'] as const) {
+      const snapshot = await setup.manager.dispatch({
+        type: 'prepare',
+        action,
+        pluginId: 'oh-dsh-desktop',
+      })
+      assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
+      assert.equal(snapshot.preview, null)
+    }
+    assert.equal(setup.platform.commands.length, 0)
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('a protected package name parsed from the manifest blocks the transaction', async () => {
+  const setup = fixture()
+  try {
+    setup.platform.bundleName = '@oh-dsh/sidebar'
+    await setup.manager.dispatch({ type: 'refresh' })
+    const snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    assert.match(snapshot.error ?? '', /bundle-demo is protected by Oh-DSH/)
+    assert.equal(snapshot.preview, null)
+    assert.equal(
+      snapshot.catalog.find(plugin => plugin.id === 'bundle-demo')?.protected,
+      false,
+      'the catalog entry itself is not protected; only the manifest package name is',
+    )
+    assert.equal(setup.platform.commands.length, 0)
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('catalog parsing drops entries marked empty', () => {
+  const catalog = parseMarketplaceCatalog({
+    schema: 'dsh-external-hub/v0.1',
+    generated: '2026-08-14T00:00:00Z',
+    repos: [
+      { name: 'kept-demo', repo: 'vlln/kept-demo', bundle: true },
+      { name: 'empty-demo', repo: 'vlln/empty-demo', bundle: true, empty: true },
+    ],
+  })
+  assert.deepEqual(catalog.plugins.map(plugin => plugin.id), ['kept-demo'])
+})
+
+test('catalog parsing drops hidden and empty entries while keeping supported ones', () => {
+  const catalog = parseMarketplaceCatalog({
+    schema: 'dsh-external-hub/v0.1',
+    generated: '2026-08-14T00:00:00Z',
+    repos: [
+      { name: 'hidden-demo', repo: 'vlln/hidden-demo', bundle: true, hide: true },
+      { name: 'empty-demo', repo: 'vlln/empty-demo', bundle: true, empty: true },
+      { name: 'both-demo', repo: 'vlln/both-demo', bundle: true, hide: true, empty: true },
+      { name: 'kept-demo', repo: 'vlln/kept-demo', bundle: true },
+    ],
+  })
+  assert.deepEqual(
+    catalog.plugins.map(plugin => [plugin.id, plugin.mechanism]),
+    [['kept-demo', 'bundle']],
+  )
+})
+
+test('a rejected transaction does not leave the marketplace busy', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    const rejected = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'oh-dsh-desktop',
+    })
+    assert.match(rejected.error ?? '', /protected by Oh-DSH/)
+    assert.equal(rejected.busy, false)
+
+    const snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'safe-demo',
+    })
+    assert.equal(snapshot.error, null)
+    assert.equal(snapshot.busy, false)
+    assert.notEqual(snapshot.preview, null)
+    assert.notEqual(snapshot.plan, null)
+    await setup.manager.dispatch({ type: 'discard' })
+  } finally {
+    setup.cleanup()
+  }
+})
