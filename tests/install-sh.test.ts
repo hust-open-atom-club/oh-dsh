@@ -1377,3 +1377,104 @@ test('a failed record commit keeps the previous payload recoverable', { skip: sk
     await github.stop()
   }
 })
+
+test('an interrupted download fails cleanly and recovers on a rerun', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const good = await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'interrupted')
+    github.publish('v0.1.8', [good])
+    github.truncateAsset('v0.1.8', good.name)
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    const args = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
+
+    const failing = await runInstaller(args, env)
+    assert.notEqual(failing.status, 0)
+    assert.match(failing.stderr, /failed to download/)
+    assert.ok(!(await exists(payload)), 'a failed download must not stage a payload')
+    assert.ok(!(await exists(join(bin, 'ohdsh'))), 'a failed download must not install a launcher')
+
+    github.publish('v0.1.8', [await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'interrupted')])
+    const rerun = await runInstaller(args, env)
+    assert.equal(rerun.status, 0, rerun.stderr)
+    assert.match(await readFile(join(payload, 'bin', 'ohdsh'), 'utf8'), /interrupted/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a corrupted archive fails at extraction without residue', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      { name: 'oh-dsh-web-0.1.8-linux-x64.tar.gz', bytes: Buffer.from('definitely not a tarball') },
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /failed to extract/)
+    assert.ok(!(await exists(payload)), 'a failed extraction must not stage a payload')
+    assert.ok(!(await exists(join(bin, 'ohdsh'))), 'a failed extraction must not install a launcher')
+    const parentEntries = await readdir(home)
+    assert.ok(!parentEntries.some(entry => entry.includes('install-pending')))
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a tampered tui asset fails closed and leaves the previous install usable', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const good = await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'good-tui')
+    github.publish('v0.1.8', [good])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    const args = ['--surface', 'tui', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    github.tamperAsset(
+      'v0.1.8',
+      good.name,
+      (await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'bad-tui')).bytes,
+    )
+    const failing = await runInstaller([...args, '--force'], env)
+    assert.notEqual(failing.status, 0)
+    assert.match(failing.stderr, /checksum mismatch/)
+    assert.match(await readFile(join(payload, 'bin', 'ohdsh'), 'utf8'), /good-tui/)
+    const parentEntries = await readdir(home)
+    assert.ok(!parentEntries.some(entry => entry.includes('install-pending')))
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a tampered linux desktop asset fails closed and leaves the previous install usable', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const good = Buffer.from('#!/bin/sh\necho good desktop\n', 'utf8')
+    github.publish('v0.1.8', [{ name: 'Oh-DSH-Desktop-0.1.8-x86_64.AppImage', bytes: good }])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    const args = ['--surface', 'desktop', '--os', 'linux', '--arch', 'x64', '--dest', bin]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    github.tamperAsset('v0.1.8', 'Oh-DSH-Desktop-0.1.8-x86_64.AppImage', Buffer.from('tampered bytes\n'))
+    const failing = await runInstaller([...args, '--force'], env)
+    assert.notEqual(failing.status, 0)
+    assert.match(failing.stderr, /checksum mismatch/)
+    assert.equal(await readFile(join(bin, 'oh-dsh-desktop'), 'utf8'), '#!/bin/sh\necho good desktop\n')
+  } finally {
+    await github.stop()
+  }
+})
