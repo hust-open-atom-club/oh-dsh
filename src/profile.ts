@@ -20,6 +20,7 @@ export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
   '@oh-dsh/panel-controls',
   '@oh-dsh/pinned-summary',
   '@oh-dsh/plugin-marketplace',
+  '@oh-dsh/save-as-image',
   '@oh-dsh/vision',
   // Pinned upstream plugin (upstream/dsh-context) staged under its npm name.
   'dsh-context',

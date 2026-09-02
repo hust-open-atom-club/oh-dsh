@@ -43,6 +43,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
     '../plugins/pinned-summary/src/client.ts',
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
     '../plugins/sidebar/src/client/plugin.tsx',
+    '../plugins/save-as-image/src/SaveAsImageAction.tsx',
   ]
   for (const path of clients) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -57,6 +58,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
     '../plugins/pinned-summary/src/i18n.ts',
     '../plugins/plugin-marketplace/src/client/i18n.ts',
     '../plugins/sidebar/src/client/i18n.ts',
+    '../plugins/save-as-image/src/locales.ts',
   ]
   for (const path of dictionaries) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8')

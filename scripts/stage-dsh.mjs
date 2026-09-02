@@ -220,6 +220,8 @@ for (const required of [
   'plugins/pinned-summary/client.js',
   'plugins/plugin-marketplace/index.js',
   'plugins/plugin-marketplace/client.js',
+  'plugins/save-as-image/index.js',
+  'plugins/save-as-image/client.js',
   'plugins/tui/index.js',
   'plugins/tui/cordis.patch.yml',
   'plugins/tui-marketplace/index.js',

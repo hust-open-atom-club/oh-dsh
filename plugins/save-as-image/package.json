@@ -1,0 +1,37 @@
+{
+  "name": "@oh-dsh/save-as-image",
+  "version": "0.1.0",
+  "description": "Save a finalized assistant response as a PNG image in Oh-DSH",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "files": [
+    "dist/index.js",
+    "dist/client.js",
+    "dist/client.js.map"
+  ],
+  "devDependencies": {
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.1-rc.2",
+    "@types/react": "~18.3.1",
+    "react": "^18.2.0"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.13"
+  }
+}
