@@ -80,6 +80,11 @@ const pluginPackages = [
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
   { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
   { directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
+  {
+    directory: 'save-as-image',
+    id: '@oh-dsh/save-as-image',
+    clientExternal: ['@deepseek-ai/*'],
+  },
 ]
 
 const shared = {
