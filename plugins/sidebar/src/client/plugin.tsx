@@ -894,6 +894,8 @@ function DesktopPanelToolbar({
             data-oh-dsh-summary-toggle=""
             aria-label={t('summary.toggle')}
             aria-pressed={summaryOpen}
+            aria-expanded={summaryOpen}
+            aria-controls="oh-dsh-pinned-summary"
             title={t('summary.title')}
             onClick={() => { service.setOpen(false); pinnedSummary.toggle() }}
           ><PanelIcon kind="summary" /></button>
