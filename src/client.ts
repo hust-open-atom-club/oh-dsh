@@ -588,7 +588,10 @@ function installHeroBranding(): () => void {
 }
 
 function focusComposer(): void {
-  document.querySelector<HTMLTextAreaElement>('textarea')?.focus()
+  // The 0.1.2 conversation composer is a contenteditable div; the terminal
+  // input remains a textarea. The composer wins when both exist.
+  document.querySelector<HTMLElement>('[data-composer-input="true"]')?.focus()
+    ?? document.querySelector<HTMLTextAreaElement>('textarea')?.focus()
 }
 
 function findSettingsButton(): HTMLButtonElement | undefined {
