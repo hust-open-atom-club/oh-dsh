@@ -1,5 +1,6 @@
 /** Floating pinned summary derived from the active DSH session. */
 
+import { acquireChromeLayer, releaseChromeLayer } from '../../shared/chrome-layer.ts'
 import type { LocaleService, Translate } from '../../shared/i18n.ts'
 import { localeTag } from '../../shared/i18n.ts'
 import {
@@ -62,20 +63,20 @@ html {
   --oh-dsh-pinned-summary-width: 304px;
 }
 
+/* Anchored inside the shared chrome layer (shared/chrome-layer.ts), which
+   already reserves the titlebar row: plain corner offsets sized against the
+   layer's own box instead of the viewport. */
 [data-oh-dsh-pinned-summary] {
-  position: fixed;
+  position: absolute;
   z-index: 9000;
   display: flex;
   flex-direction: column;
-  top: calc(var(--oh-dsh-titlebar-height, 40px) + 8px);
+  top: 8px;
   /* Follow the panel toolbar: stay clear of an open session details column. */
   right: calc(14px + var(--oh-dsh-details-width, 0px));
-  width: min(var(--oh-dsh-pinned-summary-width), calc(100vw - 28px));
+  width: min(var(--oh-dsh-pinned-summary-width), calc(100% - 28px));
   height: auto;
-  max-height: min(
-    420px,
-    calc(100vh - var(--oh-dsh-titlebar-height, 40px) - 20px)
-  );
+  max-height: min(420px, calc(100% - 20px));
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l1);
@@ -181,7 +182,7 @@ html {
 @media (max-width: 900px) {
   [data-oh-dsh-pinned-summary] {
     right: calc(8px + var(--oh-dsh-details-width, 0px));
-    width: min(var(--oh-dsh-pinned-summary-width), calc(100vw - 16px));
+    width: min(var(--oh-dsh-pinned-summary-width), calc(100% - 16px));
   }
 }
 
@@ -302,7 +303,7 @@ class PinnedSummaryService implements PinnedSummary {
         <p data-oh-dsh-summary-text></p>
       </div>
     `
-    document.body.append(panel)
+    acquireChromeLayer().append(panel)
     this.#panel = panel
     this.#title = required(panel, '[data-oh-dsh-summary-title]')
     this.#headerTitle = required(panel, '[data-oh-dsh-summary-header] span')
@@ -331,6 +332,7 @@ class PinnedSummaryService implements PinnedSummary {
     document.removeEventListener('keydown', this.#handleDocumentKeyDown)
     this.#panel?.remove()
     this.#style?.remove()
+    releaseChromeLayer()
     delete document.documentElement.dataset.ohDshSummaryPinned
   }
 
