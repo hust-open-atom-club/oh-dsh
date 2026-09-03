@@ -225,7 +225,7 @@ Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 
 | 推荐项目 | 说明 |
 | --- | --- |
-| [DeepSeek Harness](https://github.com/deepseek-harness/deepseek-harness) | DSH runtime、会话与插件加载器 |
+| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | DSH runtime、会话与插件加载器 |
 | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | **Oh-DSH TUI 的直接上游插件**，提供终端渲染、交互和命令体系 |
 | [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git Review、文件与 PTY Host 能力 |
 | [dsh-vision](https://github.com/william-jin-cmu/dsh-vision) | 跨 Desktop、Web 与 TUI 的 `view_image` 视觉工具参考实现 |

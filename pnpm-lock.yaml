@@ -60,6 +60,21 @@ importers:
         specifier: 0.1.1
         version: 0.1.1
 
+  plugins/about:
+    devDependencies:
+      '@types/react':
+        specifier: ~18.3.1
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+
   plugins/better-sidebar-runtime:
     dependencies:
       node-pty:

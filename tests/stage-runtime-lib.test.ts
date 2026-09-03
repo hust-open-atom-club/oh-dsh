@@ -57,8 +57,9 @@ function buildSurfaceFixture() {
 
   // Generic compiled plugins (vision adds a LICENSE, tui adds its patch).
   for (const name of [
-    'desktop-frame', 'skins', 'sidebar', 'panel-controls', 'pinned-summary',
-    'plugin-marketplace', 'vision', 'liangshen', 'tui', 'tui-marketplace',
+    'about', 'desktop-frame', 'skins', 'sidebar', 'panel-controls',
+    'pinned-summary', 'plugin-marketplace', 'vision', 'liangshen', 'tui',
+    'tui-marketplace',
   ]) {
     writeManifest(join(repo, 'plugins', name), {
       name: '@oh-dsh/' + name, version: '0.1.0', dependencies: {}, ohDsh: {},
@@ -142,6 +143,7 @@ function buildSurfaceFixture() {
 test('stage-runtime-lib keeps the official surface package manifest', () => {
   assert.deepEqual(sorted(SURFACE_PACKAGE_NAMES.desktop), [
     '@deepseek-harness-tui/dsh-auth',
+    '@oh-dsh/about',
     '@oh-dsh/better-sidebar-runtime',
     '@oh-dsh/desktop',
     '@oh-dsh/desktop-frame',
@@ -156,6 +158,7 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
   ])
   assert.deepEqual(sorted(SURFACE_PACKAGE_NAMES.web), [
     '@deepseek-harness-tui/dsh-auth',
+    '@oh-dsh/about',
     '@oh-dsh/better-sidebar-runtime',
     '@oh-dsh/liangshen',
     '@oh-dsh/panel-controls',
@@ -190,9 +193,9 @@ test('web surface installs exactly the official web closure', () => {
     const modules = join(runtime, 'node_modules')
     for (const name of [
       '@oh-dsh/web', '@oh-dsh/liangshen', '@oh-dsh/better-sidebar-runtime',
-      '@oh-dsh/vision', '@oh-dsh/skins', '@oh-dsh/pinned-summary',
-      '@oh-dsh/sidebar', '@oh-dsh/panel-controls', '@oh-dsh/plugin-marketplace',
-      'dsh-context', '@deepseek-harness-tui/dsh-auth',
+      '@oh-dsh/vision', '@oh-dsh/about', '@oh-dsh/skins',
+      '@oh-dsh/pinned-summary', '@oh-dsh/sidebar', '@oh-dsh/panel-controls',
+      '@oh-dsh/plugin-marketplace', 'dsh-context', '@deepseek-harness-tui/dsh-auth',
     ]) {
       assert.equal(existsSync(join(modules, ...name.split('/'))), true, name + ' registered')
     }

@@ -9,6 +9,7 @@ export type DesktopCommand =
   | { type: 'new-session' }
   | { type: 'open-paths'; paths: string[] }
   | { type: 'show-settings' }
+  | { type: 'show-about' }
   | { type: 'toggle-bottom-panel' }
   | { type: 'toggle-panel-maximized' }
   | { type: 'toggle-pinned-summary' }
@@ -54,6 +55,25 @@ export type DesktopUpdateState =
   | { status: 'unsupported'; currentVersion: string; platform: DesktopUpdatePlatform; message: string; releaseUrl: string | null }
   | { status: 'error'; currentVersion: string; stage: 'check' | 'download' | 'verify' | 'install'; code: string; message: string; releaseUrl: string | null; retryable: boolean }
 
+/**
+ * The About page's inline update flow: check, download with progress, and
+ * install, all driven from the About card. This deliberately mirrors the
+ * update window's user-visible states; the window itself stays available
+ * through `openUpdater` for the full presentation.
+ */
+export type AboutUpdateSnapshot =
+  | { status: 'idle'; currentVersion: string }
+  | { status: 'checking' }
+  | { status: 'not-available'; latestVersion: string }
+  | { status: 'available'; latestVersion: string }
+  | { status: 'downloading'; percent: number; transferred: number; total: number; bytesPerSecond: number }
+  | { status: 'downloaded'; latestVersion: string }
+  | { status: 'unsupported' }
+  | { status: 'error' }
+
+/** The only update commands the About page may drive. */
+export type AboutUpdateCommand = 'check' | 'download' | 'install-now'
+
 export type DesktopUpdateCommand =
   | { type: 'check' }
   | { type: 'download' }
@@ -87,6 +107,19 @@ export interface DesktopBridge {
   menuBarLabels(): Promise<string[]>
   /** Apply the renderer's active locale and return refreshed top-level labels. */
   setMenuLocale(locale: 'en' | 'zh'): Promise<string[]>
+  /** Open the software update window (check/download/install entry). */
+  openUpdater(): Promise<void>
+  /**
+   * Inline update flow for the About page: check, download with progress,
+   * and install. Mirrors the update window's user-visible states; the
+   * window itself stays available through `openUpdater`.
+   */
+  aboutUpdate: {
+    getSnapshot(): Promise<AboutUpdateSnapshot>
+    check(): Promise<AboutUpdateSnapshot>
+    command(command: AboutUpdateCommand): Promise<AboutUpdateSnapshot>
+    onState(listener: (snapshot: AboutUpdateSnapshot) => void): () => void
+  }
   onCommand(listener: (command: DesktopCommand) => void): () => void
   /** Subscribe to native maximize and restore events. */
   onWindowState(listener: (state: DesktopWindowState) => void): () => void

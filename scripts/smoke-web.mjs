@@ -127,6 +127,7 @@ for (const row of [
   'oh-sidebar',
   'oh-panel-controls',
   'oh-plugin-marketplace',
+  'oh-about',
   'dsh-context',
   'dsh-auth',
 ]) {
@@ -218,6 +219,7 @@ try {
     '@oh-dsh/panel-controls',
     '@oh-dsh/vision',
     '@oh-dsh/plugin-marketplace',
+    '@oh-dsh/about',
     'dsh-context',
   ]) {
     const row = bootEntries.find(entry => entry.id === pluginId)

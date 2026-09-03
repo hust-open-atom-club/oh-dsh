@@ -36,6 +36,7 @@ function pluginBadges(plugin: MarketplacePlugin): string {
   const badges: string[] = []
   if (plugin.installed) badges.push(plugin.enabled ? 'enabled' : 'disabled')
   if (plugin.updateAvailable) badges.push('update')
+  if (plugin.builtin) badges.push('built-in')
   if (plugin.protected) badges.push('managed')
   return badges.length === 0 ? '' : ` · ${badges.join(' · ')}`
 }
@@ -55,6 +56,10 @@ function handleKey(
   if (key.escape || (key.ctrl && input === 'c') || (key.ctrl && input === 'm')) {
     if (state.screen === 'detail') controller.openDetail(null)
     else close()
+    return
+  }
+  if (key.ctrl && input === 'b') {
+    controller.toggleBuiltins()
     return
   }
   if (key.return) {
@@ -83,28 +88,31 @@ function handleKey(
     return
   }
   const plugin = controller.selectedPlugin()
+  const canManage = plugin !== null
+    && plugin.protected === false
+    && plugin.mechanism !== 'unsupported'
   if (input === 'i' && state.screen === 'detail'
-    && plugin !== null && plugin.installed === false) {
+    && canManage && plugin.installed === false) {
     void controller.prepare('install', plugin.id)
     return
   }
   if (input === 'u' && state.screen === 'detail'
-    && plugin !== null && plugin.installed && plugin.updateAvailable) {
+    && canManage && plugin.installed && plugin.updateAvailable) {
     void controller.prepare('update', plugin.id)
     return
   }
   if (input === 'e' && state.screen === 'detail'
-    && plugin !== null && plugin.installed && plugin.enabled === false) {
+    && canManage && plugin.installed && plugin.enabled === false) {
     void controller.prepare('enable', plugin.id)
     return
   }
   if (input === 'd' && state.screen === 'detail'
-    && plugin !== null && plugin.installed && plugin.enabled) {
+    && canManage && plugin.installed && plugin.enabled) {
     void controller.prepare('disable', plugin.id)
     return
   }
   if (input === 'x' && state.screen === 'detail'
-    && plugin !== null && plugin.installed) {
+    && canManage && plugin.installed) {
     void controller.prepare('uninstall', plugin.id)
     return
   }
@@ -181,7 +189,10 @@ function renderList(
     h(Box, null,
       h(Text, { inverse: true }, clip(` /plugins  ${state.query}`, Math.max(24, columns - 40))),
       h(Text, null, ' '),
-      h(Text, { color: 'subtle' }, clip(`${plugins.length} plugins`, 14)),
+      h(Text, { color: 'subtle' }, clip(
+        `${plugins.length} plugins · built-ins: ${state.showBuiltins ? 'shown' : 'hidden'}`,
+        40,
+      )),
     ),
     state.error === null
       ? null
@@ -214,11 +225,14 @@ function renderDetail(
   if (plan !== null) actions.push('p=preview')
   if (preview !== null && preview !== undefined) actions.push('a=apply', 'n=discard')
   if (state.snapshot?.undoAvailable === true) actions.push('w=undo')
+  actions.push('ctrl+b=built-ins')
   actions.push('b=back')
   return h(Box, { flexDirection: 'column' },
     h(Text, { bold: true, inverse: true }, clip(` ${plugin.title} `, columns)),
     h(Text, { color: 'subtle' }, clip(
-      `${plugin.category} · ${plugin.installed ? (plugin.enabled ? 'enabled' : 'disabled') : 'not installed'}`,
+      `${plugin.category} · ${plugin.builtin
+        ? 'built-in'
+        : plugin.installed ? (plugin.enabled ? 'enabled' : 'disabled') : 'not installed'}`,
       columns,
     )),
     h(Box, { marginTop: 1 }, h(Text, null, clip(plugin.description, columns))),
@@ -298,6 +312,6 @@ export function TuiMarketplaceScene({
     state.busy ? h(Text, { color: 'subtle' }, 'Working…') : null,
   ),
   h(Text, { color: 'subtle' },
-    'Installs are shared; each plugin declares the surfaces where it takes effect.',
+    'Ctrl+B built-ins · installs are shared across surfaces.',
   ))
 }

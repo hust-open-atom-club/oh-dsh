@@ -404,7 +404,11 @@ host 插件（固定在 dsh-TUI 子模块内；TUI 通过其 renderer 加载同�
 | 退出侧栏专注模式 | `Esc` |
 
 设置页支持中英文、模型、权限、Agent preset、插件配置和 Oh-DSH 皮肤。
-设置弹窗会覆盖并虚化所有工作区和侧栏内容。
+设置弹窗会覆盖并虚化所有工作区和侧栏内容。“关于”分区列出当前构建的版本
+信息：Oh-DSH 本身、固定的上游 DeepSeek Harness 运行时、内置插件和关键依赖。
+Desktop 端在同一分区即可完成整个更新流程——检查更新、带实时进度的下载和
+安装，无需离开页面；检查时若无法访问 GitHub，更新器会通过发布镜像重试
+一次。Web 端只展示版本信息，不显示更新卡片。
 
 Web 与 Desktop 可在设置页选择皮肤。TUI 输入 `/theme` 可选择相同的 Deep
 Current、Jade Circuit、Porcelain 和 Ember Dusk；选择立即生效并在重启后保留。

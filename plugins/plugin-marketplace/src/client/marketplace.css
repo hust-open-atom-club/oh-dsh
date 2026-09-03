@@ -264,6 +264,13 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-sidebar-root {
   font-size: 12px;
 }
 
+.oh-marketplace-builtin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
 .oh-marketplace-status-tabs {
   display: flex;
   align-items: center;

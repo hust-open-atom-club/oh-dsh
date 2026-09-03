@@ -246,7 +246,10 @@ export function parseMarketplaceCatalog(
   const rows = legacyRows(value) ?? registryRows(value) ?? communityRows(value)
   if (rows === null) throw new Error('unsupported plugin catalog')
   const installedIds = new Set(installed.map(entry => entry.pluginId))
-  const plugins: MarketplacePlugin[] = rows.map(row => ({
+  const plugins: MarketplacePlugin[] = rows.map(row => {
+    const protectedPlugin = isProtectedMarketplacePlugin(row.id, row.repository)
+    return {
+      builtin: protectedPlugin,
       category: row.category,
       currentCommit: null,
       description: row.description,
@@ -256,7 +259,7 @@ export function parseMarketplaceCatalog(
       installed: installedIds.has(row.id),
       latestCommit: null,
       mechanism: row.mechanism,
-      protected: isProtectedMarketplacePlugin(row.id, row.repository),
+      protected: protectedPlugin,
       pushedAt: row.pushedAt,
       repository: row.repository,
       runtimeRisk: runtimeRisk(row.mechanism),
@@ -266,7 +269,8 @@ export function parseMarketplaceCatalog(
       trust: row.trust,
       updateAvailable: false,
       url: row.url,
-    }))
+    }
+  })
   plugins.sort((left, right) => {
     if (left.installed !== right.installed) return left.installed ? -1 : 1
     if (left.mechanism === 'unsupported' && right.mechanism !== 'unsupported') return 1

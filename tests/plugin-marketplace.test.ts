@@ -42,6 +42,7 @@ import {
   formatMarketplaceDate,
   marketplaceRepositoryDetails,
 } from '../plugins/plugin-marketplace/src/client/repository-metadata.ts'
+import { MARKETPLACE_MESSAGES } from '../plugins/plugin-marketplace/src/client/i18n.ts'
 import type {
   MarketplacePreviewProxyContext,
 } from '../plugins/plugin-marketplace/src/host/preview-proxy.ts'
@@ -439,6 +440,18 @@ test('catalog parser keeps safe entries and labels unsupported managers', () => 
     catalog.plugins.find(plugin => plugin.id === 'legacy-demo')?.surfaces,
     { declared: false, desktop: true, web: true, tui: true },
   )
+  const builtin = catalog.plugins.find(plugin => plugin.id === 'oh-dsh-desktop')
+  assert.equal(builtin?.builtin, true)
+  assert.equal(builtin?.protected, true)
+  assert.equal(builtin?.category, 'infra')
+  assert.equal(catalog.plugins.find(plugin => plugin.id === 'safe-demo')?.builtin, false)
+})
+
+test('marketplace built-in copy is complete in both browser locales', () => {
+  assert.equal(MARKETPLACE_MESSAGES.en.builtin, 'Built-in')
+  assert.equal(MARKETPLACE_MESSAGES.en['show-builtins'], 'Show built-in plugins')
+  assert.equal(MARKETPLACE_MESSAGES.zh.builtin, '内置')
+  assert.equal(MARKETPLACE_MESSAGES.zh['show-builtins'], '显示内置插件')
 })
 
 test('community and registry catalogs preserve repositories across owners', () => {
@@ -1049,6 +1062,51 @@ test('TUI marketplace loads repository metadata when details open', async () => 
   assert.equal(commands.length, 1)
 })
 
+test('TUI marketplace hides built-ins until the user reveals them', async () => {
+  const catalog = parseMarketplaceCatalog(catalogDocument()).plugins
+  const snapshot: MarketplaceSnapshot = {
+    auth: { detail: '', status: 'ready' },
+    busy: false,
+    catalog,
+    catalogGeneratedAt: null,
+    error: null,
+    installed: [],
+    lastAction: null,
+    lifecycle: { candidate: null, current: { profile: 'tui', state: 'live' }, previous: null },
+    plan: null,
+    preview: null,
+    sourceLocks: [],
+    undoAvailable: false,
+  }
+  const controller = new TuiMarketplaceController({
+    getSnapshot: async () => snapshot,
+    dispatch: async () => snapshot,
+  })
+
+  await controller.load()
+  assert.equal(controller.getSnapshot().showBuiltins, false)
+  assert.equal(controller.filteredPlugins().some(plugin => plugin.builtin), false)
+
+  controller.toggleBuiltins()
+  assert.equal(controller.getSnapshot().showBuiltins, true)
+  const builtin = controller.filteredPlugins().find(plugin => plugin.builtin)
+  assert.equal(builtin?.id, 'oh-dsh-desktop')
+  if (builtin === undefined) return
+
+  controller.openDetail(builtin.id)
+  controller.toggleBuiltins()
+  assert.equal(controller.getSnapshot().showBuiltins, false)
+  assert.equal(controller.getSnapshot().screen, 'list')
+  assert.equal(controller.getSnapshot().selectedId, null)
+  const tui = readFileSync(new URL(
+    '../plugins/tui-marketplace/src/marketplace.tsx',
+    import.meta.url,
+  ), 'utf8')
+  assert.match(tui, /key\.ctrl && input === 'b'/)
+  assert.match(tui, /plugin\.protected === false/)
+  assert.match(tui, /plugin\.builtin[\s\S]*?\? 'built-in'/)
+})
+
 test('TUI marketplace collects explicit risk confirmations before preview', async () => {
   const snapshot: MarketplaceSnapshot = {
     auth: { detail: '', status: 'ready' },
@@ -1186,6 +1244,20 @@ test('marketplace navigation preserves the Settings footer geometry', () => {
   assert.match(client, /\['available', t\('not-installed'\)\]/)
   assert.match(client, /\['updates', t\('updates'\)\]/)
   assert.match(client, /\['disabled', t\('disabled'\)\]/)
+  assert.match(client, /const \[showBuiltins, setShowBuiltins\] = useState\(false\)/)
+  assert.match(client, /value=\{BUILTIN_CATEGORY_FILTER\}>\{t\('builtin'\)\}/)
+  assert.match(client, /aria-label=\{t\('show-builtins'\)\}/)
+  assert.match(client, /showBuiltins \|\| !plugin\.builtin/)
+  assert.match(client, /return plugin\.installed \|\| plugin\.builtin/)
+  assert.match(client, /visibleCatalog\.filter\(presentationInstalled\)/)
+  assert.match(client, /statusFilter === 'installed' && !installed/)
+  assert.match(client, /statusFilter === 'available' && installed/)
+  assert.match(client, /plugin\.builtin \|\| !plugin\.updateAvailable/)
+  assert.match(client, /plugin\.builtin \|\| !plugin\.installed \|\| plugin\.enabled/)
+  assert.match(client, /plugin\.builtin \? t\('builtin'\)/)
+  assert.match(client, /plugin\.installed && !plugin\.builtin/)
+  assert.match(client, /!plugin\.builtin && plugin\.updateAvailable/)
+  assert.match(client, /plugin\.id === selectedId && plugin\.builtin/)
   assert.match(client, /type: 'prepare'/)
   assert.match(client, /confirmations\.includes\(requirement\)/)
   assert.match(client, /snapshot\.auth\.status !== 'ready' && snapshot\.catalog\.length === 0/)
@@ -1212,6 +1284,17 @@ test('marketplace navigation preserves the Settings footer geometry', () => {
   assert.match(client, /slots\.inject\('sidebar\.footer\.action'/)
   assert.doesNotMatch(client, /ctx\.slots/)
   assert.doesNotMatch(client, /parent\.insertBefore\(this\.#entry, settings\)/)
+})
+
+test('browser marketplace resets category filters removed with built-ins', () => {
+  const client = readFileSync(new URL(
+    '../plugins/plugin-marketplace/src/client/plugin.tsx',
+    import.meta.url,
+  ), 'utf8')
+
+  assert.match(client, /const remainingCategories = new Set\(\(snapshot\?\.catalog \?\? \[\]\)[\s\S]*?\.filter\(plugin => !plugin\.builtin\)[\s\S]*?\.map\(plugin => plugin\.category\)\)/)
+  assert.match(client, /categoryFilter !== 'all' && !remainingCategories\.has\(categoryFilter\)/)
+  assert.doesNotMatch(client, /categoryFilter === BUILTIN_CATEGORY_FILTER\) setCategoryFilter\('all'\)/)
 })
 
 test('marketplace startup disables manual refresh until refresh settles', () => {
@@ -1616,10 +1699,9 @@ test('the marketplace refuses to modify protected desktop plugins', async () => 
     })
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
-    assert.equal(
-      snapshot.catalog.find(plugin => plugin.id === 'oh-dsh-desktop')?.protected,
-      true,
-    )
+    const plugin = snapshot.catalog.find(candidate => candidate.id === 'oh-dsh-desktop')
+    assert.equal(plugin?.protected, true)
+    assert.equal(plugin?.builtin, true)
   } finally {
     setup.cleanup()
   }
@@ -1648,6 +1730,7 @@ test('the marketplace protects the bundled dsh-auth plugin', async () => {
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(snapshot.catalog[0]?.protected, true)
+    assert.equal(snapshot.catalog[0]?.builtin, true)
     assert.equal(setup.platform.commands.length, 0)
   } finally {
     setup.cleanup()
@@ -1677,6 +1760,7 @@ test('the marketplace protects the bundled dsh-context plugin', async () => {
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(snapshot.catalog[0]?.protected, true)
+    assert.equal(snapshot.catalog[0]?.builtin, true)
     assert.equal(setup.platform.commands.length, 0)
   } finally {
     setup.cleanup()
@@ -1706,6 +1790,7 @@ test('the marketplace protects the upstream Better Sidebar alias', async () => {
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(snapshot.catalog[0]?.protected, true)
+    assert.equal(snapshot.catalog[0]?.builtin, true)
     assert.equal(setup.platform.commands.length, 0)
   } finally {
     setup.cleanup()

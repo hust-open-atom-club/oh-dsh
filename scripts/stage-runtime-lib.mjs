@@ -64,6 +64,7 @@ export const SURFACE_PACKAGE_NAMES = Object.freeze({
     '@oh-dsh/better-sidebar-runtime',
     '@oh-dsh/vision',
     '@oh-dsh/desktop-frame',
+    '@oh-dsh/about',
     '@oh-dsh/skins',
     '@oh-dsh/sidebar',
     '@oh-dsh/panel-controls',
@@ -77,6 +78,7 @@ export const SURFACE_PACKAGE_NAMES = Object.freeze({
     '@oh-dsh/liangshen',
     '@oh-dsh/better-sidebar-runtime',
     '@oh-dsh/vision',
+    '@oh-dsh/about',
     '@oh-dsh/skins',
     '@oh-dsh/pinned-summary',
     '@oh-dsh/sidebar',
@@ -995,6 +997,7 @@ function installDesktopPackages(surface = 'all') {
       ],
     },
     ...[
+      'about',
       'desktop-frame',
       'skins',
       'sidebar',

@@ -44,6 +44,8 @@ import {
   type DesktopUpdateCommand,
   type DesktopWindowState,
   type DesktopUpdateState,
+  type AboutUpdateCommand,
+  type AboutUpdateSnapshot,
 } from './contracts.ts'
 import type { OhDshLocale } from '../plugins/shared/i18n.ts'
 import {
@@ -454,6 +456,12 @@ function sendUpdateState(state: DesktopUpdateState): void {
   updateWindow.webContents.send('desktop:update:state', state)
 }
 
+/** Mirror a narrow projection of update state changes to the main window. */
+function sendAboutUpdateState(state: DesktopUpdateState): void {
+  if (mainWindow === undefined || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('desktop:about-update:state', aboutUpdateSnapshot(state))
+}
+
 let updaterProxyBypassed = false
 
 function updaterSession() {
@@ -501,6 +509,7 @@ async function getUpdateManager(): Promise<DesktopUpdateManager> {
   })
   updateManager = manager
   manager.subscribe(sendUpdateState)
+  manager.subscribe(sendAboutUpdateState)
   manager.subscribe(notifyAvailableUpdate)
   return manager
 }
@@ -576,6 +585,38 @@ function assertUpdateWindowSender(event: { sender: Electron.WebContents }): void
   if (updateWindow === undefined || updateWindow.isDestroyed() || event.sender !== updateWindow.webContents) {
     throw new Error('update IPC is only available to the local update window')
   }
+}
+
+/** Project the full update state down to the About page's inline flow. */
+function aboutUpdateSnapshot(state: DesktopUpdateState): AboutUpdateSnapshot {
+  switch (state.status) {
+    case 'idle': return { status: 'idle', currentVersion: state.currentVersion }
+    case 'checking': return { status: 'checking' }
+    case 'not-available': return { status: 'not-available', latestVersion: state.checkedVersion }
+    case 'available': return { status: 'available', latestVersion: state.latestVersion }
+    case 'downloading': return {
+      status: 'downloading',
+      percent: state.percent,
+      transferred: state.transferred,
+      total: state.total,
+      bytesPerSecond: state.bytesPerSecond,
+    }
+    case 'downloaded': return { status: 'downloaded', latestVersion: state.latestVersion }
+    case 'scheduled': return { status: 'downloaded', latestVersion: state.latestVersion }
+    case 'cancelled': return { status: 'idle', currentVersion: state.currentVersion }
+    case 'unsupported': return { status: 'unsupported' }
+    case 'error': return state.retryable === true && state.stage === 'check'
+      ? { status: 'error' }
+      : { status: 'idle', currentVersion: state.currentVersion }
+  }
+}
+
+/** Parse an About-page update command. Only the inline flow's commands. */
+function parseAboutUpdateCommand(raw: unknown): AboutUpdateCommand {
+  if (typeof raw !== 'string' || !(['check', 'download', 'install-now'] as const).includes(raw as AboutUpdateCommand)) {
+    throw new Error('invalid about-update command')
+  }
+  return raw as AboutUpdateCommand
 }
 
 function parseUpdateCommand(raw: unknown): DesktopUpdateCommand {
@@ -1036,7 +1077,7 @@ function buildMenu(locale: OhDshLocale = menuLocale): void {
     {
       label: PRODUCT_NAME,
       submenu: [
-        { role: 'about', label: text.about },
+        { label: text.about, click: () => { sendCommand({ type: 'show-about' }) } },
         { type: 'separator' },
         { label: text.checkUpdates, click: () => { void openUpdateWindow() } },
         { type: 'separator' },
@@ -1235,6 +1276,36 @@ function installIpc(): void {
     return desktopInfo(preview)
   })
   ipcMain.handle('desktop:get-runtime-snapshot', () => desktopRuntimeSnapshot())
+  // The About settings page drives the inline update flow: check, download
+  // with progress, and install. The update window keeps its own full gated
+  // channels; About's command set is limited to the three inline steps.
+  ipcMain.handle('desktop:open-updater', event => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted updater sender')
+    void openUpdateWindow()
+  })
+  ipcMain.handle('desktop:about-update:get-state', async event => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted about-update sender')
+    return aboutUpdateSnapshot((await getUpdateManager()).getState())
+  })
+  ipcMain.handle('desktop:about-update:check', async event => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted about-update sender')
+    return aboutUpdateSnapshot(await (await getUpdateManager()).check())
+  })
+  ipcMain.handle('desktop:about-update:command', async (event, raw: unknown) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted about-update sender')
+    const command = parseAboutUpdateCommand(raw)
+    const manager = await getUpdateManager()
+    if (command === 'install-now') {
+      const current = manager.getState()
+      if (current.status !== 'downloaded') throw new Error('no downloaded update to install')
+      if (current.platform === 'deb') throw new Error('deb installers finish in the system package manager')
+      return aboutUpdateSnapshot(await scheduleImmediateUpdateInstall(manager, () => {
+        quittingForUpdate = true
+        app.quit()
+      }))
+    }
+    return aboutUpdateSnapshot(await manager.command({ type: command }))
+  })
   ipcMain.handle('desktop:plugin-marketplace-snapshot', (event) => {
     if (event.sender !== mainWindow?.webContents) throw new Error('untrusted marketplace sender')
     if (marketplace === undefined) throw new Error('plugin marketplace is not initialized')

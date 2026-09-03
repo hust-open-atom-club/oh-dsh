@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
@@ -10,6 +10,50 @@ const dist = join(root, 'dist')
 const productVersion = resolveProductVersion(root)
 const versionDefine = {
   __OH_DSH_BUILD_VERSION__: JSON.stringify(productVersion),
+  ...aboutVersionDefines(root),
+}
+
+// The About settings page renders facts that only exist in the repository
+// tree at build time: the pinned upstream DSH release, the bundled plugin
+// versions, and the key toolchain dependencies. Inject them as literals so
+// the packaged client never reads repository files at runtime. Upstream
+// pinned plugin versions live in submodule manifests; a missing submodule
+// checkout only drops that row instead of failing the build.
+function aboutVersionDefines(root) {
+  const readJson = path => JSON.parse(readFileSync(path, 'utf8'))
+  const sourceManifest = readJson(join(root, 'dsh-source.json'))
+  const sourceVersion = sourceManifest.version ?? '0.0.0'
+  const sourcePackage = String(sourceManifest.package ?? '')
+  const plugins = readdirSync(join(root, 'plugins'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => {
+      const manifest = readJson(join(root, 'plugins', entry.name, 'package.json'))
+      return { id: String(manifest.name), version: String(manifest.version) }
+    })
+  for (const [id, manifestPath] of [
+    ['dsh-context', join(root, 'upstream', 'dsh-context', 'package.json')],
+    ['@deepseek-harness-tui/dsh-auth', join(root, 'upstream', 'dsh-TUI', 'dsh-auth', 'package.json')],
+  ]) {
+    try {
+      const manifest = readJson(manifestPath)
+      plugins.push({ id, version: String(manifest.version) })
+    } catch {
+      // A missing submodule checkout only omits its About row.
+    }
+  }
+  plugins.sort((left, right) => left.id.localeCompare(right.id))
+  const manifest = readJson(join(root, 'package.json'))
+  const dependencies = [
+    { id: 'electron', version: String(manifest.devDependencies.electron) },
+    { id: 'electron-updater', version: String(manifest.dependencies['electron-updater']) },
+    { id: 'semver', version: String(manifest.dependencies.semver) },
+  ]
+  return {
+    __OH_DSH_SOURCE_VERSION__: JSON.stringify(sourceVersion),
+    __OH_DSH_SOURCE_PACKAGE__: JSON.stringify(sourcePackage),
+    __OH_DSH_PLUGIN_VERSIONS__: JSON.stringify(plugins),
+    __OH_DSH_DEPENDENCY_VERSIONS__: JSON.stringify(dependencies),
+  }
 }
 const nodeEsmRequireBanner = [
   "import { createRequire as __ohDshCreateRequire } from 'node:module';",
@@ -19,6 +63,7 @@ rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
+  { directory: 'about', id: '@oh-dsh/about' },
   { directory: 'better-sidebar-runtime', hostOnly: true },
   { directory: 'liangshen', hostOnly: true },
   {
@@ -169,7 +214,7 @@ for (const plugin of pluginPackages) {
       target: 'es2022',
       sourcemap: true,
       logLevel: 'info',
-      loader: { '.css': 'text' },
+      loader: { '.css': 'text', '.png': 'dataurl' },
       external: [
         ...(plugin.clientExternal ?? []),
         'react',
