@@ -28,9 +28,13 @@ subscription LLM route, `/reload` and `/restart`, and fixes a pnpm ≥ 11
   `./package.json` and the main entry from `require.resolve`
   (`@earendil-works/pi-ai` is the first such dependency).
 - The bundled `dsh-auth` is staged as the nested copy the renderer's
-  `link:./dsh-auth` resolution produces; Nix consumes the published
-  `@deepseek-harness-tui/dsh-auth@0.1.0` tarball through extra-deps, the
-  same published-artifact pattern as the renderer.
+  `link:./dsh-auth` resolution produces; Nix mounts the published
+  `@deepseek-harness-tui/dsh-auth@0.1.0` tarball into the repository-shaped
+  staging root, the same published-artifact pattern as the renderer.
+- The root pnpm workspace includes the nested `dsh-auth` package and records
+  its importer in the shared lockfile. pnpm deploy rewrites the renderer's
+  `link:./dsh-auth` as a file dependency; explicit workspace membership gives
+  that dependency a locked owner while preserving the pinned submodule source.
 - The guarded renderer adapter learns the new `/restart` command's
   description rewrite; every other 0.9.2 addition needed no adaptation.
 - The upstream fullscreen-default flip (now on by default upstream) is NOT
@@ -51,6 +55,11 @@ form.** Rejected: the nested copy already resolves at runtime and keeps the
 staged manifest byte-identical to the pinned source; only the Nix assembly
 needs the published form.
 
+**Use pnpm legacy deploy for Windows dependency closures.** Rejected: legacy
+deploy does not use the shared workspace lockfile and pnpm 11.21 leaves the
+nested package as a link to its source. The existing copy can dereference that
+link, but dependency resolution would no longer be pinned by the root lockfile.
+
 ## Consequences
 
 - The TUI gains 0.9.2 features (session identity, recap, paste folding,
@@ -65,3 +74,7 @@ needs the published form.
 - liangshen's preset revision moves to
   `liangshen-toolcall-full-catalog-subagents-durable-hint-v5` (durable
   instruction-hint dedupe) with no Oh-DSH-side test changes.
+- Windows TUI release staging preserves the renderer's bundled `dsh-auth`
+  through the deterministic shared-lock deploy path. The staging contract test
+  pins both workspace membership and the lockfile importer, and a
+  Windows-targeted full staging run covers the real deploy path.

@@ -25,6 +25,10 @@ import type {
   MarketplaceSurfaceSupport,
 } from '../protocol.ts'
 import { MARKETPLACE_MESSAGES, type MarketplaceMessage } from './i18n.ts'
+import {
+  formatMarketplaceDate,
+  marketplaceRepositoryStats,
+} from './repository-metadata.ts'
 import marketplaceCss from './marketplace.css'
 import {
   initialSessionNavigationState,
@@ -32,6 +36,8 @@ import {
   type SessionListSnapshot,
   type SessionNavigationState,
 } from './session-navigation.ts'
+
+const BUILTIN_CATEGORY_FILTER = '__oh_dsh_builtin__'
 
 interface ClientContext {
   effect(effect: () => (() => void) | void, label?: string): void
@@ -159,6 +165,7 @@ declare global {
 export const inject = ['locale', 'sessions', 'slots']
 
 const OPEN_KEY = 'oh-dsh-desktop.plugin-marketplace.open'
+
 const FOOTER_STACK_ATTRIBUTE = 'data-oh-dsh-marketplace-footer-stack'
 
 function readOpen(): boolean {
@@ -488,6 +495,10 @@ function mechanismLabel(
   return t(`mechanism.${plugin.mechanism}`)
 }
 
+function presentationInstalled(plugin: MarketplacePlugin): boolean {
+  return plugin.installed || plugin.builtin
+}
+
 function runtimeRiskLabel(
   plugin: MarketplacePlugin,
   t: Translate<MarketplaceMessage>,
@@ -507,6 +518,7 @@ function confirmationLabel(
   t: Translate<MarketplaceMessage>,
 ): string {
   if (confirmation === 'allow-build-scripts') return t('allow-scripts')
+  if (confirmation === 'accept-unsandboxed-build') return t('accept-unsandboxed-build')
   if (confirmation === 'accept-high-risk') return t('accept-high-risk')
   return t('accept-source-change')
 }
@@ -522,6 +534,7 @@ function PluginCard({
   select(): void
   t: Translate<MarketplaceMessage>
 }): JSX.Element {
+  const installed = presentationInstalled(plugin)
   return (
     <button
       className="oh-marketplace-card"
@@ -537,6 +550,11 @@ function PluginCard({
         </div>
       </div>
       <p className="oh-marketplace-card-description">{plugin.description}</p>
+      {plugin.stats !== null && (
+        <div className="oh-marketplace-card-stats" aria-label={t('github-stats')}>
+          {marketplaceRepositoryStats(plugin).map(stat => <span key={stat}>{stat}</span>)}
+        </div>
+      )}
       <div className="oh-marketplace-card-footer">
         <span
           className="oh-marketplace-pill"
@@ -544,17 +562,17 @@ function PluginCard({
         >
           {mechanismLabel(plugin, t)}
         </span>
-        {plugin.installed && (
+        {installed && (
           <span className="oh-marketplace-pill" data-installed="true">
             {t('installed')}
           </span>
         )}
-        {plugin.installed && (
+        {plugin.installed && !plugin.builtin && (
           <span className="oh-marketplace-pill" data-installed={String(plugin.enabled)}>
             {plugin.enabled ? t('enabled') : t('disabled')}
           </span>
         )}
-        {plugin.updateAvailable && (
+        {!plugin.builtin && plugin.updateAvailable && (
           <span className="oh-marketplace-pill" data-update="true">
             {t('update-available')}
           </span>
@@ -598,7 +616,9 @@ function PluginDetail({
   const hasScripts = plan !== null && Object.keys(plan.buildScripts).length > 0
   const readyToPreview = plan !== null
     && plan.requirements.every(requirement => confirmations.includes(requirement))
-  useEffect(() => { setConfirmations([]) }, [plugin.id, plan?.resolvedCommit])
+  useEffect(() => {
+    setConfirmations([])
+  }, [plugin.id, plan?.resolvedCommit, plan?.manifestHash, plan?.action])
   const setConfirmed = (
     confirmation: MarketplaceConfirmation,
     confirmed: boolean,
@@ -615,19 +635,20 @@ function PluginDetail({
       <div className="oh-marketplace-detail-inner">
         <button className="oh-marketplace-icon-button oh-marketplace-detail-close" onClick={close} type="button">×</button>
         <h2>{plugin.title}</h2>
-        <span className="oh-marketplace-pill" data-installed={String(plugin.installed)}>
-          {plugin.installed ? t('installed') : mechanismLabel(plugin, t)}
+        <span className="oh-marketplace-pill" data-installed={String(presentationInstalled(plugin))}>
+          {plugin.builtin ? t('builtin') : plugin.installed ? t('installed') : mechanismLabel(plugin, t)}
         </span>
         <p className="oh-marketplace-detail-description">{plugin.description}</p>
         <dl className="oh-marketplace-facts">
           <dt>{t('category')}</dt><dd>{plugin.category}</dd>
           <dt>{t('mechanism')}</dt><dd>{mechanismLabel(plugin, t)}</dd>
           <dt>{t('updated')}</dt>
-          <dd>
-            {plugin.pushedAt === null
-              ? t('unknown')
-              : new Date(plugin.pushedAt).toLocaleString(localeTag(locale))}
-          </dd>
+          <dd>{formatMarketplaceDate(plugin.stats?.updatedAt ?? plugin.pushedAt, localeTag(locale), t('unknown'))}</dd>
+          <dt>{t('stars')}</dt><dd>{plugin.stats?.stars ?? t('unknown')}</dd>
+          <dt>{t('forks')}</dt><dd>{plugin.stats?.forks ?? t('unknown')}</dd>
+          <dt>{t('open-issues')}</dt><dd>{plugin.stats?.openIssues ?? t('unknown')}</dd>
+          <dt>{t('language')}</dt><dd>{plugin.stats?.language ?? t('unknown')}</dd>
+          <dt>{t('license')}</dt><dd>{plugin.stats?.license ?? t('unknown')}</dd>
           <dt>{t('surfaces')}</dt><dd>{surfaceSupportLabel(plugin, t)}</dd>
           <dt>{t('repository')}</dt><dd>{plugin.url.replace('https://github.com/', '')}</dd>
           <dt>{t('trust')}</dt><dd>{t(`trust.${plugin.trust}`)}</dd>
@@ -794,6 +815,11 @@ function localizedHostMessage(
     const action = t(`action.${match[1] as 'install' | 'update' | 'enable' | 'disable' | 'uninstall'}`)
     return t('notice.preview-ready', { action, plugin: match[2] })
   }
+  match = /^(install|update|enable|disable|uninstall) preview is ready for (.+) without process isolation\.$/.exec(message)
+  if (match !== null) {
+    const action = t(`action.${match[1] as 'install' | 'update' | 'enable' | 'disable' | 'uninstall'}`)
+    return t('notice.preview-ready-unisolated', { action, plugin: match[2] })
+  }
   match = /^Discarded the (.+) preview without changing the profile\.$/.exec(message)
   if (match !== null) return t('notice.discarded', { plugin: match[1] })
   match = /^Applied (.+); the previous profile remains available for Undo\.$/.exec(message)
@@ -819,9 +845,11 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
     'all' | 'installed' | 'available' | 'updates' | 'disabled'
   >('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [showBuiltins, setShowBuiltins] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const openedPreviewRef = useRef<string | null>(null)
   const previewReservationRef = useRef<MarketplacePreviewReservation | null>(null)
+  const requestedStatsRef = useRef(new Set<string>())
 
   const run = useCallback(async (command: MarketplaceCommand): Promise<void> => {
     setPending(true)
@@ -872,43 +900,62 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
     return () => { alive = false }
   }, [bridge])
 
+  const visibleCatalog = useMemo(
+    () => (snapshot?.catalog ?? []).filter(plugin => showBuiltins || !plugin.builtin),
+    [showBuiltins, snapshot?.catalog],
+  )
   const categories = useMemo(() => {
-    return [...new Set(snapshot?.catalog.map(plugin => plugin.category) ?? [])].sort()
-  }, [snapshot?.catalog])
+    return [...new Set(visibleCatalog.map(plugin => plugin.category))].sort()
+  }, [visibleCatalog])
   const statusCounts = useMemo(() => {
-    const catalog = snapshot?.catalog ?? []
-    const installed = catalog.filter(plugin => plugin.installed).length
+    const installed = visibleCatalog.filter(presentationInstalled).length
     return {
-      all: catalog.length,
-      available: catalog.length - installed,
-      disabled: catalog.filter(plugin => plugin.installed && !plugin.enabled).length,
+      all: visibleCatalog.length,
+      available: visibleCatalog.length - installed,
+      disabled: visibleCatalog.filter(plugin => !plugin.builtin
+        && plugin.installed && !plugin.enabled).length,
       installed,
-      updates: catalog.filter(plugin => plugin.updateAvailable).length,
+      updates: visibleCatalog.filter(plugin => !plugin.builtin && plugin.updateAvailable).length,
     }
-  }, [snapshot?.catalog])
+  }, [visibleCatalog])
   const plugins = useMemo(() => {
     const needle = search.trim().toLowerCase()
-    return (snapshot?.catalog ?? []).filter(plugin => {
-      if (statusFilter === 'installed' && !plugin.installed) return false
-      if (statusFilter === 'available' && plugin.installed) return false
-      if (statusFilter === 'updates' && !plugin.updateAvailable) return false
-      if (statusFilter === 'disabled' && (!plugin.installed || plugin.enabled)) return false
-      if (categoryFilter !== 'all' && plugin.category !== categoryFilter) return false
+    return visibleCatalog.filter(plugin => {
+      const installed = presentationInstalled(plugin)
+      if (statusFilter === 'installed' && !installed) return false
+      if (statusFilter === 'available' && installed) return false
+      if (statusFilter === 'updates' && (plugin.builtin || !plugin.updateAvailable)) return false
+      if (statusFilter === 'disabled'
+        && (plugin.builtin || !plugin.installed || plugin.enabled)) return false
+      if (categoryFilter === BUILTIN_CATEGORY_FILTER && !plugin.builtin) return false
+      if (categoryFilter !== 'all'
+        && categoryFilter !== BUILTIN_CATEGORY_FILTER
+        && plugin.category !== categoryFilter) return false
       return needle === '' || [plugin.title, plugin.description, plugin.category, ...plugin.tags]
         .some(value => value.toLowerCase().includes(needle))
     })
-  }, [categoryFilter, search, snapshot?.catalog, statusFilter])
+  }, [categoryFilter, search, statusFilter, visibleCatalog])
   const selected = plugins.find(plugin => plugin.id === selectedId) ?? null
   const error = localError ?? snapshot?.error ?? null
+
+  useEffect(() => {
+    if (selectedId === null || snapshot === null) return
+    const plugin = snapshot.catalog.find(candidate => candidate.id === selectedId)
+    if (plugin === undefined || plugin.stats !== null || requestedStatsRef.current.has(selectedId)) return
+    requestedStatsRef.current.add(selectedId)
+    void run({ type: 'load-repository-stats', pluginId: selectedId })
+  }, [run, selectedId, snapshot?.catalog])
   const resetView = (): void => {
     setSearch('')
     setStatusFilter('all')
     setCategoryFilter('all')
     setSelectedId(null)
   }
-
   useEffect(() => {
-    if (viewState.open) resetView()
+    if (viewState.open) {
+      requestedStatsRef.current.clear()
+      resetView()
+    }
   }, [viewState.open])
 
   useEffect(() => {
@@ -949,7 +996,7 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
           </header>
           {snapshot?.preview !== null && snapshot?.preview !== undefined && (
             <div className="oh-marketplace-preview-banner">
-              <strong>{t('preview.running', { plugin: snapshot.preview.pluginId })}</strong>
+              <strong>{t(snapshot.preview.isolated === false ? 'preview.running-unisolated' : 'preview.running', { plugin: snapshot.preview.pluginId })}</strong>
               <button className="oh-marketplace-button" disabled={pending} onClick={() => { void run({ type: 'discard' }) }} type="button">
                 {t('discard')}
               </button>
@@ -1017,8 +1064,34 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
                 value={categoryFilter}
               >
                 <option value="all">{t('all-categories')}</option>
+                {showBuiltins && visibleCatalog.some(plugin => plugin.builtin) && (
+                  <option value={BUILTIN_CATEGORY_FILTER}>{t('builtin')}</option>
+                )}
                 {categories.map(category => <option key={category} value={category}>{category}</option>)}
               </select>
+              <label className="oh-marketplace-filter oh-marketplace-builtin-toggle">
+                <input
+                  aria-label={t('show-builtins')}
+                  checked={showBuiltins}
+                  onChange={event => {
+                    const checked = event.target.checked
+                    setShowBuiltins(checked)
+                    if (!checked) {
+                      const remainingCategories = new Set((snapshot?.catalog ?? [])
+                        .filter(plugin => !plugin.builtin)
+                        .map(plugin => plugin.category))
+                      if (categoryFilter !== 'all' && !remainingCategories.has(categoryFilter)) {
+                        setCategoryFilter('all')
+                      }
+                      if (snapshot?.catalog.some(plugin => (
+                        plugin.id === selectedId && plugin.builtin
+                      )) === true) setSelectedId(null)
+                    }
+                  }}
+                  type="checkbox"
+                />
+                <span>{t('show-builtins')}</span>
+              </label>
               <span className="oh-marketplace-count">
                 {t('plugin-count', { count: plugins.length })}
               </span>

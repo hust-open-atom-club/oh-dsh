@@ -9,7 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -97,6 +97,15 @@ function download(url, target) {
   rmSync(temporary, { force: true })
 }
 
+function extractTarball(archive, extraction) {
+  if (dirname(archive) !== dirname(extraction)) {
+    throw new Error('tar archive and extraction directory must share a parent')
+  }
+  run('tar', ['-xzf', basename(archive), '-C', basename(extraction)], {
+    cwd: dirname(archive),
+  })
+}
+
 /**
  * Resolve a pnpm CLI matching the pinned release. Git checkouts declare
  * their own `packageManager`; npm release assemblies do not, so they fall
@@ -128,7 +137,7 @@ export function resolvePinnedPnpm(source) {
     const extraction = join(cache, `.pnpm-extract-${String(process.pid)}`)
     rmSync(extraction, { recursive: true, force: true })
     mkdirSync(extraction, { recursive: true })
-    run('tar', ['-xzf', archive, '-C', extraction])
+    extractTarball(archive, extraction)
     rmSync(installRoot, { recursive: true, force: true })
     mkdirSync(dirname(cliRoot), { recursive: true })
     renameSync(join(extraction, 'package'), cliRoot)
@@ -233,7 +242,7 @@ function acquireNpmAssembly(target, archive) {
   rmSync(extraction, { recursive: true, force: true })
   mkdirSync(extraction, { recursive: true })
   try {
-    run('tar', ['-xzf', archive, '-C', extraction])
+    extractTarball(archive, extraction)
     const unpacked = join(extraction, 'package')
     if (!existsSync(unpacked)) {
       throw new Error(`DSH npm package did not unpack to ${unpacked}`)

@@ -1,6 +1,7 @@
 # Agent Note: One-row desktop chrome via the Windows Window Controls Overlay
 
 Status: implemented
+Archived: 2026-08-26
 
 English | [中文](2026-08-17-desktop-single-row-titlebar.zh.md)
 

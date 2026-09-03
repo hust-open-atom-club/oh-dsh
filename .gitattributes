@@ -1,0 +1,12 @@
+# Normalize line endings: LF in the repository and the working tree.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF in the working tree because cmd.exe and some
+# PowerShell execution policies misparse LF-only files.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets must never be normalized.
+*.icns binary
+*.png binary

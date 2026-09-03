@@ -36,11 +36,15 @@ declare global {
 }
 
 const DESKTOP_CHROME_CSS = `
+/* Every desktop surface publishes the chrome row height. macOS and Windows
+   spend it on the in-page title bar; framed platforms spend it inside the
+   frame, where the floating panel toolbar lives. */
 html[data-oh-dsh-desktop='true'] {
   --oh-dsh-titlebar-height: ${DESKTOP_TITLEBAR_HEIGHT}px;
 }
 
-html[data-oh-dsh-desktop='true'] body {
+html[data-oh-dsh-desktop-platform='darwin'] body,
+html[data-oh-dsh-desktop-platform='win32'] body {
   box-sizing: border-box;
   padding-top: var(--oh-dsh-titlebar-height);
   border: 1px solid var(--dsw-alias-border-l1);
@@ -48,7 +52,8 @@ html[data-oh-dsh-desktop='true'] body {
   overflow: hidden;
 }
 
-html[data-oh-dsh-desktop='true'] body::before {
+html[data-oh-dsh-desktop-platform='darwin'] body::before,
+html[data-oh-dsh-desktop-platform='win32'] body::before {
   content: '';
   position: fixed;
   z-index: 2147483645;
@@ -62,12 +67,38 @@ html[data-oh-dsh-desktop='true'] body::before {
   user-select: none;
 }
 
-/* Keep the panel toolbar clear of the Windows window-controls overlay. */
-html[data-oh-dsh-desktop='true'] .oh-dsh-panel-toolbar {
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-titlebar-drag-region {
+  position: fixed;
+  z-index: 2147483646;
+  top: 0;
+  left: 88px;
+  right: 112px;
+  height: var(--oh-dsh-titlebar-height);
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-panel-toolbar,
+html[data-oh-dsh-desktop-platform='win32'] .oh-dsh-panel-toolbar {
   z-index: 2147483647;
   top: 4px;
-  right: 154px;
+  padding: 1px;
   -webkit-app-region: no-drag;
+}
+
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-panel-toolbar button,
+html[data-oh-dsh-desktop-platform='win32'] .oh-dsh-panel-toolbar button {
+  width: 28px;
+  height: 28px;
+}
+
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-panel-toolbar {
+  right: 8px;
+}
+
+/* Keep the panel toolbar clear of the Windows window actions. */
+html[data-oh-dsh-desktop-platform='win32'] .oh-dsh-panel-toolbar {
+  right: 154px;
 }
 
 /* In-page menu bar: fills the blank strip corner on Windows with the real
@@ -310,6 +341,41 @@ html[data-oh-dsh-desktop='true']:has(
   position: relative;
 }
 
+/* Portal overlays that hand the document a bare top-level dialog own their
+   own fixed chrome, and pinned upstream UI parks its lightbox close button
+   20px below the viewport top — inside the in-page titlebar row this surface
+   reserves on macOS and Windows, where the opaque strip paints over anything
+   below its z-index and half the control disappears. Structure, not classes:
+   the pinned runtime is hashed per build, so the contract is "a body-level
+   modal dialog's direct close button". macOS shares the reserved row; Linux
+   keeps its native frame and Web never loads the chrome stylesheet.
+
+   The lightbox backdrop keeps upstream's 40px gutter width but restores
+   its symmetry below the reserved row: uniform 40px on all four sides,
+   laid out inside the region under the strip (the strip replaces the top
+   gutter the viewport used to provide), and the image's own 100vh-based
+   ceiling shrinks by the titlebar and the gutters so tall previews never
+   re-overflow behind the strip. The close button rides the same gutter
+   grid at its corner. Upstream styles load after this sheet and win ties
+   at equal specificity, so the rules carry !important — the same
+   authority the sheet's dialog demotion rules already rely on. */
+html[data-oh-dsh-desktop-platform='darwin'] body > [role='dialog'][aria-modal='true'],
+html[data-oh-dsh-desktop-platform='win32'] body > [role='dialog'][aria-modal='true'] {
+  top: var(--oh-dsh-titlebar-height, 40px) !important;
+  padding: 40px !important;
+}
+
+html[data-oh-dsh-desktop-platform='darwin'] body > [role='dialog'][aria-modal='true'] > img,
+html[data-oh-dsh-desktop-platform='win32'] body > [role='dialog'][aria-modal='true'] > img {
+  max-height: calc(100vh - var(--oh-dsh-titlebar-height, 40px) - 80px) !important;
+}
+
+html[data-oh-dsh-desktop-platform='darwin'] body > [role='dialog'][aria-modal='true'] > button,
+html[data-oh-dsh-desktop-platform='win32'] body > [role='dialog'][aria-modal='true'] > button {
+  top: calc(var(--oh-dsh-titlebar-height, 40px) + 8px) !important;
+  right: 8px !important;
+}
+
 `
 
 /** Wait for the DSH services used by native menu commands. */
@@ -342,17 +408,27 @@ const DESKTOP_SHELL_MESSAGES: LocaleMessages<DesktopShellMessage> = {
   },
 }
 
-function installDesktopChrome(): () => void {
+function installDesktopChrome(platform: NodeJS.Platform): () => void {
   const originalTitle = document.title
   const style = document.createElement('style')
   style.dataset.ohDshDesktopChrome = 'true'
   style.textContent = DESKTOP_CHROME_CSS
   document.head.append(style)
   document.documentElement.dataset.ohDshDesktop = 'true'
+  document.documentElement.dataset.ohDshDesktopPlatform = platform
+  let dragRegion: HTMLDivElement | undefined
+  if (platform === 'darwin') {
+    dragRegion = document.createElement('div')
+    dragRegion.className = 'oh-dsh-titlebar-drag-region'
+    dragRegion.setAttribute('aria-hidden', 'true')
+    document.body.append(dragRegion)
+  }
   document.title = 'Oh-DSH Desktop'
   return () => {
+    dragRegion?.remove()
     style.remove()
     delete document.documentElement.dataset.ohDshDesktop
+    delete document.documentElement.dataset.ohDshDesktopPlatform
     document.title = originalTitle
   }
 }
@@ -545,6 +621,44 @@ function showSettings(): void {
   findSettingsButton()?.click()
 }
 
+/** Select the settings nav entry whose label matches, e.g. the About page. */
+function selectSettingsSection(pattern: RegExp): boolean {
+  const dialog = document.querySelector<HTMLDivElement>('[role="dialog"][aria-modal="true"]')
+  const nav = dialog?.querySelector('nav')
+  if (nav === null || nav === undefined) return false
+  const cell = [...nav.querySelectorAll<HTMLButtonElement>('button')]
+    .find(button => pattern.test([
+      button.textContent,
+      button.getAttribute('aria-label'),
+      button.getAttribute('title'),
+    ].filter(Boolean).join(' ')))
+  if (cell === undefined) return false
+  cell.click()
+  return true
+}
+
+function showAbout(): void {
+  // The About nav lives inside the settings panel, so open the dialog first.
+  // Clicking the trigger when the dialog is already open would close it, so
+  // only click while it is closed.
+  const dialogOpen = () => document.querySelector('[role="dialog"][aria-modal="true"]') !== null
+  if (!dialogOpen()) {
+    findSettingsButton()?.click()
+  }
+  // The panel and its nav mount on React's next commit after the trigger
+  // click (or after the settings plugin boots), so poll across frames until
+  // the nav renders, then select About. A timeout keeps an early menu click
+  // from looping forever if the settings trigger never appears.
+  const started = performance.now()
+  const attempt = (): void => {
+    if (selectSettingsSection(/about|关于/i)) return
+    if (performance.now() - started < 2_000) {
+      requestAnimationFrame(attempt)
+    }
+  }
+  attempt()
+}
+
 async function openPaths(workspaces: WorkspacesService, paths: readonly string[]): Promise<void> {
   for (const path of paths) {
     const workspace = await workspaces.create({ path })
@@ -573,6 +687,9 @@ function dispatch(
       return
     case 'show-settings':
       showSettings()
+      return
+    case 'show-about':
+      showAbout()
       return
     case 'toggle-sidebar':
       panels.toggleSidebar()
@@ -645,7 +762,7 @@ export function apply(ctx: ClientContext): void {
         plugin: previewPluginId,
       })
     }
-    const removeDesktopChrome = installDesktopChrome()
+    const removeDesktopChrome = installDesktopChrome(bridge.platform)
     const removeHeroBranding = installHeroBranding()
     const unsubscribeLocale = locale.subscribe(renderPreviewLabel)
     let removeMenuBar: (() => void) | undefined

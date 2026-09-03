@@ -18,6 +18,10 @@ model — required a full Oh-DSH Desktop release before users could get it.
   `.stage/dsh-runtime` tree the application packages, so pnpm assembly,
   desktop plugin injection, the settings-boundary patch, and the Linux
   landlock launcher all keep running at build time.
+- `dsh-source.mjs` re-extracts the integrity-checked npm assembly before each
+  stage. Tar receives the archive and extraction directory as basenames under
+  their shared parent directory, so Windows Git Bash cannot interpret a drive
+  letter in the archive operand as a remote host.
 - `src/runtime-update.ts` adds a `RuntimeUpdateManager` in the main
   process: check GitHub Releases for the newest bundle newer than the
   active runtime, download with progress, verify the published SHA-256,
@@ -74,3 +78,7 @@ model — required a full Oh-DSH Desktop release before users could get it.
 - Reuse the marketplace plugin transaction: the marketplace swaps profile
   bundles, not the base runtime the profile runs on; rejected for the
   base-runtime swap, though the verify-then-activate shape mirrors it.
+- Pass absolute Windows paths to tar with `--force-local`: rejected because
+  the release uses the host tar implementation on every platform, while a
+  shared working directory and relative operands need no implementation-
+  specific option.

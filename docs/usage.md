@@ -187,6 +187,11 @@ installer may request administrator approval.
 The window title bar, menu bar, and tool strip are merged into a single row;
 open the application menu from the labels in the row's left corner.
 
+Closing the window minimizes Oh-DSH Desktop to the system tray instead of
+quitting: click the tray icon to restore the window, and use **Quit Oh-DSH
+Desktop** in the tray (or application) menu to exit. macOS and Linux keep
+their usual close behavior.
+
 ### Desktop online updates
 
 Choose **Oh-DSH Desktop -> Check for Updates...** from the application menu.
@@ -388,7 +393,13 @@ demand while that window has capacity.
 | Leave sidebar focus mode | `Esc` |
 
 Settings covers language, models, permissions, Agent presets, plugin config,
-and Oh-DSH skins. Its modal covers and blurs every workspace and sidebar.
+and Oh-DSH skins. Its modal covers and blurs every workspace and sidebar. The
+About section lists this build's versions: Oh-DSH itself, the pinned upstream
+DeepSeek Harness runtime, bundled plugins, and key dependencies. On Desktop
+the same section also runs the full update flow — check for updates, download
+with live progress, and install — without leaving the page; if GitHub cannot
+be reached during a check, the updater retries once through a release mirror.
+Web shows the version inventory without the update card.
 
 Choose a skin from Settings on Web or Desktop. In TUI, run `/theme` to select
 the same Deep Current, Jade Circuit, Porcelain, or Ember Dusk palette. The
@@ -404,9 +415,12 @@ uninstall. Desktop and Web use the sidebar marketplace; in TUI run `/plugins`
 (or press `Ctrl+M`) to open the terminal marketplace.
 
 The catalog labels the surfaces where each plugin is expected to take effect.
-Installation itself succeeds on all three surfaces; if a plugin declares Web
-or Desktop support only, it will not take effect in TUI after installation,
-and the cards and details call that out explicitly.
+Installation itself succeeds on all three surfaces when the required preview
+sandbox is available; if a plugin declares Web or Desktop support only, it will
+not take effect in TUI after installation, and the cards and details call that
+out explicitly. Linux x64 uses the staged Landlock launcher for scripted builds.
+If no write-restricted sandbox is available, a direct human can separately
+accept an explicitly labelled unsafe build; Agents cannot authorize that mode.
 
 Recommended flow:
 

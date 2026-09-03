@@ -5,13 +5,17 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
   nativeTheme,
   net,
   Notification,
+  screen,
   session,
   shell,
+  Tray,
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
+  type NativeImage,
 } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { createWriteStream, existsSync, mkdirSync, readFileSync, statSync, type WriteStream } from 'node:fs'
@@ -28,7 +32,7 @@ import {
 } from '../plugins/plugin-marketplace/src/host/agent-gateway.ts'
 import {
   findGitHubCli,
-  previewSandboxPolicy,
+  previewRuntimeLauncher,
   ProductionMarketplacePlatform,
   withGitHubCredentials,
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
@@ -40,6 +44,8 @@ import {
   type DesktopUpdateCommand,
   type DesktopWindowState,
   type DesktopUpdateState,
+  type AboutUpdateCommand,
+  type AboutUpdateSnapshot,
 } from './contracts.ts'
 import type { OhDshLocale } from '../plugins/shared/i18n.ts'
 import {
@@ -59,6 +65,7 @@ import {
   type BundledRuntimePaths,
 } from './runtime-paths.ts'
 import { resolveProductVersion } from './version.ts'
+import { resolveLandlockLauncher } from './landlock-launcher.ts'
 import {
   RuntimeUpdateManager,
   resolveStagedRuntimeRoot,
@@ -94,6 +101,8 @@ let logStream: WriteStream | undefined
 let updateWindow: BrowserWindow | undefined
 let updateManager: DesktopUpdateManager | undefined
 let runtimeUpdateManager: RuntimeUpdateManager | undefined
+let tray: Tray | undefined
+let trayHideNoticeShown = false
 let quittingForUpdate = false
 let quitting = false
 let transitioning = false
@@ -245,6 +254,7 @@ function previewRuntimeOptions(input: {
   dshHome: string
   pluginId: string
   sandboxRoot: string
+  sandboxed: boolean
   transactionId: string
 }): DshRuntimeOptions {
   const paths = runtimePaths()
@@ -255,9 +265,11 @@ function previewRuntimeOptions(input: {
   if (!existsSync(paths.nodeBinary)) throw new Error(`packaged Node runtime is missing: ${paths.nodeBinary}`)
   if (!existsSync(paths.cliEntry)) throw new Error(`packaged DSH CLI is missing: ${paths.cliEntry}`)
   const preview = { pluginId: input.pluginId, transactionId: input.transactionId }
-  const sandbox = '/usr/bin/sandbox-exec'
-  const launcher = process.platform === 'darwin' && existsSync(sandbox)
-    ? { args: ['-p', previewSandboxPolicy(input.sandboxRoot)], command: sandbox }
+  const launcher = input.sandboxed
+    ? previewRuntimeLauncher({
+      root: input.sandboxRoot,
+      sandbox: resolveLandlockLauncher(paths.runtimeRoot),
+    })
     : undefined
   return {
     args: ['--profile', DESKTOP_PROFILE],
@@ -316,6 +328,21 @@ function brandIconDataUrl(): string | null {
   return `data:image/png;base64,${readFileSync(path).toString('base64')}`
 }
 
+function trayIconImage(): NativeImage | undefined {
+  // Packaged builds carry only the 512px window icon beside resources/;
+  // development has the rendered 16px set. The tray needs a small bitmap
+  // sized for the primary display, or Windows scales it blurry.
+  const packaged = join(process.resourcesPath, 'oh-dsh-desktop.png')
+  const development = join(currentDir, '..', 'assets', 'icons', '16x16.png')
+  const path = existsSync(packaged) ? packaged : existsSync(development) ? development : undefined
+  if (path === undefined) return undefined
+  const image = nativeImage.createFromPath(path)
+  if (image.isEmpty()) return undefined
+  const size = Math.max(16, Math.round(16 * screen.getPrimaryDisplay().scaleFactor))
+  const resized = image.resize({ height: size, width: size })
+  return resized.isEmpty() ? undefined : resized
+}
+
 function createWindow(options: { preview?: boolean; title?: string } = {}): BrowserWindow {
   const icon = windowIconPath()
   const window = new BrowserWindow({
@@ -348,6 +375,18 @@ function createWindow(options: { preview?: boolean; title?: string } = {}): Brow
   }
   window.on('maximize', sendWindowState)
   window.on('unmaximize', sendWindowState)
+  window.on('close', (event) => {
+    // With a tray alive, closing the main window hides it instead of
+    // quitting; preview windows and an already-running quit pass through.
+    // The tray only exists on win32, so macOS and Linux close unchanged.
+    if (options.preview === true || tray === undefined || quitting || quittingForUpdate) return
+    event.preventDefault()
+    window.hide()
+    if (!trayHideNoticeShown) {
+      trayHideNoticeShown = true
+      tray.displayBalloon({ iconType: 'info', title: PRODUCT_NAME, content: labels(menuLocale).trayNotice })
+    }
+  })
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = undefined
     if (previewWindow === window) {
@@ -417,6 +456,12 @@ function sendUpdateState(state: DesktopUpdateState): void {
   updateWindow.webContents.send('desktop:update:state', state)
 }
 
+/** Mirror a narrow projection of update state changes to the main window. */
+function sendAboutUpdateState(state: DesktopUpdateState): void {
+  if (mainWindow === undefined || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('desktop:about-update:state', aboutUpdateSnapshot(state))
+}
+
 let updaterProxyBypassed = false
 
 function updaterSession() {
@@ -464,6 +509,7 @@ async function getUpdateManager(): Promise<DesktopUpdateManager> {
   })
   updateManager = manager
   manager.subscribe(sendUpdateState)
+  manager.subscribe(sendAboutUpdateState)
   manager.subscribe(notifyAvailableUpdate)
   return manager
 }
@@ -539,6 +585,38 @@ function assertUpdateWindowSender(event: { sender: Electron.WebContents }): void
   if (updateWindow === undefined || updateWindow.isDestroyed() || event.sender !== updateWindow.webContents) {
     throw new Error('update IPC is only available to the local update window')
   }
+}
+
+/** Project the full update state down to the About page's inline flow. */
+function aboutUpdateSnapshot(state: DesktopUpdateState): AboutUpdateSnapshot {
+  switch (state.status) {
+    case 'idle': return { status: 'idle', currentVersion: state.currentVersion }
+    case 'checking': return { status: 'checking' }
+    case 'not-available': return { status: 'not-available', latestVersion: state.checkedVersion }
+    case 'available': return { status: 'available', latestVersion: state.latestVersion }
+    case 'downloading': return {
+      status: 'downloading',
+      percent: state.percent,
+      transferred: state.transferred,
+      total: state.total,
+      bytesPerSecond: state.bytesPerSecond,
+    }
+    case 'downloaded': return { status: 'downloaded', latestVersion: state.latestVersion }
+    case 'scheduled': return { status: 'downloaded', latestVersion: state.latestVersion }
+    case 'cancelled': return { status: 'idle', currentVersion: state.currentVersion }
+    case 'unsupported': return { status: 'unsupported' }
+    case 'error': return state.retryable === true && state.stage === 'check'
+      ? { status: 'error' }
+      : { status: 'idle', currentVersion: state.currentVersion }
+  }
+}
+
+/** Parse an About-page update command. Only the inline flow's commands. */
+function parseAboutUpdateCommand(raw: unknown): AboutUpdateCommand {
+  if (typeof raw !== 'string' || !(['check', 'download', 'install-now'] as const).includes(raw as AboutUpdateCommand)) {
+    throw new Error('invalid about-update command')
+  }
+  return raw as AboutUpdateCommand
 }
 
 function parseUpdateCommand(raw: unknown): DesktopUpdateCommand {
@@ -675,6 +753,7 @@ async function startPreviewSurface(input: {
   dshHome: string
   pluginId: string
   sandboxRoot: string
+  sandboxed: boolean
   transactionId: string
 }): Promise<{ url?: string }> {
   await stopPreviewSurface()
@@ -812,24 +891,26 @@ async function installLocalPlugin(): Promise<void> {
   }
 }
 
-function createPluginMarketplace(): PluginMarketplaceManager | undefined {
-  if (desktopReadOnly) return undefined
+function createPluginMarketplace(): PluginMarketplaceManager {
   const info = desktopInfo()
-  ensureDesktopProfile(info.dshHome)
+  if (!desktopReadOnly) ensureDesktopProfile(info.dshHome)
   const paths = runtimePaths()
   const workingDirectory = join(info.appDataPath, 'plugin-marketplace')
-  mkdirSync(workingDirectory, { recursive: true, mode: 0o700 })
+  if (!desktopReadOnly) mkdirSync(workingDirectory, { recursive: true, mode: 0o700 })
   const environment = runtimeEnvironment(paths)
   return new PluginMarketplaceManager({
     appDataPath: info.appDataPath,
     dshHome: info.dshHome,
+    ...(desktopReadOnly ? { readOnly: true } : {}),
     onWarn: line => { appendLog('desktop', `[marketplace] ${line}`) },
     platform: new ProductionMarketplacePlatform({
+      appDataPath: info.appDataPath,
       cliEntry: paths.cliEntry,
-      cwd: workingDirectory,
+      ...(desktopReadOnly ? { cacheReadOnly: true } : { cwd: workingDirectory }),
       env: environment,
       nodeBinary: paths.nodeBinary,
       pnpmEntry: paths.pnpmEntry,
+      sandboxLauncher: resolveLandlockLauncher(paths.runtimeRoot),
       onLog: line => { appendLog('desktop', `[marketplace] ${line}`) },
     }),
     profile: DESKTOP_PROFILE,
@@ -875,6 +956,8 @@ function labels(locale: OhDshLocale) {
     resetZoom: '重置缩放',
     settings: '设置…',
     selectAll: '全选',
+    show: '显示主窗口',
+    trayNotice: 'Oh-DSH 仍在系统托盘中运行，点击托盘图标可恢复窗口。要退出请使用托盘菜单中的“退出 Oh-DSH Desktop”。',
     toggleBottomPanel: '切换底部面板',
     toggleDevTools: '切换开发者工具',
     toggleFullscreen: '切换全屏',
@@ -922,6 +1005,8 @@ function labels(locale: OhDshLocale) {
     resetZoom: 'Reset Zoom',
     settings: 'Settings…',
     selectAll: 'Select All',
+    show: 'Show Main Window',
+    trayNotice: 'Oh-DSH keeps running in the system tray. Click the tray icon to restore the window; use Quit in the tray menu to exit.',
     toggleBottomPanel: 'Toggle Bottom Panel',
     toggleDevTools: 'Toggle Developer Tools',
     toggleFullscreen: 'Toggle Full Screen',
@@ -947,6 +1032,40 @@ function labels(locale: OhDshLocale) {
   }
 }
 
+function revealMainWindow(): void {
+  if (mainWindow !== undefined && !mainWindow.isDestroyed()) {
+    mainWindow.show()
+    mainWindow.focus()
+    return
+  }
+  mainWindow = createWindow()
+  if (runtimeUrl !== undefined) void mainWindow.loadURL(runtimeUrl.href).then(flushQueuedPaths)
+  else void showSplash({ error: true, message: 'DeepSeek Harness 未运行，请从“DSH”菜单重新启动。' })
+}
+
+function buildTrayMenu(): Menu {
+  const text = labels(menuLocale)
+  return Menu.buildFromTemplate([
+    { label: text.show, click: () => { revealMainWindow() } },
+    { type: 'separator' },
+    { label: text.quit, click: () => { app.quit() } },
+  ])
+}
+
+function createTray(): Tray | undefined {
+  // Close-to-tray is a Windows affordance; macOS and Linux keep their dock
+  // and close-quits behavior. A missing icon leaves the close behavior
+  // exactly as before instead of trapping a window with no tray.
+  if (process.platform !== 'win32') return undefined
+  const icon = trayIconImage()
+  if (icon === undefined) return undefined
+  const trayInstance = new Tray(icon)
+  trayInstance.setToolTip(PRODUCT_NAME)
+  trayInstance.setContextMenu(buildTrayMenu())
+  trayInstance.on('click', () => { revealMainWindow() })
+  return trayInstance
+}
+
 function buildMenu(locale: OhDshLocale = menuLocale): void {
   menuLocale = locale
   const text = labels(locale)
@@ -958,7 +1077,7 @@ function buildMenu(locale: OhDshLocale = menuLocale): void {
     {
       label: PRODUCT_NAME,
       submenu: [
-        { role: 'about', label: text.about },
+        { label: text.about, click: () => { sendCommand({ type: 'show-about' }) } },
         { type: 'separator' },
         { label: text.checkUpdates, click: () => { void openUpdateWindow() } },
         { type: 'separator' },
@@ -1059,6 +1178,7 @@ function buildMenu(locale: OhDshLocale = menuLocale): void {
   ]
   applicationMenu = Menu.buildFromTemplate(template)
   Menu.setApplicationMenu(applicationMenu)
+  tray?.setContextMenu(buildTrayMenu())
 }
 
 /** The native application menu, popped up by the in-page Windows menu bar. */
@@ -1156,13 +1276,45 @@ function installIpc(): void {
     return desktopInfo(preview)
   })
   ipcMain.handle('desktop:get-runtime-snapshot', () => desktopRuntimeSnapshot())
-  ipcMain.handle('desktop:plugin-marketplace-snapshot', () => {
+  // The About settings page drives the inline update flow: check, download
+  // with progress, and install. The update window keeps its own full gated
+  // channels; About's command set is limited to the three inline steps.
+  ipcMain.handle('desktop:open-updater', event => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted updater sender')
+    void openUpdateWindow()
+  })
+  ipcMain.handle('desktop:about-update:get-state', async event => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted about-update sender')
+    return aboutUpdateSnapshot((await getUpdateManager()).getState())
+  })
+  ipcMain.handle('desktop:about-update:check', async event => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted about-update sender')
+    return aboutUpdateSnapshot(await (await getUpdateManager()).check())
+  })
+  ipcMain.handle('desktop:about-update:command', async (event, raw: unknown) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted about-update sender')
+    const command = parseAboutUpdateCommand(raw)
+    const manager = await getUpdateManager()
+    if (command === 'install-now') {
+      const current = manager.getState()
+      if (current.status !== 'downloaded') throw new Error('no downloaded update to install')
+      if (current.platform === 'deb') throw new Error('deb installers finish in the system package manager')
+      return aboutUpdateSnapshot(await scheduleImmediateUpdateInstall(manager, () => {
+        quittingForUpdate = true
+        app.quit()
+      }))
+    }
+    return aboutUpdateSnapshot(await manager.command({ type: command }))
+  })
+  ipcMain.handle('desktop:plugin-marketplace-snapshot', (event) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted marketplace sender')
     if (marketplace === undefined) throw new Error('plugin marketplace is not initialized')
     return marketplace.getSnapshot()
   })
-  ipcMain.handle('desktop:plugin-marketplace-dispatch', async (_event, raw: unknown) => {
+  ipcMain.handle('desktop:plugin-marketplace-dispatch', async (event, raw: unknown) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('untrusted marketplace sender')
     if (marketplace === undefined) throw new Error('plugin marketplace is not initialized')
-    return await marketplace.dispatch(parseMarketplaceCommand(raw))
+    return await marketplace.dispatch(parseMarketplaceCommand(raw), 'human-ui')
   })
   ipcMain.handle('desktop:open-external', async (_event, raw: unknown) => {
     if (typeof raw !== 'string') throw new Error('external URL must be a string')
@@ -1269,23 +1421,23 @@ async function bootstrap(): Promise<void> {
   browserSession.setPermissionRequestHandler((_webContents, _permission, callback) => { callback(false) })
   browserSession.setPermissionCheckHandler(() => false)
   buildMenu(systemLocale())
+  tray = createTray()
   mainWindow = createWindow()
   await showSplash()
   const initialArguments = process.argv.slice(app.isPackaged ? 1 : 2)
   queuedPaths.push(...initialArguments.filter(argument => !argument.startsWith('-')))
   await restartRuntime()
 
-  app.on('activate', () => {
-    if (mainWindow !== undefined && !mainWindow.isDestroyed()) {
-      mainWindow.show()
-      return
-    }
-    mainWindow = createWindow()
-    if (runtimeUrl !== undefined) void mainWindow.loadURL(runtimeUrl.href).then(flushQueuedPaths)
-    else void showSplash({ error: true, message: 'DeepSeek Harness 未运行，请从“DSH”菜单重新启动。' })
-  })
+  app.on('activate', () => { revealMainWindow() })
   app.on('window-all-closed', () => {
+    // While the tray owns the hidden main window the app stays alive; a
+    // quit already in progress finishes on its own without re-entering.
+    if (process.platform === 'win32' && tray !== undefined && !quitting) return
     if (process.platform !== 'darwin') app.quit()
+  })
+  app.on('will-quit', () => {
+    tray?.destroy()
+    tray = undefined
   })
   app.on('before-quit', (event) => {
     if (quitting) return

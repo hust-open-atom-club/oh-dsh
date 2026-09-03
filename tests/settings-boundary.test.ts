@@ -76,8 +76,8 @@ test('Nix assembly applies the shared settings boundary', () => {
     'utf8',
   )
   const boundary = nix.indexOf('${../scripts/settings-boundary.mjs}')
-  const registration = nix.indexOf('${./register-plugins.py}')
+  const assembly = nix.indexOf('${ohDshBundle}/lib/oh-dsh/dsh-runtime')
   assert.ok(boundary >= 0)
-  assert.ok(registration >= 0)
-  assert.ok(boundary < registration)
+  assert.ok(assembly >= 0)
+  assert.ok(assembly < boundary)
 })

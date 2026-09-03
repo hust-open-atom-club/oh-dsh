@@ -1,5 +1,11 @@
 html {
   --oh-dsh-sidebar-width: 300px;
+  /* What the toolbar takes from the top-right corner of the conversation
+     column: its own 95px body plus the 14px window inset and an 8px gap
+     (117px), less the top bar's own 28px right padding — so the Session log
+     control ends up visually 8px clear of the toolbar. The session top bar's
+     utilities stand down by this much so the toolbar can own the corner. */
+  --oh-dsh-toolbar-clearance: 89px;
 }
 
 #oh-dsh-embedded-layout {
@@ -36,7 +42,22 @@ html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-sidebar-root {
   position: fixed;
   z-index: 2147483647;
   top: 5px;
-  right: 14px;
+  /* The toolbar owns the corner; the session top bar's utilities stand clear
+     of it instead. What still moves the toolbar is whatever squeezes the
+     conversation column — the details column and the side tools panel — plus
+     one 8px gap; 14px is the resting inset, and min() is the last-resort cap
+     for a stacked layout. */
+  right: min(
+    max(
+      14px,
+      calc(
+        8px
+        + var(--oh-dsh-details-width, 0px)
+        + var(--oh-dsh-workspace-panel-inset, 0px)
+      )
+    ),
+    calc(100vw - 460px)
+  );
   display: flex;
   align-items: center;
   gap: 3px;
@@ -45,7 +66,51 @@ html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-sidebar-root {
   border-radius: 10px;
   background: color-mix(in srgb, var(--dsw-alias-bg-base, #fff) 92%, transparent);
   box-shadow: 0 1px 5px rgb(0 0 0 / 5%);
+  transition: right 180ms var(--ds-ease-in-out, ease);
   -webkit-app-region: no-drag;
+}
+
+
+/* An active session lines the conversation top bar's controls up on this row:
+   match the Session log button's height and center so the toolbar reads as a
+   neighbour rather than a sticker sitting half a row too high. */
+html[data-oh-dsh-session-active='true'] .oh-dsh-panel-toolbar {
+  top: 11px;
+}
+
+html[data-oh-dsh-session-active='true'] .oh-dsh-panel-toolbar button {
+  width: 28px;
+  height: 28px;
+}
+
+/* Framed platforms: the toolbar owns the top-right corner, so the session top
+   bar's utilities (Session log) stand down by the toolbar's clearance. The
+   slot name is a DSH contract, unlike the hashed utility classes around it,
+   and :has() reaches the utility wrapper that carries no stable class. macOS
+   and Windows keep their title bar row, so their column never shares this
+   corner. While the side panel is maximized the toolbar is docked at the
+   bottom, so the utilities take their natural place again. */
+html[data-oh-dsh-desktop='true']:not([data-oh-dsh-desktop-platform='darwin']):not([data-oh-dsh-desktop-platform='win32']):not([data-oh-dsh-side-panel-maximized='true'])
+  [data-slot='conversation.session.header']
+  :has(> [data-slot='conversation.session.header.utilities']) {
+  margin-right: var(--oh-dsh-toolbar-clearance, 89px);
+}
+
+/* Maximized, the side panel owns the top row end to end: Session log is
+   squeezed to the far left and no horizontal inset can clear it, so the
+   toolbar drops to the bottom corner instead of hovering in the middle of the
+   panel. It stays reachable — the panel header has no restore control of its
+   own, so the toolbar's toggle is still the way back. */
+html[data-oh-dsh-side-panel-maximized='true'] .oh-dsh-panel-toolbar {
+  top: auto;
+  bottom: 14px;
+  right: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oh-dsh-panel-toolbar {
+    transition: none;
+  }
 }
 
 .oh-dsh-panel-toolbar button {

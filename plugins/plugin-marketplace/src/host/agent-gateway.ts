@@ -98,7 +98,7 @@ export async function startMarketplaceAgentGateway(
       }
       const command = parseMarketplaceCommand(record.command)
       if (!isDeferred(command)) {
-        const snapshot = await manager.dispatch(command)
+        const snapshot = await manager.dispatch(command, 'agent')
         json(response, 200, { accepted: true, deferred: false, snapshot })
         return
       }
@@ -113,7 +113,7 @@ export async function startMarketplaceAgentGateway(
       deferredPending = true
       json(response, 202, { accepted: true, deferred: true, snapshot })
       setTimeout(() => {
-        void manager.dispatch(command)
+        void manager.dispatch(command, 'agent')
           .then(result => {
             if (result.error !== null) options.onError?.(new Error(result.error))
           })

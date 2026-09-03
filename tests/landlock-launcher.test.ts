@@ -14,6 +14,7 @@ import {
   landlockLauncherPackageName,
   restoreLandlockLauncher,
 } from '../scripts/landlock-launcher.mjs'
+import { landlockPreviewCommand, resolveLandlockLauncher } from '../src/landlock-launcher.ts'
 
 const packageVersion = '0.1.1'
 
@@ -87,4 +88,46 @@ test('Linux staging fails when the published Landlock launcher is missing', () =
 test('desktop pins the published Linux x64 Landlock launcher package', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   assert.equal(manifest.optionalDependencies?.[landlockLauncherPackageName], packageVersion)
+})
+
+test('resolves and invokes the staged Linux x64 launcher', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-landlock-'))
+  const launcher = join(root, 'node_modules', ...landlockLauncherPackageName.split('/'), 'bin', 'landlock-run')
+  try {
+    mkdirSync(dirname(launcher), { recursive: true })
+    writeFileSync(launcher, 'launcher', { mode: 0o755 })
+    const resolved = resolveLandlockLauncher(root, 'linux', 'x64')
+    assert.equal(resolved, launcher)
+    assert.deepEqual(landlockPreviewCommand({
+      launcher,
+      nodeBinary: '/runtime/node',
+      nodeArguments: ['/runtime/cli.js', '--profile', 'desktop'],
+      root,
+    }), {
+      command: launcher,
+      args: ['--ro', '/', '--rw', root, '--rw', '/dev/null', '--', '/runtime/node', '/runtime/cli.js', '--profile', 'desktop'],
+    })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('Nix packaging pins and stages the Linux x64 Landlock launcher', () => {
+  const nix = readFileSync(new URL('../nix/oh-dsh.nix', import.meta.url), 'utf8')
+  assert.ok(nix.includes('node-addon-landlock-run-linux-x64-0.1.1.tgz'))
+  assert.ok(nix.includes('sha512-OHAzPW2Coe/iYobAJAAA8CeVrBoKV4BnNHsgwvXwOfishxkUVSWSvdyxrZPiwYRXutpIGVrSo9zV3WOQy2euBA=='))
+  assert.ok(nix.includes('system == "x86_64-linux"'))
+  assert.ok(nix.includes('restoreLandlockLauncher'))
+  assert.ok(nix.includes('test -x "$landlock_package/bin/landlock-run"'))
+  assert.ok(nix.includes('$src/scripts/stage-runtime-lib.mjs stage-pnpm'))
+  assert.ok(nix.includes('test -f "$out/node-runtime/lib/node_modules/pnpm/bin/pnpm.mjs"'))
+  assert.ok(nix.includes('test -f "$out/node-runtime/bin/pnpm"'))
+  assert.ok(nix.includes('install-packages'))
+  assert.ok(nix.includes('--release-graph'))
+  assert.ok(nix.includes('SURFACE_PACKAGE_NAMES'))
+})
+
+test('does not resolve Landlock for unsupported targets', () => {
+  assert.equal(resolveLandlockLauncher('/missing', 'darwin', 'x64'), undefined)
+  assert.equal(resolveLandlockLauncher('/missing', 'linux', 'arm64'), undefined)
 })

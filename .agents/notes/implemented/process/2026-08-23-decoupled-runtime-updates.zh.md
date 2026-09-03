@@ -17,6 +17,9 @@ Desktop 才能到达用户。
   `.sha256`）。该 bundle 就是应用打包用的同一份 `.stage/dsh-runtime`
   树，因此 pnpm 装配、桌面插件注入、settings boundary 补丁和 Linux
   landlock 启动器仍在构建期完成。
+- `dsh-source.mjs` 在每次暂存前重新解压已通过完整性校验的 npm assembly。
+  tar 在 archive 与 extraction directory 的共同父目录下接收两个 basename，
+  因而 Windows Git Bash 不会把 archive 参数中的盘符解释成远程主机。
 - `src/runtime-update.ts` 在主进程新增 `RuntimeUpdateManager`：检查
   GitHub Release 中比当前运行时更新的最新 bundle，带进度下载，校验
   发布的 SHA-256，用系统 tar 解压到 `~/.ohdsh/runtimes/<version>/`，
@@ -62,3 +65,5 @@ Desktop 才能到达用户。
 - 复用 marketplace 插件事务：marketplace 交换的是 profile bundle，
   不是承载该 profile 的基础运行时；基础运行时切换未复用，但"验证后
   激活"的形态与之一致。
+- 向 tar 传绝对 Windows 路径并加 `--force-local`：不采用。release 在各平台
+  使用宿主 tar 实现；切换到共同工作目录并传相对参数，无需依赖实现专属选项。

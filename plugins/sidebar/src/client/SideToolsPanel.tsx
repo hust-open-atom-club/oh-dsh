@@ -523,6 +523,40 @@ export function SideToolsPanel(props: SideToolsPanelProps): JSX.Element {
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
   }
+  // The floating toolbar lives above this panel, so it has to stand clear of
+  // it while the panel is open. Publish the footprint on the root element:
+  // the toolbar is mounted outside the panel's own subtree.
+  const panelRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const root = document.documentElement
+    if (props.open && props.maximized) root.dataset.ohDshSidePanelMaximized = 'true'
+    else delete root.dataset.ohDshSidePanelMaximized
+    return () => { delete root.dataset.ohDshSidePanelMaximized }
+  }, [props.open, props.maximized])
+  useEffect(() => {
+    const root = document.documentElement
+    const element = panelRef.current
+    if (!props.open || element === null) {
+      root.style.setProperty('--oh-dsh-workspace-panel-inset', '0px')
+      return
+    }
+    const publish = (): void => {
+      // The panel squeezes the conversation column, so its whole footprint
+      // (width plus any offset from the right edge) shifts the session top bar.
+      const { width, right } = element.getBoundingClientRect()
+      root.style.setProperty(
+        '--oh-dsh-workspace-panel-inset',
+        `${Math.round(width + (globalThis.innerWidth - right))}px`,
+      )
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+      root.style.setProperty('--oh-dsh-workspace-panel-inset', '0px')
+    }
+  }, [props.open, props.maximized, props.width])
   const title = activeTab?.title ?? props.t('side.title')
   const renderProps: DesktopSidebarRenderProps | undefined = activeTab === undefined
     ? undefined
@@ -539,6 +573,7 @@ export function SideToolsPanel(props: SideToolsPanelProps): JSX.Element {
       : descriptor.render(renderProps)
   return (
     <aside
+      ref={panelRef}
       className="oh-dsh-workspace-panel oh-dsh-side-panel"
       data-open={String(props.open)}
       data-maximized={String(props.maximized)}

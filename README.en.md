@@ -242,7 +242,7 @@ or only TUI with `pnpm run dist:tui`.
 
 | Recommended project | Description |
 | --- | --- |
-| [DeepSeek Harness](https://github.com/deepseek-harness/deepseek-harness) | DSH runtime, sessions, and plugin loader |
+| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | DSH runtime, sessions, and plugin loader |
 | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | **Direct upstream plugin for Oh-DSH TUI**, providing terminal rendering, interaction, and commands |
 | [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git review, files, and PTY host capabilities |
 | [dsh-vision](https://github.com/william-jin-cmu/dsh-vision) | Reference for the cross-surface `view_image` vision tool |

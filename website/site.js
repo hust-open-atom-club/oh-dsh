@@ -2,10 +2,18 @@ const repositoryUrl = "https://github.com/hust-open-atom-club/oh-dsh";
 const latestReleaseUrl = `${repositoryUrl}/releases/latest`;
 const releaseApiUrl =
     "https://api.github.com/repos/hust-open-atom-club/oh-dsh/releases/latest";
+const atomgitRepositoryUrl =
+    "https://atomgit.com/hust-open-atom-club/oh-dsh";
+const atomgitReleasesUrl = `${atomgitRepositoryUrl}/releases`;
+const atomgitReleaseApiUrl =
+    "https://api.atomgit.com/api/v5/repos/hust-open-atom-club/oh-dsh/releases/latest";
 const releasesApiUrl =
     "https://api.github.com/repos/hust-open-atom-club/oh-dsh/releases?per_page=100";
 const downloadsCacheKey = "oh-dsh-site-downloads";
 const downloadsCacheTtl = 30 * 60 * 1000;
+const qqGroupShareUrl = "https://qm.qq.com/q/2uEd11lkWk";
+const qqGroupSchemeUrl =
+    "mqqapi://card/show_pslcard?src_type=internal&version=1&uin=554359007&card_type=group&source=qrcode";
 
 const translations = {
     "zh-CN": {
@@ -29,12 +37,14 @@ const translations = {
         downloadReady: "准备下载",
         downloadTitle: "下载前，顺手点亮一颗 Star？",
         downloadDescription:
-            "Oh-DSH 完全开源。你的 Star 会帮助更多开发者发现它，随后我们会继续下载。",
+            "Oh-DSH 完全开源。可前往 GitHub 点亮 Star 并继续下载，或直接使用 AtomGit 镜像；国内网络下可能更快。",
         detectedPlatform: "已识别当前平台",
         starAndDownload: "去 GitHub Star，并继续下载",
-        directDownload: "直接下载",
+        githubDirectDownload: "直接从 GitHub 下载",
+        atomgitMirrorDownload: "从 AtomGit 镜像下载",
         unknownPlatform: "其他平台",
         footer: "开放、可组合的 DeepSeek Harness 工作台",
+        qqGroup: "QQ 群",
         screenshotAlt: "Oh-DSH Desktop 深色界面，包含工作区、对话和插件入口",
         pageDescription:
             "Oh-DSH 以一套 DSH runtime 提供 Desktop、Web UI 与 TUI 三种开发体验。",
@@ -60,12 +70,14 @@ const translations = {
         downloadReady: "Ready to download",
         downloadTitle: "Before you go, leave us a Star?",
         downloadDescription:
-            "Oh-DSH is fully open source. Your Star helps more developers find it, and your download will continue.",
+            "Oh-DSH is fully open source. Star it on GitHub and continue downloading, or use the AtomGit mirror directly; it may be faster in mainland China.",
         detectedPlatform: "Detected platform",
         starAndDownload: "Star on GitHub and continue",
-        directDownload: "Download directly",
+        githubDirectDownload: "Download directly from GitHub",
+        atomgitMirrorDownload: "Download from AtomGit mirror",
         unknownPlatform: "Other platform",
         footer: "An open, composable DeepSeek Harness workbench",
+        qqGroup: "QQ Group",
         screenshotAlt:
             "Oh-DSH Desktop dark interface with workspace, conversation, and plugin navigation",
         pageDescription:
@@ -74,10 +86,10 @@ const translations = {
 };
 
 const elements = {
+    atomgitDownload: document.querySelector("[data-atomgit-download]"),
     descriptionMeta: document.querySelector('meta[name="description"]'),
     dialog: document.querySelector("[data-download-dialog]"),
     dialogClose: document.querySelector("[data-dialog-close]"),
-    directDownload: document.querySelector("[data-direct-download]"),
     downloadCount: document.querySelector("[data-download-count]"),
     downloadTrigger: document.querySelector("[data-download-trigger]"),
     installCaption: document.querySelector("[data-install-caption]"),
@@ -85,8 +97,10 @@ const elements = {
     installCopy: document.querySelector("[data-install-copy]"),
     installCopyLabel: document.querySelector("[data-install-copy] [data-i18n]"),
     languageToggle: document.querySelector("[data-language-toggle]"),
+    githubDownload: document.querySelector("[data-github-download]"),
     platformLabel: document.querySelector("[data-platform-label]"),
     particles: document.querySelector("[data-harness-particles]"),
+    qqGroupLink: document.querySelector("[data-qq-group-link]"),
     starCount: document.querySelector("[data-star-count]"),
     starDownload: document.querySelector("[data-star-download]"),
 };
@@ -345,10 +359,25 @@ function chooseReleaseAsset(assets) {
     })[0];
 }
 
-function setDownloadUrl(url) {
-    elements.downloadTrigger.href = url;
-    elements.directDownload.href = url;
-    elements.starDownload.href = url;
+function setDownloadUrls(elements, url) {
+    elements.forEach((element) => {
+        element.href = url;
+    });
+}
+
+function loadReleaseDownloads(apiUrl, fallbackUrl, elements) {
+    return fetch(apiUrl)
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
+        .then((release) => {
+            const asset = chooseReleaseAsset(release.assets ?? []);
+            setDownloadUrls(
+                elements,
+                asset?.browser_download_url ?? release.html_url ?? fallbackUrl,
+            );
+        })
+        .catch(() => {
+            setDownloadUrls(elements, fallbackUrl);
+        });
 }
 
 function showCopyFeedback() {
@@ -418,6 +447,40 @@ elements.dialog.addEventListener("click", (event) => {
 
 if (elements.installCopy && elements.installCommand) {
     elements.installCopy.addEventListener("click", copyInstallCommand);
+}
+
+function openQqGroup(event) {
+    // Modified and non-left clicks keep the native share-page navigation.
+    if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+    ) {
+        return;
+    }
+    event.preventDefault();
+
+    // Aim the click at an installed QQ client first; when no client claims
+    // the private scheme, the share page still offers a manual join.
+    const fallback = window.setTimeout(() => {
+        window.location.href = qqGroupShareUrl;
+    }, 2000);
+    const claimed = () => window.clearTimeout(fallback);
+    window.addEventListener("blur", claimed, { once: true });
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+            if (document.hidden) claimed();
+        },
+        { once: true },
+    );
+    window.location.href = qqGroupSchemeUrl;
+}
+
+if (elements.qqGroupLink) {
+    elements.qqGroupLink.addEventListener("click", openQqGroup);
 }
 
 elements.starDownload.addEventListener("click", () => {
@@ -541,16 +604,22 @@ if (typeof fetch === "function") {
               .catch(() => {})
         : Promise.resolve();
 
-    architecturePromise
-        .then(() => fetch(releaseApiUrl))
-        .then((response) => (response.ok ? response.json() : Promise.reject()))
-        .then((release) => {
-            const asset = chooseReleaseAsset(release.assets ?? []);
-            setDownloadUrl(
-                asset?.browser_download_url ?? release.html_url ?? latestReleaseUrl,
-            );
-        })
-        .catch(() => setDownloadUrl(latestReleaseUrl));
+    architecturePromise.then(() => {
+        void loadReleaseDownloads(
+            atomgitReleaseApiUrl,
+            atomgitReleasesUrl,
+            [elements.atomgitDownload],
+        );
+        void loadReleaseDownloads(
+            releaseApiUrl,
+            latestReleaseUrl,
+            [
+                elements.downloadTrigger,
+                elements.starDownload,
+                elements.githubDownload,
+            ],
+        );
+    });
 }
 
 applyLanguage(preferredLanguage());

@@ -27,7 +27,7 @@ test('Make surface targets select isolated staging profiles', () => {
 })
 
 test('surface staging keeps Desktop isolated and ships Liangshen as a Web/Desktop plugin', () => {
-  const script = readFileSync(join(root, 'scripts', 'stage-dsh.mjs'), 'utf8')
+  const script = readFileSync(join(root, 'scripts', 'stage-runtime-lib.mjs'), 'utf8')
   const desktopStart = script.indexOf("desktop: new Set([")
   const webStart = script.indexOf("web: new Set([")
   assert.ok(desktopStart >= 0 && webStart > desktopStart)
@@ -40,4 +40,12 @@ test('surface staging keeps Desktop isolated and ships Liangshen as a Web/Deskto
   assert.doesNotMatch(script.slice(script.indexOf("tui: new Set([")), /'@oh-dsh\/liangshen'/)
   assert.match(script, /alignBetterSidebarPtyDependency/)
   assert.match(script, /runtimePackageDirectory\('node-pty'\)/)
+})
+
+test('root deploy workspace owns nested TUI link packages', () => {
+  const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
+  const lockfile = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
+
+  assert.match(workspace, /^  - upstream\/dsh-TUI\/dsh-auth$/m)
+  assert.match(lockfile, /^  upstream\/dsh-TUI\/dsh-auth:$/m)
 })

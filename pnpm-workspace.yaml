@@ -2,6 +2,7 @@ packages:
   - .
   - plugins/*
   - upstream/dsh-TUI
+  - upstream/dsh-TUI/dsh-auth
   - upstream/dsh-TUI/vendor/dsh-std/packages/command
   - upstream/dsh-TUI/vendor/dsh-std/packages/connection
   - upstream/dsh-TUI/vendor/dsh-std/packages/core

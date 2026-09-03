@@ -2,6 +2,7 @@ import type {
   MarketplaceInstalledPlugin,
   MarketplaceMechanism,
   MarketplacePlugin,
+  MarketplaceRepositoryStats,
   MarketplaceSurfaceKind,
   MarketplaceSurfaceSupport,
 } from './protocol.ts'
@@ -27,6 +28,10 @@ interface CatalogRepository {
   repository?: unknown
   repo?: unknown
   url?: unknown
+  stats?: unknown
+  language?: unknown
+  license?: unknown
+  updatedAt?: unknown
   tags?: unknown
 }
 
@@ -42,6 +47,7 @@ interface NormalizedCatalogRow {
   title: string
   trust: MarketplacePlugin['trust']
   url: string
+  stats: MarketplaceRepositoryStats | null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -50,6 +56,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function cleanString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
+}
+
+function nonNegativeInteger(value: unknown): number | null {
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? value as number : null
+}
+
+function repositoryStats(value: unknown): MarketplaceRepositoryStats | null {
+  if (!isRecord(value)) return null
+  const forks = nonNegativeInteger(value.forks)
+  const openIssues = nonNegativeInteger(value.openIssues)
+  const stars = nonNegativeInteger(value.stars)
+  if (forks === null || openIssues === null || stars === null) return null
+  return {
+    forks,
+    language: cleanString(value.language),
+    license: cleanString(value.license),
+    openIssues,
+    stars,
+    updatedAt: cleanString(value.updatedAt),
+  }
 }
 
 function mechanism(row: CatalogRepository): MarketplaceMechanism {
@@ -144,6 +170,7 @@ function legacyRows(value: Record<string, unknown>): NormalizedCatalogRow[] | nu
       repository,
       tags: tags(row.tags),
       title: id,
+      stats: repositoryStats(row.stats),
       trust: repository.startsWith('dsh-external/') ? 'organization' : 'community',
       url: `https://github.com/${repository}`,
     }]
@@ -172,6 +199,7 @@ function registryRows(value: Record<string, unknown>): NormalizedCatalogRow[] | 
       repository,
       tags: tags(candidate.tags),
       title: cleanString(candidate.displayName) ?? id,
+      stats: repositoryStats(candidate.stats),
       trust: isRecord(candidate.listing) && candidate.listing.state === 'reviewed'
         ? 'organization'
         : 'community',
@@ -202,6 +230,7 @@ function communityRows(value: Record<string, unknown>): NormalizedCatalogRow[] |
       repository,
       tags: tags(candidate.tags),
       title: cleanString(candidate.name) ?? id,
+      stats: repositoryStats(candidate.stats),
       trust: 'community',
       url: `https://github.com/${repository}`,
     }]
@@ -217,7 +246,10 @@ export function parseMarketplaceCatalog(
   const rows = legacyRows(value) ?? registryRows(value) ?? communityRows(value)
   if (rows === null) throw new Error('unsupported plugin catalog')
   const installedIds = new Set(installed.map(entry => entry.pluginId))
-  const plugins: MarketplacePlugin[] = rows.map(row => ({
+  const plugins: MarketplacePlugin[] = rows.map(row => {
+    const protectedPlugin = isProtectedMarketplacePlugin(row.id, row.repository)
+    return {
+      builtin: protectedPlugin,
       category: row.category,
       currentCommit: null,
       description: row.description,
@@ -227,16 +259,18 @@ export function parseMarketplaceCatalog(
       installed: installedIds.has(row.id),
       latestCommit: null,
       mechanism: row.mechanism,
-      protected: isProtectedMarketplacePlugin(row.id, row.repository),
+      protected: protectedPlugin,
       pushedAt: row.pushedAt,
       repository: row.repository,
       runtimeRisk: runtimeRisk(row.mechanism),
+      stats: row.stats,
       tags: row.tags,
       title: row.title,
       trust: row.trust,
       updateAvailable: false,
       url: row.url,
-    }))
+    }
+  })
   plugins.sort((left, right) => {
     if (left.installed !== right.installed) return left.installed ? -1 : 1
     if (left.mechanism === 'unsupported' && right.mechanism !== 'unsupported') return 1

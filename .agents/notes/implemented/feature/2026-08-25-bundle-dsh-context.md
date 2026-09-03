@@ -38,9 +38,10 @@ that already ships a complete DSH plugin build of its own.
   maintainer does not target TUI.
 - The Nix assembly substitutes the plugin's npm release tarball
   (`upstream/dsh-context` from registry.npmjs.org, same pattern as the TUI
-  renderer) instead of building in the sandbox; `register-plugins.py`
-  enrolls it for the full and web surfaces from the bundle's `context/` dir,
-  keeping the upstream `lib/` layout. The build helper treats a checkout
+  renderer) instead of building in the sandbox; the shared runtime assembler
+  (`installDesktopPackages` in `scripts/stage-runtime-lib.mjs`) enrolls it
+  for the full and web surfaces from the repository-shaped staging root's
+  `upstream/dsh-context` tree, keeping the upstream `lib/` layout. The build helper treats a checkout
   without git metadata and with a prebuilt `lib/index.js` as nothing to do.
 - Host imports (`@deepseek-ai/dsh-session`, `dsh-settings`,
   `@deepseek-ai/schemastery`, `zod`) resolve through the staged runtime's

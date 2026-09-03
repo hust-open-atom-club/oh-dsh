@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
@@ -16,6 +16,16 @@ test('desktop release source pins the published DSH npm package', () => {
     'https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.1.2-alpha.3.tgz',
   )
   assert.match(DSH_SOURCE_SPEC.packageManager, /^pnpm@\d+\.\d+\.\d+$/)
+})
+
+test('npm archive extraction keeps tar operands relative on Windows', () => {
+  const source = readFileSync(new URL('../scripts/dsh-source.mjs', import.meta.url), 'utf8')
+
+  assert.match(
+    source,
+    /function extractTarball\(archive, extraction\)[\s\S]*?\['-xzf', basename\(archive\), '-C', basename\(extraction\)\][\s\S]*?cwd: dirname\(archive\)/,
+  )
+  assert.equal([...source.matchAll(/^    extractTarball\(archive, extraction\)$/gm)].length, 2)
 })
 
 test('DSH source override must match the pinned package version', () => {

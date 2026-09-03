@@ -6,6 +6,11 @@
 #                             committed pnpm dependency lock
 #   "nixpkgs"               — pkgs.deepseek-harness (kept as a placeholder; the
 #                             nixpkgs PR is not yet merged, so this throws)
+#
+# The DSH runtime is assembled with the same shared staging library as the
+# official release pipeline (scripts/stage-runtime-lib.mjs, consumed by
+# scripts/stage-dsh.mjs), so the packaged surface layout cannot drift from
+# the release layout. Nix only fetches sources and wraps launchers.
 
 { pkgs, system, llm-agents, dshSourceSpec }:
 
@@ -19,6 +24,16 @@ let
   isFull = surface == "full";
   includesWeb = surface != "tui";
   includesTui = surface != "web";
+
+  # The install-packages surface name understood by the shared assembler:
+  # the full Desktop distribution carries every official surface package.
+  stageSurface = if isFull then "all" else surface;
+
+  # Repository source for the final derivation: the shared assembler imports
+  # sibling scripts and the Liangshen adapter, so the whole tree (not a
+  # single-file coercion) must be available for those relative imports.
+  repoSrc = cleanSource;
+
 
   # ---------------------------------------------------------------------------
   # DSH runtime selection
@@ -95,6 +110,10 @@ let
   dshAuthRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-auth/-/dsh-auth-0.1.0.tgz";
     hash = "sha512-vggwtl0+fuZ9Xuwq9NC5MznT3ZpBfnqGTBgPUfEaqoTPXrxI0S+jcNcO3ou9Akn23cUAZikgmS7zHMVr+ZlXbw==";
+  };
+  landlockLauncherRelease = pkgs.fetchurl {
+    url = "https://registry.npmjs.org/@deepseek-ai/node-addon-landlock-run-linux-x64/-/node-addon-landlock-run-linux-x64-0.1.1.tgz";
+    hash = "sha512-OHAzPW2Coe/iYobAJAAA8CeVrBoKV4BnNHsgwvXwOfishxkUVSWSvdyxrZPiwYRXutpIGVrSo9zV3WOQy2euBA==";
   };
   tuiEcosystemSpecSrc = pkgs.fetchFromGitHub {
     owner = "T-Auto";
@@ -180,73 +199,99 @@ let
       cp -r bin $out/lib/oh-dsh/
       cp package.json $out/lib/oh-dsh/
 
-      # Carry package manifests so the final package can register the selected
-      # surfaces into dsh-runtime/node_modules (mirrors stage-dsh.mjs).
-      mkdir -p $out/lib/oh-dsh/manifests
-      cp package.json $out/lib/oh-dsh/manifests/desktop.json
-      for p in plugins/*/package.json; do
-        name=$(basename $(dirname "$p"))
-        cp "$p" "$out/lib/oh-dsh/manifests/$name.json"
-      done
-      cp web/package.json $out/lib/oh-dsh/manifests/web.json
+      # Carry the workspace pnpm package; the final derivation stages it
+      # beside node-runtime through the shared stage-runtime-lib.mjs.
+      if [ ! -f node_modules/pnpm/dist/pnpm.mjs ]; then
+        echo "pnpm package is missing from the Nix build; run pnpm install" >&2
+        exit 1
+      fi
+      mkdir -p $out/lib/oh-dsh/pnpm
+      cp -r node_modules/pnpm/bin node_modules/pnpm/dist \
+        $out/lib/oh-dsh/pnpm/
+      cp node_modules/pnpm/package.json node_modules/pnpm/LICENSE \
+        $out/lib/oh-dsh/pnpm/ 2>/dev/null || true
+
+      # Assemble a repository-shaped staging root for the shared runtime
+      # assembler: installDesktopPackages reads manifests and compiled files
+      # from the same layout the release pipeline uses. dist/, plugins/,
+      # web/, and node_modules/ stay on the workspace tree (read-only); the
+      # upstream packages are overlaid with their published release trees.
+      stage_root="$TMPDIR/oh-dsh-stage-root"
+      rm -rf "$stage_root"
+      mkdir -p "$stage_root/upstream/dsh-TUI/dsh-auth" \
+        "$stage_root/upstream/dsh-context"
+      cp package.json "$stage_root/package.json"
+      ln -s "$PWD/dist" "$stage_root/dist"
+      ln -s "$PWD/plugins" "$stage_root/plugins"
+      ln -s "$PWD/web" "$stage_root/web"
+      ln -s "$PWD/node_modules" "$stage_root/node_modules"
+
+      # The published TUI release ships compiled lib/skills/presets and
+      # bundled compiled @dsh-std packages; mount those and link every
+      # remaining dependency to the workspace-installed graph.
       cp upstream/dsh-TUI-release/package.json \
-        $out/lib/oh-dsh/manifests/tui-renderer.json
-      cp upstream/dsh-context/package.json \
-        $out/lib/oh-dsh/manifests/dsh-context.json
-      cp upstream/dsh-auth-release/package.json \
-        $out/lib/oh-dsh/manifests/dsh-auth.json
-
-      # Carry the prebuilt subscription OAuth plugin for registration into
-      # the runtime (npm release layout, same as the context plugin).
-      mkdir -p $out/lib/oh-dsh/auth
-      cp -r upstream/dsh-auth-release/lib $out/lib/oh-dsh/auth/lib
-      cp upstream/dsh-auth-release/dsh-plugin.json \
-        upstream/dsh-auth-release/cordis.patch.yml \
-        upstream/dsh-auth-release/LICENSE \
-        $out/lib/oh-dsh/auth/ 2>/dev/null || true
-      # Carry the prebuilt context plugin (npm release layout: lib/ + patch +
-      # license) for registration into the runtime.
-      mkdir -p $out/lib/oh-dsh/context
-      cp -r upstream/dsh-context/lib $out/lib/oh-dsh/context/lib
-      cp upstream/dsh-context/cordis.patch.yml \
-        upstream/dsh-context/LICENSE \
-        $out/lib/oh-dsh/context/
-
-      # Copy the pinned renderer and apply the guarded Oh-DSH adaptation.
-      mkdir -p $out/lib/oh-dsh/tui-renderer
-      cp -r upstream/dsh-TUI-release/lib \
-        upstream/dsh-TUI-release/dsh-ecosystem-spec \
-        upstream/dsh-TUI-release/presets \
         upstream/dsh-TUI-release/cordis.patch.yml \
         upstream/dsh-TUI-release/cordis.yml \
         upstream/dsh-TUI-release/LICENSE \
-        $out/lib/oh-dsh/tui-renderer/
-      node -e "import('./scripts/tui-upstream-adapter.mjs').then(({ adaptTuiRendererPackage }) => adaptTuiRendererPackage('$out/lib/oh-dsh/tui-renderer'))"
+        "$stage_root/upstream/dsh-TUI/"
+      cp -r upstream/dsh-TUI-release/lib \
+        upstream/dsh-TUI-release/dsh-ecosystem-spec \
+        upstream/dsh-TUI-release/presets \
+        "$stage_root/upstream/dsh-TUI/"
+      mkdir -p "$stage_root/upstream/dsh-TUI/node_modules"
+      if [ -d upstream/dsh-TUI-release/node_modules ]; then
+        cp -r upstream/dsh-TUI-release/node_modules/. \
+          "$stage_root/upstream/dsh-TUI/node_modules/"
+      fi
+      if [ -d upstream/dsh-TUI/node_modules ]; then
+        for dep in upstream/dsh-TUI/node_modules/*; do
+          name=$(basename "$dep")
+          [ -e "$stage_root/upstream/dsh-TUI/node_modules/$name" ] || \
+            ln -s "$PWD/$dep" "$stage_root/upstream/dsh-TUI/node_modules/$name"
+        done
+      fi
 
-      # Collect runtime dependency closures that the DSH runtime may not ship.
-      mkdir -p $out/lib/oh-dsh/extra-deps
-      ${pkgs.python3}/bin/python3 ${./collect-deps.py} \
-        node_modules/.pnpm \
-        plugins/better-sidebar-runtime/package.json \
-        $out/lib/oh-dsh/extra-deps
-      ${pkgs.python3}/bin/python3 ${./collect-deps.py} \
-        node_modules/.pnpm \
-        upstream/dsh-TUI-release/package.json \
-        $out/lib/oh-dsh/extra-deps
+      # Subscription OAuth plugin and context insight plugin, published npm
+      # release layouts (compiled lib/ beside the manifest).
+      cp upstream/dsh-auth-release/package.json \
+        upstream/dsh-auth-release/dsh-plugin.json \
+        upstream/dsh-auth-release/cordis.patch.yml \
+        upstream/dsh-auth-release/LICENSE \
+        "$stage_root/upstream/dsh-TUI/dsh-auth/"
+      cp -r upstream/dsh-auth-release/lib \
+        "$stage_root/upstream/dsh-TUI/dsh-auth/"
+      mkdir -p "$stage_root/upstream/dsh-TUI/dsh-auth/node_modules"
+      if [ -d upstream/dsh-TUI/dsh-auth/node_modules ]; then
+        for dep in upstream/dsh-TUI/dsh-auth/node_modules/*; do
+          ln -s "$PWD/$dep" \
+            "$stage_root/upstream/dsh-TUI/dsh-auth/node_modules/$(basename "$dep")"
+        done
+      fi
+      cp upstream/dsh-context/package.json \
+        upstream/dsh-context/cordis.patch.yml \
+        upstream/dsh-context/LICENSE \
+        "$stage_root/upstream/dsh-context/"
+      cp -r upstream/dsh-context/lib "$stage_root/upstream/dsh-context/"
 
-      # The published TUI release carries its dsh-std packages as compiled
-      # bundled dependencies. Prefer those artifacts over unbuilt workspace
-      # sources when assembling the offline Nix runtime.
-      rm -rf $out/lib/oh-dsh/extra-deps/@dsh-std
-      cp -r upstream/dsh-TUI-release/node_modules/@dsh-std \
-        $out/lib/oh-dsh/extra-deps/@dsh-std
-      # The published renderer depends on the released dsh-auth OAuth package.
-      mkdir -p $out/lib/oh-dsh/extra-deps/@deepseek-harness-tui
-      cp -r upstream/dsh-auth-release \
-        $out/lib/oh-dsh/extra-deps/@deepseek-harness-tui/dsh-auth
-      for dep in $out/lib/oh-dsh/extra-deps/@dsh-std/*; do
-        ln -s ../.. "$dep/node_modules"
-      done
+      # Install the selected surface packages into a copy of the DSH runtime
+      # with the same assembler as scripts/stage-dsh.mjs, so the Nix closure
+      # carries the official layout: package files, dependency wiring, and
+      # the profile-fallback dependency manifest.
+      runtime_build="$TMPDIR/dsh-runtime"
+      rm -rf "$runtime_build"
+      mkdir -p "$runtime_build"
+      cp -r ${dshRuntimeRoot}/. "$runtime_build/"
+      chmod -R u+w "$runtime_build"
+      chmod +x "$runtime_build/lib/bin.js" || true
+      node scripts/stage-runtime-lib.mjs install-packages \
+        --root "$stage_root" --runtime "$runtime_build" \
+        --surface ${stageSurface} --release-graph
+      node scripts/stage-runtime-lib.mjs restore-executable-helpers \
+        --runtime "$runtime_build"
+      cp THIRD_PARTY_NOTICES.md "$runtime_build/THIRD_PARTY_NOTICES.md"
+
+      mkdir -p $out/lib/oh-dsh/dsh-runtime
+      cp -r "$runtime_build"/. $out/lib/oh-dsh/dsh-runtime/
 
       runHook postInstall
     '';
@@ -262,7 +307,11 @@ pkgs.stdenv.mkDerivation {
 
   dontUnpack = true;
 
-  nativeBuildInputs = [ pkgs.makeWrapper ];
+  # The shared assembler imports sibling scripts and the Liangshen adapter;
+  # carry the repository source so those relative imports resolve from $src.
+  src = repoSrc;
+
+  nativeBuildInputs = [ pkgs.makeWrapper pkgs.nodejs_24 ];
 
   installPhase = ''
     runHook preInstall
@@ -273,17 +322,43 @@ pkgs.stdenv.mkDerivation {
     cp -r ${ohDshBundle}/lib/oh-dsh/dist $out/lib/oh-dsh/dist
     cp ${ohDshBundle}/lib/oh-dsh/package.json $out/lib/oh-dsh/package.json
 
-    # DSH runtime
+    # DSH runtime assembled by the shared stage-dsh assembler.
     mkdir -p $out/dsh-runtime
-    cp -r ${dshRuntimeRoot}/. $out/dsh-runtime/
+    cp -r ${ohDshBundle}/lib/oh-dsh/dsh-runtime/. $out/dsh-runtime/
     chmod -R u+w $out/dsh-runtime
     chmod +x $out/dsh-runtime/lib/bin.js || true
+
+    ${lib.optionalString (system == "x86_64-linux") ''
+      # The assembler stages the runtime from an offline DSH source, so
+      # install the same pinned static Landlock launcher explicitly and
+      # validate its published metadata.
+      landlock_package="$out/dsh-runtime/node_modules/@deepseek-ai/node-addon-landlock-run-linux-x64"
+      landlock_source="$TMPDIR/landlock-launcher-package"
+      rm -rf "$landlock_package" "$landlock_source"
+      mkdir -p "$landlock_package" "$landlock_source"
+      tar -xzf ${landlockLauncherRelease} --strip-components=1 \
+        -C "$landlock_source"
+      cp "$landlock_source/package.json" "$landlock_source/prebuilds.json" \
+        "$landlock_package/"
+      ${pkgs.nodejs_24}/bin/node --input-type=module -e \
+        "import { restoreLandlockLauncher } from '${../scripts/landlock-launcher.mjs}'; restoreLandlockLauncher({ runtimeRoot: process.argv[1], sourcePackageRoot: process.argv[2] })" \
+        "$out/dsh-runtime" "$landlock_source"
+      test -x "$landlock_package/bin/landlock-run"
+    ''}
 
     # Keep Nix assembly behind the same configuration-client boundary as the
     # regular staged runtime. The shared patch fails closed when upstream
     # anchors change.
     ${pkgs.nodejs_24}/bin/node ${../scripts/settings-boundary.mjs} \
       $out/dsh-runtime
+    ${pkgs.nodejs_24}/bin/node \
+      ${../plugins/liangshen/src/upstream-adapter.mjs} \
+      ownership $out/dsh-runtime
+    ${lib.optionalString includesWeb ''
+      ${pkgs.nodejs_24}/bin/node \
+        ${../plugins/liangshen/src/upstream-adapter.mjs} \
+        dsh $out/dsh-runtime
+    ''}
 
     # Node runtime: reuse the same nodejs that built the bundle. The DSH
     # runtime's HMR service requires --expose-internals (upstream releases
@@ -292,48 +367,31 @@ pkgs.stdenv.mkDerivation {
     makeWrapper ${pkgs.nodejs_24}/bin/node $out/node-runtime/bin/node \
       --add-flags "--expose-internals"
 
-    # Register Oh-DSH packages into dsh-runtime/node_modules so the DSH
-    # profile loader can resolve them (mirrors installDesktopPackages in
-    # scripts/stage-dsh.mjs).
-    ${pkgs.python3}/bin/python3 ${./register-plugins.py} \
-      ${ohDshBundle}/lib/oh-dsh \
-      $out/lib/oh-dsh/dist \
-      $out/dsh-runtime \
-      ${surface}
+    # Stage pnpm beside the node runtime through the shared assembler:
+    # bundledRuntimePaths resolves pnpmEntry at
+    # node-runtime/lib/node_modules/pnpm/bin/pnpm.mjs for isolated
+    # Marketplace installs.
+    ${pkgs.nodejs_24}/bin/node $src/scripts/stage-runtime-lib.mjs stage-pnpm \
+      --source ${ohDshBundle}/lib/oh-dsh/pnpm --target $out/node-runtime
+    test -f "$out/node-runtime/lib/node_modules/pnpm/bin/pnpm.mjs"
+    test -f "$out/node-runtime/bin/pnpm"
 
-    # Copy plugin runtime dependencies that the DSH runtime does not ship
-    # (e.g. schemastery for better-sidebar-runtime).
-    if [ -d "${ohDshBundle}/lib/oh-dsh/extra-deps" ]; then
-      for dep in ${ohDshBundle}/lib/oh-dsh/extra-deps/*/; do
-        name=$(basename "$dep")
-        # Scoped entries (e.g. @deepseek-harness-tui) must merge package by
-        # package; a plain skip would drop dsh-auth beside the renderer.
-        case "$name" in
-          @*)
-            mkdir -p "$out/dsh-runtime/node_modules/$name"
-            for sub in "$dep"*/; do
-              subname="$name/$(basename "$sub")"
-              if [ ! -d "$out/dsh-runtime/node_modules/$subname" ]; then
-                cp -r "$sub" "$out/dsh-runtime/node_modules/$subname"
-                chmod -R u+w "$out/dsh-runtime/node_modules/$subname"
-                # Same dependency-root link collect-deps.py gives collected
-                # packages: without it the renderer's private link resolves
-                # to the store real path and peer imports cannot be found.
-                if [ ! -e "$out/dsh-runtime/node_modules/$subname/node_modules" ]; then
-                  ln -s ../.. "$out/dsh-runtime/node_modules/$subname/node_modules"
-                fi
-              fi
-            done
-            ;;
-          *)
-            if [ ! -d "$out/dsh-runtime/node_modules/$name" ]; then
-              cp -r "$dep" "$out/dsh-runtime/node_modules/$name"
-              chmod -R u+w "$out/dsh-runtime/node_modules/$name"
-            fi
-            ;;
-        esac
-      done
-    fi
+    # Guardrail: the assembled runtime must carry exactly the official
+    # surface package set; a drift in SURFACE_PACKAGE_NAMES or a missing
+    # registration fails the Nix build instead of the running profile.
+    ${pkgs.nodejs_24}/bin/node --input-type=module -e "
+      import { SURFACE_PACKAGE_NAMES } from '${repoSrc}/scripts/stage-runtime-lib.mjs'
+      import { existsSync } from 'node:fs'
+      const surface = '${stageSurface}'
+      const runtimeRoot = process.argv[1]
+      const expected = surface === 'all'
+        ? new Set([...SURFACE_PACKAGE_NAMES.desktop, ...SURFACE_PACKAGE_NAMES.web, ...SURFACE_PACKAGE_NAMES.tui])
+        : SURFACE_PACKAGE_NAMES[surface]
+      const missing = [...expected].filter(name => !existsSync(runtimeRoot + '/node_modules/' + name))
+      if (missing.length > 0) {
+        throw new Error('Nix surface closure is missing packages: ' + missing.join(', '))
+      }
+    " "$out/dsh-runtime"
 
     # HMR is a development-time feature that requires --expose-internals;
     # the packaged runtime keeps it enabled (matching upstream releases).

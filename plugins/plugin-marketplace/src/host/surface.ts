@@ -7,7 +7,7 @@ import type {
   MarketplaceSnapshot,
   PluginMarketplaceBridge,
 } from '../protocol.ts'
-import { ProductionMarketplacePlatform } from './platform.ts'
+import { previewRuntimeLauncher, ProductionMarketplacePlatform } from './platform.ts'
 import {
   MarketplacePreviewProxy,
 } from './preview-proxy.ts'
@@ -21,6 +21,7 @@ import {
 const NODE_BINARY_ENV = 'OH_DSH_MARKETPLACE_NODE_BINARY'
 const CLI_ENTRY_ENV = 'OH_DSH_MARKETPLACE_CLI_ENTRY'
 const PNPM_ENTRY_ENV = 'OH_DSH_MARKETPLACE_PNPM_ENTRY'
+const SANDBOX_LAUNCHER_ENV = 'OH_DSH_MARKETPLACE_SANDBOX_LAUNCHER'
 
 export type MarketplaceHostSurfaceKind = 'web' | 'tui'
 
@@ -67,6 +68,7 @@ export class SurfaceMarketplaceRuntime implements MarketplaceRuntime {
   readonly #exitCode: number
   readonly #kind: MarketplaceHostSurfaceKind
   readonly #nodeBinary: string
+  readonly #sandboxLauncher: string | undefined
   readonly #previewProxy: MarketplacePreviewProxy | null
   readonly #profile: string
   readonly #restartDelayMs: number
@@ -91,6 +93,7 @@ export class SurfaceMarketplaceRuntime implements MarketplaceRuntime {
     this.#exitCode = input.exitCode ?? 0
     this.#kind = input.kind
     this.#nodeBinary = input.nodeBinary
+    this.#sandboxLauncher = input.environment.OH_DSH_MARKETPLACE_SANDBOX_LAUNCHER || undefined
     this.#previewProxy = input.previewProxy ?? null
     this.#profile = input.profile
     this.#restartDelayMs = input.restartDelayMs ?? 500
@@ -128,15 +131,28 @@ export class SurfaceMarketplaceRuntime implements MarketplaceRuntime {
       OH_DSH_HOME: input.dshHome,
       TMPDIR: temporary,
     }
+    const launcher = input.sandboxed
+      ? previewRuntimeLauncher({
+        root: input.sandboxRoot,
+        sandbox: this.#sandboxLauncher,
+      })
+      : undefined
+    const previewCommand = (args: string[]): { command: string; args: string[] } =>
+      launcher === undefined
+        ? { command: this.#nodeBinary, args: [this.#cliEntry, ...args] }
+        : {
+          command: launcher.command,
+          args: [...launcher.args, this.#nodeBinary, this.#cliEntry, ...args],
+        }
     if (this.#kind === 'tui') {
       const { spawnSync } = await import('node:child_process')
       // Compose the candidate profile first so configuration errors fail
       // before activation.
-      const composed = spawnSync(this.#nodeBinary, [
-        this.#cliEntry,
+      const composeCommand = previewCommand([
         '--profile', this.#profile,
         '--dump-config',
-      ], {
+      ])
+      const composed = spawnSync(composeCommand.command, composeCommand.args, {
         cwd: workspace,
         encoding: 'utf8',
         env: environment,
@@ -150,10 +166,8 @@ export class SurfaceMarketplaceRuntime implements MarketplaceRuntime {
       // Then boot the candidate without the interactive renderer. Every row
       // before the TUI front door has activated by the time the probe exits,
       // so plugin apply-time failures surface here instead of after apply.
-      const activated = spawnSync(this.#nodeBinary, [
-        this.#cliEntry,
-        '--profile', this.#profile,
-      ], {
+      const activationCommand = previewCommand(['--profile', this.#profile])
+      const activated = spawnSync(activationCommand.command, activationCommand.args, {
         cwd: workspace,
         encoding: 'utf8',
         env: {
@@ -189,6 +203,7 @@ export class SurfaceMarketplaceRuntime implements MarketplaceRuntime {
         OH_DSH_MARKETPLACE_PREVIEW: '1',
       },
       nodeBinary: this.#nodeBinary,
+      ...(launcher === undefined ? {} : { launcher }),
       readyTimeoutMs: 90_000,
     })
     const url = await supervisor.start()
@@ -241,6 +256,7 @@ export function createSurfaceMarketplaceHost(input: {
     env: input.environment,
     nodeBinary: paths.nodeBinary,
     pnpmEntry: paths.pnpmEntry,
+    sandboxLauncher: input.environment[SANDBOX_LAUNCHER_ENV] || undefined,
     ...(input.onLog === undefined ? {} : { onLog: input.onLog }),
   })
   const previewProxy = input.kind === 'web'
@@ -277,7 +293,7 @@ export function marketplaceBridge(
 ): PluginMarketplaceBridge {
   return Object.freeze({
     dispatch: async (command: MarketplaceCommand): Promise<MarketplaceSnapshot> =>
-      manager.dispatch(command),
+      manager.dispatch(command, 'human-ui'),
     getSnapshot: async (): Promise<MarketplaceSnapshot> =>
       manager.getSnapshot(),
   })

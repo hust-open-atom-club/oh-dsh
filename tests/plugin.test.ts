@@ -38,6 +38,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
   const clients = [
     '../plugins/skins/src/client/plugin.tsx',
     '../src/client.ts',
+    '../plugins/about/src/client/plugin.tsx',
     '../plugins/panel-controls/src/terminal/plugin.tsx',
     '../plugins/pinned-summary/src/client.ts',
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
@@ -51,6 +52,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
 
   const dictionaries = [
     '../plugins/skins/src/client/i18n.ts',
+    '../plugins/about/src/client/i18n.ts',
     '../plugins/panel-controls/src/terminal/i18n.ts',
     '../plugins/pinned-summary/src/i18n.ts',
     '../plugins/plugin-marketplace/src/client/i18n.ts',

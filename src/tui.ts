@@ -15,6 +15,7 @@ import {
   type BundledRuntimePaths,
 } from './runtime-paths.ts'
 import { resolveProductVersion } from './version.ts'
+import { resolveLandlockLauncher } from './landlock-launcher.ts'
 import { readLauncherRecord, startupUpdateNotice } from './self-update.ts'
 
 /** Default Oh-DSH-owned home, isolated from the upstream DSH CLI. */
@@ -199,6 +200,7 @@ export function tuiLaunchSpec(
     OH_DSH_MARKETPLACE_CLI_ENTRY: paths.cliEntry,
     OH_DSH_MARKETPLACE_NODE_BINARY: paths.nodeBinary,
     OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
+    OH_DSH_MARKETPLACE_SANDBOX_LAUNCHER: resolveLandlockLauncher(paths.runtimeRoot) ?? '',
     PATH: runtimeSearchPath(paths, env),
   }
   // Do not let the pinned renderer's legacy aliases trigger a warning line

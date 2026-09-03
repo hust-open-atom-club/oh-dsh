@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-23-decoupled-runtime-updates.md
-2026-08-23-decoupled-runtime-updates.md: 48a048adb24ba6db36d2fdb1ad8c63be407db933
-2026-08-23-decoupled-runtime-updates.zh.md: 5ad71d9ff620d6e517e36a571efea066a7cb715d
+2026-08-23-decoupled-runtime-updates.md: c2fa11bc073ebcae10594303a206386bc108bc0c
+2026-08-23-decoupled-runtime-updates.zh.md: 75d4e8916d2eb31962bb680f4a49fd49a609a727

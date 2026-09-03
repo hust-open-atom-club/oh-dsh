@@ -275,6 +275,22 @@ function DesktopFrame(props: DesktopFrameProps): JSX.Element {
     }
   }, [])
   useEffect(() => { props.actions.setNarrow(viewport < SIDEBAR_AUTO_COLLAPSE) }, [props.actions, viewport])
+  // Publish the details column width on the root element: floating chrome
+  // lives outside the frame, so it can only inherit the value from there.
+  useEffect(() => {
+    const root = document.documentElement
+    root.style.setProperty('--oh-dsh-details-width', `${cols.details}px`)
+    return () => { root.style.removeProperty('--oh-dsh-details-width') }
+  }, [cols.details])
+  // An active session puts the conversation top bar's own controls (Session
+  // log) in the top-right corner; only then does floating chrome need to step
+  // aside from it.
+  useEffect(() => {
+    const root = document.documentElement
+    if (detailsSession === undefined) delete root.dataset.ohDshSessionActive
+    else root.dataset.ohDshSessionActive = 'true'
+    return () => { delete root.dataset.ohDshSessionActive }
+  }, [detailsSession])
   return (
     <div
       ref={frameRef}

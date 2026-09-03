@@ -1,6 +1,7 @@
 # Agent Note: 通过 Windows Window Controls Overlay 实现单行桌面 chrome
 
 Status: implemented
+Archived: 2026-08-26
 
 [English](2026-08-17-desktop-single-row-titlebar.md) | 中文
 

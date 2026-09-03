@@ -133,9 +133,9 @@ ohdsh desktop
 | Web-only | **Oh-DSH Web**、Node runtime 和内置 Web 插件，不含 Electron | 浏览器、服务器或轻量安装 |
 | TUI-only | **Oh-DSH TUI**、Node runtime 和终端插件，不含 Electron | SSH 与纯终端环境 |
 
-- **macOS：**打开 DMG，将 **Oh-DSH Desktop** 拖入 Applications。
-- **Windows：**运行安装包，或解压便携版后启动。
-- **Linux：**直接运行 AppImage，或使用 `apt` 安装 deb。
+- **macOS**：打开 DMG，将 **Oh-DSH Desktop** 拖入 Applications。
+- **Windows**：运行安装包，或解压便携版后启动。
+- **Linux**：直接运行 AppImage，或使用 `apt` 安装 deb。
 
 安装脚本是推荐入口；Release 资产适合需要手动选择包或离线分发的场景。
 
@@ -225,7 +225,7 @@ Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 
 | 推荐项目 | 说明 |
 | --- | --- |
-| [DeepSeek Harness](https://github.com/deepseek-harness/deepseek-harness) | DSH runtime、会话与插件加载器 |
+| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | DSH runtime、会话与插件加载器 |
 | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | **Oh-DSH TUI 的直接上游插件**，提供终端渲染、交互和命令体系 |
 | [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git Review、文件与 PTY Host 能力 |
 | [dsh-vision](https://github.com/william-jin-cmu/dsh-vision) | 跨 Desktop、Web 与 TUI 的 `view_image` 视觉工具参考实现 |

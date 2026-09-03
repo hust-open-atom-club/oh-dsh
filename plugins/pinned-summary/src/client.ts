@@ -68,7 +68,8 @@ html {
   display: flex;
   flex-direction: column;
   top: calc(var(--oh-dsh-titlebar-height, 40px) + 8px);
-  right: 14px;
+  /* Follow the panel toolbar: stay clear of an open session details column. */
+  right: calc(14px + var(--oh-dsh-details-width, 0px));
   width: min(var(--oh-dsh-pinned-summary-width), calc(100vw - 28px));
   height: auto;
   max-height: min(
@@ -179,7 +180,7 @@ html {
 
 @media (max-width: 900px) {
   [data-oh-dsh-pinned-summary] {
-    right: 8px;
+    right: calc(8px + var(--oh-dsh-details-width, 0px));
     width: min(var(--oh-dsh-pinned-summary-width), calc(100vw - 16px));
   }
 }

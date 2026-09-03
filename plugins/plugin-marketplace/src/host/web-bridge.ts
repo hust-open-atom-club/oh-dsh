@@ -72,7 +72,7 @@ export function mountMarketplaceWebBridge(
             sendJson(response, 403, { error: 'untrusted marketplace origin' })
             return
           }
-          sendJson(response, 200, await manager.dispatch(await readCommand(request)))
+          sendJson(response, 200, await manager.dispatch(await readCommand(request), 'human-ui'))
           return
         }
         response.writeHead(405, { allow: 'GET, POST' })

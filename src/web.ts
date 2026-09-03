@@ -22,6 +22,7 @@ import {
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
 import { checkForUpdate, formatUpdateNotice, readLauncherRecord } from './self-update.ts'
 import { resolveProductVersion } from './version.ts'
+import { resolveLandlockLauncher } from './landlock-launcher.ts'
 
 /** Default port matching the dsh-web-app bundle's own webserver default. */
 export const DEFAULT_WEB_PORT = 3080
@@ -282,6 +283,7 @@ export async function main(
       OH_DSH_MARKETPLACE_CLI_ENTRY: paths.cliEntry,
       OH_DSH_MARKETPLACE_NODE_BINARY: paths.nodeBinary,
       OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
+      OH_DSH_MARKETPLACE_SANDBOX_LAUNCHER: resolveLandlockLauncher(paths.runtimeRoot) ?? '',
       PATH: runtimeSearchPath(paths, env),
     },
     nodeBinary: paths.nodeBinary,

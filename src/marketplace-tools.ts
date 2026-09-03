@@ -295,7 +295,7 @@ export function mountMarketplaceAgentTools(
 
   ctx.tools.register(marketplaceTool({
     name: 'desktop_plugin_preview',
-    description: 'Launch the already prepared risky action in the isolated desktop preview. Pass only confirmations that the user explicitly accepted.',
+    description: 'Launch the prepared action in the isolated desktop preview. Build scripts require direct human approval; Agents cannot approve unsandboxed execution.',
     parameters: {
       confirmations: {
         type: 'array',

@@ -18,6 +18,7 @@ export interface TuiMarketplaceState {
   query: string
   screen: TuiMarketplaceScreen
   selectedId: string | null
+  showBuiltins: boolean
   snapshot: MarketplaceSnapshot | null
 }
 
@@ -33,6 +34,7 @@ export class TuiMarketplaceController {
   readonly #bridge: PluginMarketplaceBridge
   readonly #onBeforeRestart: (() => void) | undefined
   readonly #listeners = new Set<() => void>()
+  readonly #requestedRepositoryStats = new Set<string>()
   #state: TuiMarketplaceState = {
     acceptedConfirmations: [],
     busy: false,
@@ -42,6 +44,7 @@ export class TuiMarketplaceController {
     query: '',
     screen: 'list',
     selectedId: null,
+    showBuiltins: false,
     snapshot: null,
   }
 
@@ -63,13 +66,15 @@ export class TuiMarketplaceController {
   filteredPlugins(): MarketplacePlugin[] {
     const needle = this.#state.query.trim().toLowerCase()
     const catalog = this.#state.snapshot?.catalog ?? []
-    if (needle === '') return catalog
-    return catalog.filter(plugin => [
-      plugin.title,
-      plugin.description,
-      plugin.category,
-      ...plugin.tags,
-    ].some(value => value.toLowerCase().includes(needle)))
+    return catalog.filter(plugin => {
+      if (!this.#state.showBuiltins && plugin.builtin) return false
+      return needle === '' || [
+        plugin.title,
+        plugin.description,
+        plugin.category,
+        ...plugin.tags,
+      ].some(value => value.toLowerCase().includes(needle))
+    })
   }
 
   selectedPlugin(): MarketplacePlugin | null {
@@ -79,6 +84,18 @@ export class TuiMarketplaceController {
 
   setQuery(query: string): void {
     this.#state = { ...this.#state, query }
+    this.emit()
+  }
+
+  toggleBuiltins(): void {
+    const showBuiltins = !this.#state.showBuiltins
+    const hidesSelected = !showBuiltins && this.selectedPlugin()?.builtin === true
+    this.#state = {
+      ...this.#state,
+      screen: hidesSelected ? 'list' : this.#state.screen,
+      selectedId: hidesSelected ? null : this.#state.selectedId,
+      showBuiltins,
+    }
     this.emit()
   }
 
@@ -104,6 +121,12 @@ export class TuiMarketplaceController {
       selectedId: pluginId,
     }
     this.emit()
+    if (pluginId === null) return
+    const plugin = this.#state.snapshot?.catalog.find(candidate => candidate.id === pluginId)
+    if (plugin?.stats === null && !this.#requestedRepositoryStats.has(pluginId)) {
+      this.#requestedRepositoryStats.add(pluginId)
+      void this.dispatch({ type: 'load-repository-stats', pluginId })
+    }
   }
 
   async load(): Promise<void> {

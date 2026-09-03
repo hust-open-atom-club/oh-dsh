@@ -10,6 +10,8 @@ export type MarketplaceMessage =
   | 'update-available'
   | 'not-installed'
   | 'managed'
+  | 'builtin'
+  | 'show-builtins'
   | 'all'
   | 'all-categories'
   | 'mechanism.repository'
@@ -20,6 +22,12 @@ export type MarketplaceMessage =
   | 'category'
   | 'mechanism'
   | 'updated'
+  | 'stars'
+  | 'forks'
+  | 'open-issues'
+  | 'language'
+  | 'license'
+  | 'github-stats'
   | 'unknown'
   | 'repository'
   | 'surfaces'
@@ -61,6 +69,7 @@ export type MarketplaceMessage =
   | 'commit'
   | 'package'
   | 'allow-scripts'
+  | 'accept-unsandboxed-build'
   | 'accept-high-risk'
   | 'accept-source-change'
   | 'recovery-note'
@@ -80,6 +89,7 @@ export type MarketplaceMessage =
   | 'refresh'
   | 'close'
   | 'preview.running'
+  | 'preview.running-unisolated'
   | 'discard'
   | 'apply'
   | 'apply-action'
@@ -98,6 +108,7 @@ export type MarketplaceMessage =
   | 'auth.not-refreshed'
   | 'notice.loaded'
   | 'notice.preview-ready'
+  | 'notice.preview-ready-unisolated'
   | 'notice.discarded'
   | 'notice.applied'
   | 'notice.restored'
@@ -113,6 +124,8 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'update-available': 'Update available',
     'not-installed': 'Not installed',
     managed: 'Oh-DSH managed',
+    builtin: 'Built-in',
+    'show-builtins': 'Show built-in plugins',
     all: 'All',
     'all-categories': 'All categories',
     'mechanism.repository': 'Repository',
@@ -123,6 +136,12 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     category: 'Category',
     mechanism: 'Mechanism',
     updated: 'Updated',
+    stars: 'Stars',
+    forks: 'Forks',
+    'open-issues': 'Open issues and pull requests',
+    language: 'Language',
+    license: 'License',
+    'github-stats': 'GitHub repository statistics',
     unknown: 'Unknown',
     repository: 'Repository',
     surfaces: 'Effective surfaces',
@@ -164,6 +183,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     commit: 'commit {commit}',
     package: 'package {package}',
     'allow-scripts': 'Allow these scripts only inside the write-restricted preview.',
+    'accept-unsandboxed-build': 'Run these third-party build scripts without process isolation (unsafe).',
     'accept-high-risk': 'I understand that this plugin runs as trusted host code after apply.',
     'accept-source-change': 'I reviewed and accept the changed source identity.',
     'recovery-note': 'Apply swaps the profile atomically. The previous profile stays available for recovery; arbitrary external effects are not rolled back.',
@@ -183,6 +203,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     refresh: 'Refresh',
     close: 'Close Plugins',
     'preview.running': '{plugin} is running in an isolated preview window.',
+    'preview.running-unisolated': '{plugin} is running in a preview without process isolation.',
     discard: 'Discard',
     apply: 'Apply to {target}',
     'apply-action': 'Apply {action}',
@@ -201,6 +222,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'auth.not-refreshed': 'Plugin catalog has not been refreshed yet.',
     'notice.loaded': 'Loaded {count} catalog plugins.',
     'notice.preview-ready': 'Isolated {action} preview is ready for {plugin}.',
+    'notice.preview-ready-unisolated': '{action} preview is ready for {plugin} without process isolation.',
     'notice.discarded': 'Discarded the {plugin} preview without changing the profile.',
     'notice.applied': 'Applied {plugin}; the previous profile remains available for Undo.',
     'notice.restored': 'Restored the profile from before {plugin} was applied.',
@@ -215,6 +237,8 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'update-available': '有可用更新',
     'not-installed': '未安装',
     managed: '由 Oh-DSH 管理',
+    builtin: '内置',
+    'show-builtins': '显示内置插件',
     all: '全部',
     'all-categories': '全部分类',
     'mechanism.repository': '仓库插件',
@@ -225,6 +249,12 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     category: '分类',
     mechanism: '安装机制',
     updated: '更新时间',
+    stars: 'Stars',
+    forks: 'Forks',
+    'open-issues': '开放 Issue 与 PR',
+    language: '主要语言',
+    license: '许可证',
+    'github-stats': 'GitHub 仓库统计',
     unknown: '未知',
     repository: '仓库',
     surfaces: '生效界面',
@@ -266,6 +296,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     commit: '提交 {commit}',
     package: '软件包 {package}',
     'allow-scripts': '仅允许在写入受限的预览环境中运行这些脚本。',
+    'accept-unsandboxed-build': '在没有进程隔离的情况下运行这些第三方构建脚本（不安全）。',
     'accept-high-risk': '我了解应用后该插件会作为受信任主机代码运行。',
     'accept-source-change': '我已检查并接受变化后的来源身份。',
     'recovery-note': '应用时会原子替换 Profile，并保留上一版本用于恢复；插件产生的任意外部副作用不在回滚范围内。',
@@ -285,6 +316,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     refresh: '刷新',
     close: '关闭插件市场',
     'preview.running': '{plugin} 正在隔离预览窗口中运行。',
+    'preview.running-unisolated': '{plugin} 正在没有进程隔离的预览中运行。',
     discard: '放弃',
     apply: '应用到 {target}',
     'apply-action': '应用{action}',
@@ -303,6 +335,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'auth.not-refreshed': '插件目录尚未刷新。',
     'notice.loaded': '已加载 {count} 个目录插件。',
     'notice.preview-ready': '{plugin} 的隔离{action}预览已就绪。',
+    'notice.preview-ready-unisolated': '{plugin} 的{action}预览已就绪，未使用进程隔离。',
     'notice.discarded': '已放弃 {plugin} 的预览，Profile 配置未发生更改。',
     'notice.applied': '已应用 {plugin}；之前的配置仍可撤销恢复。',
     'notice.restored': '已恢复应用 {plugin} 之前的配置。',

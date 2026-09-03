@@ -30,12 +30,13 @@ renderer 自己的 `oauth` patch 行。Desktop 与 Web 用户没有订阅账号�
   dump 中断言 `dsh-auth` 行。
 - marketplace 保护覆盖插件 id、包名与 `ccch1mneyyy/dsh-auth` 仓库，并按
   dsh-context 用例镜像添加拒绝测试。
-- Nix 为 full 与 web 面从 bundle 的 `auth/` 目录（npm 发布布局）注册该包，
-  extra-deps 拷贝循环改为逐包合并 scope 条目，而不是跳过 renderer 已创建的
-  scope 目录。完整 `oh-dsh` 包构建通过，`@deepseek-harness-tui/dsh-auth` 与
-  `dsh-context` 均注册成功。scope 条目的 extra-deps 拷贝还会在缺失时获得与
-  collect-deps.py 相同的 `node_modules -> ../..` 依赖根链接，使 renderer 指向
-  auth 副本的私有链接能经运行时图解析 peer import。
+- Nix 把已发布的 tarball 挂载到仓库形状 staging root 的
+  `upstream/dsh-TUI/dsh-auth`（npm 发布布局），由共享运行时组装器
+  （`scripts/stage-runtime-lib.mjs` 的 `installDesktopPackages`）为 full 与
+  web 面注册。完整 `oh-dsh` 包构建通过，`@deepseek-harness-tui/dsh-auth` 与
+  `dsh-context` 均注册成功。renderer 的私有 `dsh-auth` 依赖由发布管线同一套
+  依赖安装逻辑复制进其包级 `.oh-dsh-store`，因此不会回到不可变的
+  bundle store 源路径。
 
 ## Alternatives considered
 
@@ -53,6 +54,11 @@ renderer 包。
 ## Consequences
 
 - `/auth` 在三个面上可用，凭据同样存储于 Oh-DSH 数据目录。
+- `tests/stage-runtime-lib.test.ts` 经共享组装器暂存 full 与 TUI fixture，并要求
+  `dsh-auth` 的 host peer 从暂存运行时图解析。
+- Nix 装配机制已移入共享运行时组装器（见
+  2026-08-27-nix-packaging-shares-stage-dsh-assembly）；本笔记保留表面归属与私有
+  副本决策。
 - 升级 renderer pin 会一并移动 dsh-auth 源；独立暂存 spec 指向嵌套子模块
   路径，将来上游移动该嵌套包时暂存会大声失败。
 - 若上游增加客户端半区，该包将从 `BUNDLED_DESKTOP_HOST_PLUGINS` 移入

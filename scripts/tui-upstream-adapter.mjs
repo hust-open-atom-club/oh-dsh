@@ -282,6 +282,13 @@ export function adaptTuiRendererPackage(packageDir) {
   )
   replaceEvery(plugin, 'dsh-tui --resume', 'ohdsh tui --resume')
 
+  const providerWizard = join(lib, 'dsh-adapter', 'providerWizard.js')
+  replaceEvery(
+    providerWizard,
+    '`~/.dsh/.credentials.yaml`',
+    '`$DSH_HOME/.credentials.yaml`',
+  )
+
   const channel = join(lib, 'dsh-adapter', 'channel.js')
   replaceOnce(
     channel,
@@ -304,6 +311,16 @@ export function adaptTuiRendererPackage(packageDir) {
   const messages = join(lib, 'i18n.js')
   replaceEvery(messages, '~/.dsh-tui', '~/.ohdsh/tui')
   replaceEvery(messages, 'dsh-tui', 'Oh-DSH TUI')
+  replaceOnce(
+    messages,
+    "'provider-q-apikey-detail': { zh: '密钥将写入 ~/.dsh/.credentials.yaml（权限 0600），不会出现在会话记录中', en: 'The key is stored in ~/.dsh/.credentials.yaml (mode 0600) and never shown in the transcript' },",
+    "'provider-q-apikey-detail': { zh: '密钥由 Harness 凭据服务管理，不会出现在会话记录中', en: 'The key is managed by the Harness credentials service and never shown in the transcript' },",
+  )
+  replaceEvery(
+    messages,
+    '~/.dsh/.credentials.yaml',
+    '$DSH_HOME/.credentials.yaml',
+  )
 
   const customTheme = join(lib, 'customTheme.js')
   replaceEvery(customTheme, '[dsh-tui]', '[Oh-DSH TUI]')

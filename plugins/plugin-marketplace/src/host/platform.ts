@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -21,7 +22,7 @@ import {
   win32,
 } from 'node:path'
 import { parseMarketplaceCatalog } from '../catalog.ts'
-import type { MarketplaceAuthStatus } from '../protocol.ts'
+import type { MarketplaceAuthStatus, MarketplaceRepositoryStats } from '../protocol.ts'
 import {
   MARKETPLACE_CATALOG_PATH,
   MARKETPLACE_CATALOG_REPOSITORY,
@@ -49,14 +50,19 @@ export interface BundleBuildInput {
   checkout: string
   sandboxRoot: string
   scripts: string[]
+  /** Explicitly opt out of process confinement; never the default. */
+  sandboxed?: boolean
 }
 
 /** Privileged operations consumed by the marketplace transaction module. */
 export interface MarketplacePlatform {
+  /** Whether lifecycle scripts can run under a write-restricted launcher. */
+  readonly scriptSandboxAvailable?: boolean
   authStatus(): Promise<MarketplaceAuthResult>
   buildBundle(input: BundleBuildInput): Promise<void>
   cloneRepository(repository: string, commit: string, target: string): Promise<void>
   loadCatalog(options?: LoadCatalogOptions): Promise<unknown>
+  loadRepositoryStats(repository: string): Promise<MarketplaceRepositoryStats | null>
   readRepositoryFile(repository: string, path: string, commit: string): Promise<string | null>
   resolveCommit(repository: string): Promise<string>
   runDsh(input: DshCommandInput): Promise<void>
@@ -79,6 +85,8 @@ export interface ProductionMarketplacePlatformOptions {
   nodeBinary: string
   now?: () => number
   pnpmEntry: string
+  /** Packaged Linux launcher; absent means scripted previews fail closed. */
+  sandboxLauncher?: string | undefined
   onLog?: (message: string) => void
 }
 
@@ -89,7 +97,11 @@ interface CommandOptions {
 }
 
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024
+
 export const MARKETPLACE_CATALOG_CACHE_TTL_MS = 2 * 60 * 60 * 1000
+
+export const MARKETPLACE_REPOSITORY_STATS_CACHE_TTL_MS = 6 * 60 * 60 * 1000
+
 const CATALOG_CACHE_VERSION = 1
 
 interface CatalogCache {
@@ -98,6 +110,65 @@ interface CatalogCache {
   fetchedAt: number
   locator: string
   version: 1
+}
+
+interface RepositoryStatsCache {
+  etag: string | null
+  fetchedAt: number
+  repository: string
+  stats: MarketplaceRepositoryStats
+  version: 1
+}
+
+function parseGitHubRepositoryStats(value: unknown): MarketplaceRepositoryStats | null {
+  if (!isRecord(value)) return null
+  const values = [value.forks_count, value.open_issues_count, value.stargazers_count]
+  if (values.some(entry => !Number.isSafeInteger(entry) || (entry as number) < 0)) return null
+  return {
+    forks: value.forks_count as number,
+    language: typeof value.language === 'string' && value.language !== '' ? value.language : null,
+    license: isRecord(value.license) && typeof value.license.name === 'string'
+      && value.license.name !== '' ? value.license.name : null,
+    openIssues: value.open_issues_count as number,
+    stars: value.stargazers_count as number,
+    updatedAt: typeof value.updated_at === 'string' && Number.isFinite(Date.parse(value.updated_at))
+      ? value.updated_at
+      : null,
+  }
+}
+
+function readRepositoryStatsCache(path: string | null, repository: string): RepositoryStatsCache | null {
+  if (path === null) return null
+  try {
+    const value = JSON.parse(readFileSync(path, 'utf8')) as unknown
+    if (!isRecord(value) || value.version !== 1 || value.repository !== repository
+      || typeof value.fetchedAt !== 'number' || !Number.isFinite(value.fetchedAt) || value.fetchedAt < 0
+      || (value.etag !== null && typeof value.etag !== 'string')) return null
+    const stats = isRecord(value.stats) ? {
+      forks_count: value.stats.forks,
+      language: value.stats.language,
+      license: value.stats.license === null ? null : { name: value.stats.license },
+      open_issues_count: value.stats.openIssues,
+      stargazers_count: value.stats.stars,
+      updated_at: value.stats.updatedAt,
+    } : null
+    const parsed = parseGitHubRepositoryStats(stats)
+    if (parsed === null) return null
+    return { etag: value.etag as string | null, fetchedAt: value.fetchedAt, repository, stats: parsed, version: 1 }
+  } catch {
+    return null
+  }
+}
+
+function writeRepositoryStatsCache(path: string, cache: RepositoryStatsCache): void {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+  const temporary = `${path}.tmp-${String(process.pid)}-${Math.random().toString(36).slice(2)}`
+  try {
+    writeFileSync(temporary, JSON.stringify(cache) + '\n', { mode: 0o600 })
+    renameSync(temporary, path)
+  } finally {
+    try { if (existsSync(temporary)) rmSync(temporary) } catch {}
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -327,44 +398,69 @@ export function previewSandboxPolicy(root: string): string {
   ].join('')
 }
 
-interface PreviewScriptCommandInput {
-  nodeArguments: string[]
-  nodeBinary: string
+export interface PreviewRuntimeLauncherInput {
   pathExists?: (path: string) => boolean
   platform?: NodeJS.Platform
   root: string
-  sandbox?: string
+  sandbox?: string | undefined
+}
+
+/** Seatbelt on macOS, Landlock on Linux, otherwise fail closed. */
+export function previewRuntimeLauncher(
+  input: PreviewRuntimeLauncherInput,
+): { args: string[]; command: string } {
+  const platform = input.platform ?? process.platform
+  const pathExists = input.pathExists ?? existsSync
+  const sandbox = input.sandbox
+    ?? (platform === 'darwin' ? '/usr/bin/sandbox-exec' : undefined)
+  if (platform === 'darwin') {
+    if (sandbox === undefined || !pathExists(sandbox)) {
+      throw new Error(
+        `scripted marketplace previews require a write-restricted process sandbox, which is unavailable on ${platform}`,
+      )
+    }
+    return {
+      args: ['-p', previewSandboxPolicy(input.root)],
+      command: sandbox,
+    }
+  }
+  if (platform === 'linux' && sandbox !== undefined && pathExists(sandbox)) {
+    return {
+      command: sandbox,
+      args: ['--ro', '/', '--rw', input.root, '--rw', '/dev/null', '--'],
+    }
+  }
+  throw new Error(
+    `scripted marketplace previews require a write-restricted process sandbox, which is unavailable on ${platform}`,
+  )
+}
+
+interface PreviewScriptCommandInput extends PreviewRuntimeLauncherInput {
+  nodeArguments: string[]
+  nodeBinary: string
 }
 
 /** Select a write-restricted launcher or reject the scripted preview. */
 export function previewScriptCommand(
   input: PreviewScriptCommandInput,
 ): { args: string[]; command: string } {
-  const platform = input.platform ?? process.platform
-  const sandbox = input.sandbox ?? '/usr/bin/sandbox-exec'
-  const pathExists = input.pathExists ?? existsSync
-  if (platform !== 'darwin' || !pathExists(sandbox)) {
-    throw new Error(
-      `scripted marketplace previews require a write-restricted process sandbox, which is unavailable on ${platform}`,
-    )
-  }
+  const launcher = previewRuntimeLauncher(input)
   return {
-    args: [
-      '-p',
-      previewSandboxPolicy(input.root),
-      input.nodeBinary,
-      ...input.nodeArguments,
-    ],
-    command: sandbox,
+    args: [...launcher.args, input.nodeBinary, ...input.nodeArguments],
+    command: launcher.command,
   }
 }
 
 export class ProductionMarketplacePlatform implements MarketplacePlatform {
+  readonly scriptSandboxAvailable: boolean
   readonly #ghPath: string | null
   readonly #options: ProductionMarketplacePlatformOptions
 
   constructor(options: ProductionMarketplacePlatformOptions) {
     this.#options = options
+    this.scriptSandboxAvailable = process.platform === 'darwin'
+      ? existsSync('/usr/bin/sandbox-exec')
+      : process.platform === 'linux' && options.sandboxLauncher !== undefined
     this.#ghPath = findGitHubCli(options.env)
   }
 
@@ -436,11 +532,14 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
         })),
     ]
     for (const command of commands) {
-      const launcher = previewScriptCommand({
-        nodeArguments: command.args,
-        nodeBinary: this.#options.nodeBinary,
-        root: input.sandboxRoot,
-      })
+      const launcher = input.sandboxed === false
+        ? { command: this.#options.nodeBinary, args: command.args }
+        : previewScriptCommand({
+          nodeArguments: command.args,
+          nodeBinary: this.#options.nodeBinary,
+          root: input.sandboxRoot,
+          sandbox: this.#options.sandboxLauncher,
+        })
       this.#options.onLog?.(`marketplace build: ${command.label}`)
       const result = await runCommand(launcher.command, launcher.args, {
         cwd: input.checkout,
@@ -543,6 +642,61 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
     throw new Error(`failed to load public marketplace catalog: ${String(publicError)}`)
   }
 
+  async loadRepositoryStats(repository: string): Promise<MarketplaceRepositoryStats | null> {
+    validateRepository(repository)
+    const catalogPath = catalogCachePath(
+      this.#options.env,
+      this.#options.appDataPath ?? this.#options.env.DSH_DESKTOP_APP_DATA,
+    )
+    const cachePath = catalogPath === null
+      ? null
+      : join(dirname(catalogPath), 'repository-stats', `${repository.replace('/', '--')}.json`)
+    const cached = readRepositoryStatsCache(cachePath, repository)
+    const now = this.#options.now?.() ?? Date.now()
+    const age = cached === null ? Number.POSITIVE_INFINITY : now - cached.fetchedAt
+    if (cached !== null && age >= 0 && age < MARKETPLACE_REPOSITORY_STATS_CACHE_TTL_MS) {
+      return cached.stats
+    }
+
+    const save = (entry: RepositoryStatsCache): void => {
+      if (this.#options.cacheReadOnly === true || cachePath === null) return
+      try {
+        writeRepositoryStatsCache(cachePath, entry)
+      } catch (error) {
+        this.#options.onLog?.(`marketplace repository stats: failed to update local cache: ${String(error)}`)
+      }
+    }
+
+    try {
+      const headers: Record<string, string> = {
+        accept: 'application/vnd.github+json',
+        'user-agent': 'oh-dsh-desktop',
+        'x-github-api-version': '2022-11-28',
+      }
+      if (cached?.etag !== null && cached?.etag !== undefined) headers['if-none-match'] = cached.etag
+      const response = await (this.#options.fetch ?? globalThis.fetch)(
+        `https://api.github.com/repos/${repository}`,
+        { headers, signal: AbortSignal.timeout(30_000) },
+      )
+      if (response.status === 304 && cached !== null) {
+        save({ ...cached, etag: response.headers.get('etag') ?? cached.etag, fetchedAt: now })
+        return cached.stats
+      }
+      if (!response.ok) throw new Error(`GitHub repository request failed with HTTP ${String(response.status)}`)
+      const stats = parseGitHubRepositoryStats(await response.json())
+      if (stats === null) throw new Error('GitHub repository response omitted valid statistics')
+      save({ etag: response.headers.get('etag'), fetchedAt: now, repository, stats, version: 1 })
+      return stats
+    } catch (error) {
+      if (cached !== null) {
+        this.#options.onLog?.(`marketplace repository ${repository}: using stale cache after refresh failed: ${String(error)}`)
+        return cached.stats
+      }
+      this.#options.onLog?.(`marketplace repository metadata unavailable for ${repository}: ${String(error)}`)
+      return null
+    }
+  }
+
   async resolveCommit(repository: string): Promise<string> {
     validateRepository(repository)
     const gh = this.requireGitHubCli()
@@ -609,13 +763,16 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       DSH_HOME: input.dshHome,
     }, this.#ghPath)
     const nodeArguments = [this.#options.cliEntry, ...input.args]
-    const sandbox = '/usr/bin/sandbox-exec'
-    const command = sandboxed && process.platform === 'darwin' && existsSync(sandbox)
-      ? sandbox
-      : this.#options.nodeBinary
-    const args = command === sandbox
-      ? ['-p', previewSandboxPolicy(input.sandboxRoot), this.#options.nodeBinary, ...nodeArguments]
-      : nodeArguments
+    const launcher = sandboxed
+      ? previewScriptCommand({
+        nodeArguments,
+        nodeBinary: this.#options.nodeBinary,
+        root: input.sandboxRoot,
+        sandbox: this.#options.sandboxLauncher,
+      })
+      : { command: this.#options.nodeBinary, args: nodeArguments }
+    const command = launcher.command
+    const args = launcher.args
     this.#options.onLog?.(`marketplace command: dsh ${input.args.join(' ')}`)
     const result = await runCommand(command, args, {
       ...(this.#options.cwd === undefined ? {} : { cwd: this.#options.cwd }),
@@ -636,3 +793,4 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
 export function defaultPreviewTemporaryRoot(): string {
   return join(tmpdir(), 'oh-dsh-plugin-preview')
 }
+// weave: run 'weave explain plugins/plugin-marketplace/src/host/platform.ts' for per-hunk detail, 'weave check' to verify your resolution

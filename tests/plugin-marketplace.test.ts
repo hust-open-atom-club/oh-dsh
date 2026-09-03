@@ -16,6 +16,8 @@ import type {
 import {
   findGitHubCli,
   MARKETPLACE_CATALOG_CACHE_TTL_MS,
+  previewRuntimeLauncher,
+  previewSandboxPolicy,
   previewScriptCommand,
   ProductionMarketplacePlatform,
   withGitHubCredentials,
@@ -35,6 +37,12 @@ import {
   createMarketplaceHttpBridge,
   waitForMarketplaceRestart,
 } from '../plugins/plugin-marketplace/src/client/http.ts'
+import {
+  formatMarketplaceCount,
+  formatMarketplaceDate,
+  marketplaceRepositoryDetails,
+} from '../plugins/plugin-marketplace/src/client/repository-metadata.ts'
+import { MARKETPLACE_MESSAGES } from '../plugins/plugin-marketplace/src/client/i18n.ts'
 import type {
   MarketplacePreviewProxyContext,
 } from '../plugins/plugin-marketplace/src/host/preview-proxy.ts'
@@ -42,10 +50,11 @@ import {
   MarketplacePreviewProxy,
   MARKETPLACE_WEB_PREVIEW_PATH,
 } from '../plugins/plugin-marketplace/src/host/preview-proxy.ts'
-import type { MarketplaceSnapshot } from '../plugins/plugin-marketplace/src/protocol.ts'
+import type { MarketplaceRepositoryStats, MarketplaceSnapshot } from '../plugins/plugin-marketplace/src/protocol.ts'
 import { TuiMarketplaceController } from '../plugins/tui-marketplace/src/marketplace-controller.ts'
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567'
+
 const UPDATED_COMMIT = 'fedcba9876543210fedcba9876543210fedcba98'
 
 function catalogDocument(): unknown {
@@ -96,10 +105,20 @@ function catalogDocument(): unknown {
   }
 }
 
+test('repository metadata formatters handle compact counts and invalid dates', () => {
+  assert.equal(formatMarketplaceCount(1_250, 'en'), '1.3K')
+  assert.equal(formatMarketplaceCount(null), null)
+  assert.equal(formatMarketplaceCount(-1), null)
+  assert.equal(formatMarketplaceDate(null, 'en', 'Unknown'), 'Unknown')
+  assert.equal(formatMarketplaceDate('not-a-date', 'en', 'Unknown'), 'Unknown')
+  assert.notEqual(formatMarketplaceDate('2026-08-27T12:00:00Z', 'en', 'Unknown'), 'Unknown')
+})
+
 class FakePlatform implements MarketplacePlatform {
   readonly builds: Array<{
     checkout: string
     sandboxRoot: string
+    sandboxed: boolean | undefined
     scripts: string[]
   }> = []
   readonly commands: DshCommandInput[] = []
@@ -108,6 +127,7 @@ class FakePlatform implements MarketplacePlatform {
   latestCommit = COMMIT
   bundleName = '@example/bundle-demo'
   bundleDescription = 'Bundle demo manifest'
+  scriptSandboxAvailable = true
 
   async authStatus(): Promise<MarketplaceAuthResult> {
     return { detail: 'test auth', status: 'ready' }
@@ -117,6 +137,7 @@ class FakePlatform implements MarketplacePlatform {
     this.builds.push({
       checkout: input.checkout,
       sandboxRoot: input.sandboxRoot,
+      sandboxed: input.sandboxed,
       scripts: input.scripts,
     })
   }
@@ -124,6 +145,8 @@ class FakePlatform implements MarketplacePlatform {
   async cloneRepository(_repository: string, _commit: string, target: string): Promise<void> {
     mkdirSync(target, { recursive: true })
   }
+
+  async loadRepositoryStats(_repository: string): Promise<MarketplaceRepositoryStats | null> { return null }
 
   async loadCatalog(options: LoadCatalogOptions = {}): Promise<unknown> {
     this.catalogLoads.push(options)
@@ -417,6 +440,18 @@ test('catalog parser keeps safe entries and labels unsupported managers', () => 
     catalog.plugins.find(plugin => plugin.id === 'legacy-demo')?.surfaces,
     { declared: false, desktop: true, web: true, tui: true },
   )
+  const builtin = catalog.plugins.find(plugin => plugin.id === 'oh-dsh-desktop')
+  assert.equal(builtin?.builtin, true)
+  assert.equal(builtin?.protected, true)
+  assert.equal(builtin?.category, 'infra')
+  assert.equal(catalog.plugins.find(plugin => plugin.id === 'safe-demo')?.builtin, false)
+})
+
+test('marketplace built-in copy is complete in both browser locales', () => {
+  assert.equal(MARKETPLACE_MESSAGES.en.builtin, 'Built-in')
+  assert.equal(MARKETPLACE_MESSAGES.en['show-builtins'], 'Show built-in plugins')
+  assert.equal(MARKETPLACE_MESSAGES.zh.builtin, '内置')
+  assert.equal(MARKETPLACE_MESSAGES.zh['show-builtins'], '显示内置插件')
 })
 
 test('community and registry catalogs preserve repositories across owners', () => {
@@ -735,16 +770,33 @@ test('production bundle build runs approved hooks in its own workspace', {
   }
 })
 
-test('scripted bundle previews fail closed without a write sandbox', () => {
-  for (const platform of ['linux', 'win32'] as const) {
-    assert.throws(() => previewScriptCommand({
-      nodeArguments: ['/preview/pnpm.mjs', 'install'],
-      nodeBinary: '/preview/node',
-      pathExists: () => false,
-      platform,
-      root: '/preview',
-    }), new RegExp(`unavailable on ${platform}`))
-  }
+test('scripted bundle previews use Linux Landlock and fail closed without it', () => {
+  const linux = previewScriptCommand({
+    nodeArguments: ['/preview/pnpm.mjs', 'install'],
+    nodeBinary: '/preview/node',
+    pathExists: () => true,
+    platform: 'linux',
+    root: '/preview',
+    sandbox: '/runtime/landlock-run',
+  })
+  assert.deepEqual(linux, {
+    command: '/runtime/landlock-run',
+    args: ['--ro', '/', '--rw', '/preview', '--rw', '/dev/null', '--', '/preview/node', '/preview/pnpm.mjs', 'install'],
+  })
+  assert.throws(() => previewScriptCommand({
+    nodeArguments: ['/preview/pnpm.mjs', 'install'],
+    nodeBinary: '/preview/node',
+    pathExists: () => false,
+    platform: 'linux',
+    root: '/preview',
+  }), /unavailable on linux/)
+  assert.throws(() => previewScriptCommand({
+    nodeArguments: ['/preview/pnpm.mjs', 'install'],
+    nodeBinary: '/preview/node',
+    pathExists: () => false,
+    platform: 'win32',
+    root: '/preview',
+  }), /unavailable on win32/)
   assert.throws(() => previewScriptCommand({
     nodeArguments: ['/preview/pnpm.mjs', 'install'],
     nodeBinary: '/preview/node',
@@ -752,6 +804,15 @@ test('scripted bundle previews fail closed without a write sandbox', () => {
     platform: 'darwin',
     root: '/preview',
   }), /unavailable on darwin/)
+  const darwinRuntime = previewRuntimeLauncher({
+    pathExists: () => true,
+    platform: 'darwin',
+    root: '/preview',
+  })
+  assert.deepEqual(darwinRuntime, {
+    command: '/usr/bin/sandbox-exec',
+    args: ['-p', previewSandboxPolicy('/preview')],
+  })
 })
 
 test('refresh keeps public catalogs available when GitHub CLI is unavailable', async () => {
@@ -914,6 +975,138 @@ test('web restart wait observes the old host leave and the new host arrive', asy
   assert.equal(calls, 4)
 })
 
+test('TUI repository metadata includes every fetched field', async () => {
+  const plugin = parseMarketplaceCatalog({
+    schema: 'dsh-external-hub/v0.1',
+    repos: [{
+      name: 'tui-demo',
+      repo: 'example/tui-demo',
+      category: 'plugin',
+      description: 'TUI demo',
+      bundle: true,
+      stats: {
+        forks: 5,
+        language: 'TypeScript',
+        license: 'MIT License',
+        openIssues: 7,
+        stars: 42,
+        updatedAt: '2026-08-27T12:00:00Z',
+      },
+    }],
+  }).plugins[0]
+  assert.notEqual(plugin, undefined)
+  if (plugin === undefined) return
+
+  const lines = marketplaceRepositoryDetails(plugin)
+  assert.match(lines.join('\n'), /★ 42/)
+  assert.match(lines.join('\n'), /forks 5/)
+  assert.match(lines.join('\n'), /issues \+ PRs 7/)
+  assert.match(lines.join('\n'), /TypeScript/)
+  assert.match(lines.join('\n'), /MIT License/)
+  assert.doesNotMatch(lines.join('\n'), /updated: unknown/)
+})
+
+test('TUI marketplace loads repository metadata when details open', async () => {
+  const plugin = parseMarketplaceCatalog({
+    schema: 'dsh-external-hub/v0.1',
+    repos: [{
+      name: 'tui-demo',
+      repo: 'example/tui-demo',
+      category: 'plugin',
+      description: 'TUI demo',
+      bundle: true,
+    }],
+  }).plugins[0]
+  assert.notEqual(plugin, undefined)
+  if (plugin === undefined) return
+  const snapshot: MarketplaceSnapshot = {
+    auth: { detail: '', status: 'ready' },
+    busy: false,
+    catalog: [plugin],
+    catalogGeneratedAt: null,
+    error: null,
+    installed: [],
+    lastAction: null,
+    lifecycle: { candidate: null, current: { profile: 'tui', state: 'live' }, previous: null },
+    plan: null,
+    preview: null,
+    sourceLocks: [],
+    undoAvailable: false,
+  }
+  const stats = {
+    forks: 5,
+    language: 'TypeScript',
+    license: 'MIT License',
+    openIssues: 7,
+    stars: 42,
+    updatedAt: '2026-08-27T12:00:00Z',
+  }
+  const commands: unknown[] = []
+  const controller = new TuiMarketplaceController({
+    getSnapshot: async () => snapshot,
+    dispatch: async (command): Promise<MarketplaceSnapshot> => {
+      commands.push(command)
+      return { ...snapshot, catalog: [{ ...plugin, stats }] }
+    },
+  })
+
+  await controller.load()
+  controller.openDetail(plugin.id)
+  await new Promise<void>(resolve => { setImmediate(resolve) })
+
+  assert.deepEqual(commands, [{ type: 'load-repository-stats', pluginId: plugin.id }])
+  assert.deepEqual(controller.selectedPlugin()?.stats, stats)
+  controller.openDetail(null)
+  controller.openDetail(plugin.id)
+  await new Promise<void>(resolve => { setImmediate(resolve) })
+  assert.equal(commands.length, 1)
+})
+
+test('TUI marketplace hides built-ins until the user reveals them', async () => {
+  const catalog = parseMarketplaceCatalog(catalogDocument()).plugins
+  const snapshot: MarketplaceSnapshot = {
+    auth: { detail: '', status: 'ready' },
+    busy: false,
+    catalog,
+    catalogGeneratedAt: null,
+    error: null,
+    installed: [],
+    lastAction: null,
+    lifecycle: { candidate: null, current: { profile: 'tui', state: 'live' }, previous: null },
+    plan: null,
+    preview: null,
+    sourceLocks: [],
+    undoAvailable: false,
+  }
+  const controller = new TuiMarketplaceController({
+    getSnapshot: async () => snapshot,
+    dispatch: async () => snapshot,
+  })
+
+  await controller.load()
+  assert.equal(controller.getSnapshot().showBuiltins, false)
+  assert.equal(controller.filteredPlugins().some(plugin => plugin.builtin), false)
+
+  controller.toggleBuiltins()
+  assert.equal(controller.getSnapshot().showBuiltins, true)
+  const builtin = controller.filteredPlugins().find(plugin => plugin.builtin)
+  assert.equal(builtin?.id, 'oh-dsh-desktop')
+  if (builtin === undefined) return
+
+  controller.openDetail(builtin.id)
+  controller.toggleBuiltins()
+  assert.equal(controller.getSnapshot().showBuiltins, false)
+  assert.equal(controller.getSnapshot().screen, 'list')
+  assert.equal(controller.getSnapshot().selectedId, null)
+  const tui = readFileSync(new URL(
+    '../plugins/tui-marketplace/src/marketplace.tsx',
+    import.meta.url,
+  ), 'utf8')
+  assert.match(tui, /key\.ctrl && input === 'b'/)
+  assert.match(tui, /plugin\.protected === false/)
+  assert.match(tui, /plugin\.builtin[\s\S]*?\? 'built-in'/)
+})
+
 test('TUI marketplace collects explicit risk confirmations before preview', async () => {
   const snapshot: MarketplaceSnapshot = {
     auth: { detail: '', status: 'ready' },
@@ -953,6 +1146,7 @@ test('TUI marketplace collects explicit risk confirmations before preview', asyn
         ...snapshot,
         preview: {
           action: 'install',
+          isolated: true,
           pluginId: 'tui-demo',
           previewUrl: null,
           resolvedCommit: COMMIT,
@@ -1050,6 +1244,20 @@ test('marketplace navigation preserves the Settings footer geometry', () => {
   assert.match(client, /\['available', t\('not-installed'\)\]/)
   assert.match(client, /\['updates', t\('updates'\)\]/)
   assert.match(client, /\['disabled', t\('disabled'\)\]/)
+  assert.match(client, /const \[showBuiltins, setShowBuiltins\] = useState\(false\)/)
+  assert.match(client, /value=\{BUILTIN_CATEGORY_FILTER\}>\{t\('builtin'\)\}/)
+  assert.match(client, /aria-label=\{t\('show-builtins'\)\}/)
+  assert.match(client, /showBuiltins \|\| !plugin\.builtin/)
+  assert.match(client, /return plugin\.installed \|\| plugin\.builtin/)
+  assert.match(client, /visibleCatalog\.filter\(presentationInstalled\)/)
+  assert.match(client, /statusFilter === 'installed' && !installed/)
+  assert.match(client, /statusFilter === 'available' && installed/)
+  assert.match(client, /plugin\.builtin \|\| !plugin\.updateAvailable/)
+  assert.match(client, /plugin\.builtin \|\| !plugin\.installed \|\| plugin\.enabled/)
+  assert.match(client, /plugin\.builtin \? t\('builtin'\)/)
+  assert.match(client, /plugin\.installed && !plugin\.builtin/)
+  assert.match(client, /!plugin\.builtin && plugin\.updateAvailable/)
+  assert.match(client, /plugin\.id === selectedId && plugin\.builtin/)
   assert.match(client, /type: 'prepare'/)
   assert.match(client, /confirmations\.includes\(requirement\)/)
   assert.match(client, /snapshot\.auth\.status !== 'ready' && snapshot\.catalog\.length === 0/)
@@ -1076,6 +1284,17 @@ test('marketplace navigation preserves the Settings footer geometry', () => {
   assert.match(client, /slots\.inject\('sidebar\.footer\.action'/)
   assert.doesNotMatch(client, /ctx\.slots/)
   assert.doesNotMatch(client, /parent\.insertBefore\(this\.#entry, settings\)/)
+})
+
+test('browser marketplace resets category filters removed with built-ins', () => {
+  const client = readFileSync(new URL(
+    '../plugins/plugin-marketplace/src/client/plugin.tsx',
+    import.meta.url,
+  ), 'utf8')
+
+  assert.match(client, /const remainingCategories = new Set\(\(snapshot\?\.catalog \?\? \[\]\)[\s\S]*?\.filter\(plugin => !plugin\.builtin\)[\s\S]*?\.map\(plugin => plugin\.category\)\)/)
+  assert.match(client, /categoryFilter !== 'all' && !remainingCategories\.has\(categoryFilter\)/)
+  assert.doesNotMatch(client, /categoryFilter === BUILTIN_CATEGORY_FILTER\) setCategoryFilter\('all'\)/)
 })
 
 test('marketplace startup disables manual refresh until refresh settles', () => {
@@ -1158,7 +1377,7 @@ test('preview strips a stale pnpm store reference from the copied profile', asyn
     assert.equal(snapshot.error, null)
     snapshot = await setup.manager.dispatch({ type: 'inspect', action: 'install', pluginId: 'bundle-demo' })
     assert.equal(snapshot.error, null)
-    snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
+    snapshot = await setup.manager.dispatch({ type: 'preview', confirmations: ["allow-build-scripts"] })
     assert.equal(snapshot.error, null)
 
     // The copied candidate must not keep the stale tree: the preview's pnpm
@@ -1191,14 +1410,19 @@ test('bundle preview remains isolated until apply and supports undo', async () =
     snapshot = await setup.manager.dispatch({ type: 'inspect', action: 'install', pluginId: 'bundle-demo' })
     assert.deepEqual(snapshot.plan?.buildScripts, { prepare: 'node build.mjs' })
 
-    snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: false })
+    snapshot = await setup.manager.dispatch({ type: 'preview', confirmations: [] })
     assert.match(snapshot.error ?? '', /allow-build-scripts/)
     assert.equal(snapshot.preview, null)
 
-    snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
+    snapshot = await setup.manager.dispatch({ type: 'preview', confirmations: ["allow-build-scripts"] })
     assert.equal(snapshot.error, null)
     assert.equal(snapshot.preview?.pluginId, 'bundle-demo')
+    assert.equal(snapshot.preview?.isolated, true)
     assert.equal(setup.platform.builds.length, 1)
+    assert.equal(setup.platform.builds[0]?.sandboxed, true)
+    assert.equal(setup.platform.commands[0]?.sandboxed, true)
+    assert.equal(setup.platform.commands[1]?.sandboxed, true)
+    assert.equal(setup.runtime.previewStarts[0]?.sandboxed, true)
     assert.deepEqual(setup.platform.builds[0]?.scripts, ['prepare'])
     const build = setup.platform.builds[0]
     assert.equal(
@@ -1262,9 +1486,71 @@ test('safe actions prepare an isolated candidate in one transaction', async () =
     assert.equal(snapshot.plan?.sourceReview, 'first-use')
     assert.match(snapshot.plan?.manifestHash ?? '', /^[0-9a-f]{64}$/)
     assert.equal(snapshot.preview?.pluginId, 'safe-demo')
-    assert.equal(snapshot.lifecycle.candidate?.pluginId, 'safe-demo')
-    assert.equal(snapshot.lifecycle.current.profile, 'desktop')
-    assert.equal(snapshot.lifecycle.previous, null)
+    assert.equal(snapshot.preview?.isolated, true)
+    assert.equal(setup.runtime.previewStarts[0]?.sandboxed, true)
+    assert.equal(setup.platform.commands[0]?.sandboxed, true)
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('unsandboxed builds require direct human approval', async () => {
+  const setup = fixture()
+  try {
+    setup.platform.scriptSandboxAvailable = false
+    await setup.manager.dispatch({ type: 'refresh' })
+    let snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    assert.deepEqual(snapshot.plan?.requirements, [
+      'allow-build-scripts',
+      'accept-unsandboxed-build',
+    ])
+
+    snapshot = await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['allow-build-scripts', 'accept-unsandboxed-build'],
+    }, 'agent')
+    assert.match(snapshot.error ?? '', /direct human approval/)
+    assert.equal(snapshot.preview, null)
+    assert.equal(setup.platform.builds.length, 0)
+
+    snapshot = await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['allow-build-scripts', 'accept-unsandboxed-build'],
+    }, 'human-ui')
+    assert.equal(snapshot.error, null)
+    assert.equal(snapshot.preview?.pluginId, 'bundle-demo')
+    assert.equal(snapshot.preview?.isolated, false)
+    assert.match(snapshot.lastAction ?? '', /without process isolation/)
+    assert.equal(setup.platform.builds.length, 1)
+    assert.equal(setup.platform.builds[0]?.sandboxed, false)
+    assert.equal(setup.platform.commands[0]?.sandboxed, false)
+    assert.equal(setup.platform.commands[1]?.sandboxed, false)
+    assert.equal(setup.runtime.previewStarts[0]?.sandboxed, false)
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('scriptless previews stay usable when confinement is unavailable', async () => {
+  const setup = fixture()
+  try {
+    setup.platform.scriptSandboxAvailable = false
+    await setup.manager.dispatch({ type: 'refresh' })
+    const snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'safe-demo',
+    })
+    assert.equal(snapshot.error, null)
+    assert.deepEqual(snapshot.plan?.requirements, [])
+    assert.equal(snapshot.preview?.pluginId, 'safe-demo')
+    assert.equal(snapshot.preview?.isolated, false)
+    assert.equal(setup.platform.commands[0]?.sandboxed, false)
+    assert.equal(setup.runtime.previewStarts[0]?.sandboxed, false)
   } finally {
     setup.cleanup()
   }
@@ -1413,10 +1699,9 @@ test('the marketplace refuses to modify protected desktop plugins', async () => 
     })
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
-    assert.equal(
-      snapshot.catalog.find(plugin => plugin.id === 'oh-dsh-desktop')?.protected,
-      true,
-    )
+    const plugin = snapshot.catalog.find(candidate => candidate.id === 'oh-dsh-desktop')
+    assert.equal(plugin?.protected, true)
+    assert.equal(plugin?.builtin, true)
   } finally {
     setup.cleanup()
   }
@@ -1445,6 +1730,7 @@ test('the marketplace protects the bundled dsh-auth plugin', async () => {
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(snapshot.catalog[0]?.protected, true)
+    assert.equal(snapshot.catalog[0]?.builtin, true)
     assert.equal(setup.platform.commands.length, 0)
   } finally {
     setup.cleanup()
@@ -1474,6 +1760,7 @@ test('the marketplace protects the bundled dsh-context plugin', async () => {
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(snapshot.catalog[0]?.protected, true)
+    assert.equal(snapshot.catalog[0]?.builtin, true)
     assert.equal(setup.platform.commands.length, 0)
   } finally {
     setup.cleanup()
@@ -1503,6 +1790,7 @@ test('the marketplace protects the upstream Better Sidebar alias', async () => {
     assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(snapshot.catalog[0]?.protected, true)
+    assert.equal(snapshot.catalog[0]?.builtin, true)
     assert.equal(setup.platform.commands.length, 0)
   } finally {
     setup.cleanup()
@@ -1518,7 +1806,7 @@ test('installed bundles keep enabled state and update through isolated previews'
       action: 'install',
       pluginId: 'bundle-demo',
     })
-    await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
+    await setup.manager.dispatch({ type: 'preview', confirmations: ["allow-build-scripts"] })
     let snapshot = await setup.manager.dispatch({ type: 'apply' })
     let plugin = snapshot.catalog.find(entry => entry.id === 'bundle-demo')
     assert.equal(plugin?.installed, true)
@@ -1545,7 +1833,7 @@ test('installed bundles keep enabled state and update through isolated previews'
       action: 'enable',
       pluginId: 'bundle-demo',
     })
-    await setup.manager.dispatch({ type: 'preview', allowBuildScripts: false })
+    await setup.manager.dispatch({ type: 'preview', confirmations: [] })
     snapshot = await setup.manager.dispatch({ type: 'apply' })
     plugin = snapshot.catalog.find(entry => entry.id === 'bundle-demo')
     assert.equal(plugin?.enabled, true)
@@ -1561,7 +1849,7 @@ test('installed bundles keep enabled state and update through isolated previews'
       action: 'update',
       pluginId: 'bundle-demo',
     })
-    await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
+    await setup.manager.dispatch({ type: 'preview', confirmations: ["allow-build-scripts"] })
     snapshot = await setup.manager.dispatch({ type: 'apply' })
     plugin = snapshot.catalog.find(entry => entry.id === 'bundle-demo')
     assert.equal(plugin?.currentCommit, UPDATED_COMMIT)
@@ -1629,7 +1917,7 @@ test('repository plugins can be disabled without losing their install receipt', 
       action: 'disable',
       pluginId: 'repository-demo',
     })
-    await setup.manager.dispatch({ type: 'preview', allowBuildScripts: false })
+    await setup.manager.dispatch({ type: 'preview', confirmations: [] })
     snapshot = await setup.manager.dispatch({ type: 'apply' })
     plugin = snapshot.catalog.find(entry => entry.id === 'repository-demo')
     assert.equal(plugin?.installed, true)
