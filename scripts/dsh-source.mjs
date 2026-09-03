@@ -262,13 +262,45 @@ function resolveNpmAssembly() {
   // into the assembly), and a reused cache would silently carry those
   // mutations — or any other corruption — into the next release build.
   acquireNpmAssembly(target, archive)
+  // Mirror the repository policy: freshly published rc releases sit inside
+  // pnpm's minimumReleaseAge window, and the pinned assembly must install
+  // them without waiting for the age cutoff. The release's dependency
+  // ranges (`^0.1.2-alpha.3`) also match every later prerelease on the line,
+  // so the committed lockfile was generated with each `@deepseek-ai/dsh-*`
+  // member pinned to the release line; a frozen install re-derives the same
+  // pins from that lockfile (pnpm rejects a lockfile whose recorded
+  // overrides differ from the current configuration).
+  const releaseLockfile = join(root, 'scripts', `dsh-runtime-${DSH_SOURCE_SPEC.version}-lock.yaml`)
+  // Reproduce the lockfile's own recorded overrides verbatim: pnpm
+  // normalizes no-op pins out of the record, so a census of package names
+  // would not match it byte for byte and the frozen install would reject
+  // the configuration mismatch.
+  const recordedOverrides = existsSync(releaseLockfile)
+    ? /^overrides:\n((?:  .+\n)+)/m.exec(readFileSync(releaseLockfile, 'utf8'))?.[1] ?? ''
+    : ''
   writeFileSync(
     join(target, 'pnpm-workspace.yaml'),
-    // Mirror the repository policy: freshly published rc releases sit inside
-    // pnpm's minimumReleaseAge window, and the pinned assembly must install
-    // them without waiting for the age cutoff.
-    'packages:\n  - .\n\nminimumReleaseAgeExclude:\n  - \'@deepseek-ai/*\'\n',
+    'packages:\n  - .\n\nminimumReleaseAgeExclude:\n  - \'@deepseek-ai/*\'\n'
+    + '\n# Staging installs with --ignore-scripts throughout; these packages\n'
+    + '# carry build scripts that must be dispositioned explicitly or pnpm\n'
+    + '# fails the frozen install with ERR_PNPM_IGNORED_BUILDS.\n'
+    + 'ignoredBuiltDependencies:\n'
+    + ['@deepseek-ai/dsh-subprocess-local', '@google/genai', 'koffi', 'node-pty', 'protobufjs']
+      .map(name => `  - '${name}'\n`).join('')
+    + (recordedOverrides !== '' ? `\noverrides:\n${recordedOverrides}` : ''),
   )
+  // The published manifest's devDependencies reference unpublished
+  // `dsh-experimental-*` packages (true for every 0.1.2 assembly so far), so
+  // a full install of the assembly cannot resolve. The assembly is consumed
+  // only by `pnpm install --frozen-lockfile` followed by `deploy --prod`;
+  // dev dependencies never reach the staged runtime, so drop them beside the
+  // workspace shim rather than pinning unreleased packages.
+  const manifestPath = join(target, 'package.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  if (manifest.devDependencies !== undefined) {
+    delete manifest.devDependencies
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, undefined, 2)}\n`)
+  }
   validateSource(target)
   return target
 }

@@ -6,7 +6,7 @@ import {
   useRef,
   useSyncExternalStore,
 } from 'react'
-import { defineStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { defineStore } from '@deepseek-ai/dsh-client-store'
 import { createRoot, type Root } from 'react-dom/client'
 import type { DesktopBridge } from '../../../../src/contracts.ts'
 import type { DesktopPanels } from '../../../panel-controls/src/client.ts'

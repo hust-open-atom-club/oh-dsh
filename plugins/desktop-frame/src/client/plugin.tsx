@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { defineStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { defineStore } from '@deepseek-ai/dsh-client-store'
 import frameCss from './frame.css'
 import { DesktopFrameThemePresenter } from './theme-presenter.ts'
 
@@ -37,6 +37,9 @@ interface DesktopFrameProps {
   useSessions<T>(selector: (state: SessionState) => T): T
   actions: DesktopLayoutActions
   renderSlot(name: string, owner: Record<string, unknown>): ReactNode
+  // Standard share since the 0.1.2 slot system: strict session-scoped child
+  // slots (details) only render inside this current-session binding.
+  SessionProvider: (props: { children?: ReactNode }) => JSX.Element
 }
 
 interface ClientContext {
@@ -287,7 +290,9 @@ function DesktopFrame(props: DesktopFrameProps): JSX.Element {
         </div>
       </div>
       <div className="oh-dsh-desktop-frame-center">{props.renderSlot('conversation', {})}</div>
-      <div className="oh-dsh-desktop-frame-details">{props.renderSlot('details', {})}</div>
+      <div className="oh-dsh-desktop-frame-details">
+        <props.SessionProvider>{props.renderSlot('details', {})}</props.SessionProvider>
+      </div>
       <div className="oh-dsh-desktop-frame-overlay" data-shell-overlay>{props.renderSlot('shell.overlay', {})}</div>
       {!sidebarCollapsed && (
         <DragHandle

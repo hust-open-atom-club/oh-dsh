@@ -315,106 +315,28 @@ You can also select it at TUI startup with `ohdsh tui --preset liangshen`.
 The blank-only rule applies after a conversation has started; that choice is
 saved as the default for the next new session.
 
-## Image recognition
+## Image input
 
-Desktop, Web, and TUI all load the bundled `@oh-dsh/vision` plugin. DSH owns
-image paste, thumbnails, attachment storage, and submission through its native
-attachment rail. DeepSeek V4 is still described as text-only by the pinned DSH
-metadata; the plugin only admits V4 at the Host's final image-capability check.
-The Host then describes each native image attachment through the configured
-vision backend before the pinned text-only adapter serializes the same turn. It
-does not intercept the composer or create a second thumbnail/reference path.
-The `view_image` tool remains available for explicit workspace-local paths,
-HTTP(S) URLs, and image data URLs.
+Desktop, Web, and TUI use DSH's native multimodal input. Paste a PNG, JPEG,
+WebP, or GIF into the message composer (`⌘V` on macOS, `Ctrl+V` on
+Windows/Linux) or use the attachment button: DSH owns the thumbnail, remove,
+drag-and-drop, size limits, and submission through its native attachment rail.
+Models with native image understanding — such as DeepSeek V4 Flash — consume
+the attachments directly, so no vision bridge, extra model, or separate API
+key is involved.
 
-In Desktop or Web UI, copy a PNG, JPEG, WebP, or GIF, focus the message
-composer, and press `⌘V` on macOS or `Ctrl+V` on Windows/Linux. DSH's native
-composer displays the thumbnail inside the input card and owns remove, drag/drop,
-size limits, and submission. The plugin does not intercept this flow. TUI has
-no graphical thumbnail; provide a workspace-local image path or HTTP(S) URL in
-the prompt to use the same `view_image` tool.
-
-The default backend uses Zhipu `glm-4.6v-flash`. In the native
-`Settings → Plugins → Plugin configuration → Vision` card, confirm the cloud
-endpoint first, then click `Get a Zhipu key` to open the Zhipu console. Paste
-the returned key into the password-style field; it is stored in the shared data
-root's credential file (`~/.ohdsh/.credentials.yaml` by default):
-
-```yaml
-ZHIPUAI_API_KEY: your-api-key
-```
-
-Keep the credential file owner-readable only, for example with
-`chmod 600 ~/.ohdsh/.credentials.yaml` on macOS/Linux. Exporting
-`ZHIPUAI_API_KEY` before launch is also supported. The legacy
-`VISION_API_KEY` name remains a migration fallback.
-
-Override the backend and model in the shared `~/.ohdsh/settings.yaml`:
-
-```yaml
-oh-dsh-vision:
-  baseURL: https://dashscope.aliyuncs.com/compatible-mode/v1
-  model: qwen3-vl-flash
-  apiKeyEnv: DASHSCOPE_API_KEY
-  maxTokens: 2048
-  timeoutMs: 60000
-maxImageBytes: 10485760
-```
-
-The card intentionally shows only the cloud endpoint, cloud model, and one
-masked Zhipu key field. The key is write-only through the DSH credential store
-and is never returned in a settings snapshot. Retry, fallback, timeout, image
-size, and local OCR/VLM options remain available to the Agent or through
-advanced `settings.yaml` configuration, so users do not have to enter several
-keys. Claude/Anthropic keys belong to their model provider and are not treated
-as the Zhipu Vision key.
-
-A local Ollama endpoint needs no key:
-
-```yaml
-oh-dsh-vision:
-  baseURL: http://localhost:11434/v1
-  model: qwen3-vl:4b
-```
-
-Cloud credentials are attempted first with bounded retries and configured cloud
-fallback models. If the cloud request is rate-limited, unavailable, or returns
-an incompatible response, a configured local OCR/VLM model is tried. If that
-path also fails, one final cloud recovery is attempted before the error points
-you to the Vision card, a new cloud key, or a local model. `localModel` is the
-model ID you choose from your local Ollama/LM Studio-compatible installation;
-an empty value disables the local fallback. `localApiKeyEnv` is only needed for
-a non-local endpoint.
-
-```yaml
-oh-dsh-vision:
-  apiKeyEnv: ZHIPUAI_API_KEY
-  retryAttempts: 3
-  retryBackoffMs: 1000
-  localBaseURL: http://localhost:11434/v1
-  localModel: glm-ocr
-  localFallbackModels:
-    - qwen2.5-vl:7b
-```
-
-Each backend has a bounded exponential retry. When both backends fail, the
-error tells the user to check the cloud key or install/configure a local
-OpenAI-compatible OCR/VLM model. The plugin does not embed or fetch a shared
-cloud secret; the user's authorized key remains in DSH credentials or the
-configured environment variable.
-
-Local image paths must remain inside the active Session workspace, including
-after symlink resolution. Remote URLs or local image bytes are sent to the
-configured vision endpoint only when `view_image` is called. The browser's
-attachment button, paste, and drag-and-drop remain native DSH image input;
-DeepSeek V4 is admitted by the plugin's final check, while other models keep
-their declared image-input behavior.
+The former `@oh-dsh/vision` bridge plugin, which described images through an
+OpenAI-compatible VLM for text-only models, has been removed together with the
+native-multimodal model line. Its `oh-dsh-vision` settings namespace and the
+`ZHIPUAI_API_KEY`/`VISION_API_KEY` credentials are no longer read. TUI has no
+graphical thumbnail; provide a workspace-local image path or an HTTP(S) URL in
+the prompt to use the same native image input.
 
 ## Context insight
 
 Desktop and Web bundle
 [dsh-context](https://github.com/bowenliang123/dsh-context) (pinned release
-`v0.31.1`) as a built-in plugin. It contributes a Context panel with capacity,
+`v0.41.0`) as a built-in plugin. It contributes a Context panel with capacity,
 remaining, composition, history, event, and message statistics, and a
 `/context` command that summarizes the current context composition inside the
 conversation. The plugin is read-only insight: it observes the session through

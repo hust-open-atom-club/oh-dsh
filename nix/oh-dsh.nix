@@ -61,31 +61,36 @@ let
       && base != "dist";
   };
 
+  # NOTE: the fetchFromGitHub nar hashes below (better-sidebar, dsh-TUI,
+  # dsh-auth, ecosystem-spec) and both fetchPnpmDeps hashes still carry the
+  # 0.1.1-rc.2-era values; this workspace has no nix runner, so they must be
+  # refreshed from an actual `nix build` (the mismatch errors print the new
+  # hashes). See the dsh-0.1.2-alpha.3 upgrade agent note.
   betterSidebarSrc = pkgs.fetchFromGitHub {
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
-    rev = "d9b8f15d9eab018742f97d67e54b2398504894cd";
+    rev = "9494774c4867cdb661c8f9a805c40f7982518868";
     hash = "sha256-bfpop+QKF8fRAl/vWjcTJgTkBA2bvHK+/KlBkR0NLa4=";
   };
   contextRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.31.1.tgz";
-    hash = "sha512-AJMWAtYWMWj7ondprNWbLutXX9VpONEP2Vk6t1Gh5ZdzuHTc1u0pGGI2qRRKdjZBjVy3x9TgF5jgW2Mx1T89pg==";
+    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.41.0.tgz";
+    hash = "sha512-yPa+brCs/CKlH7bxIvAV3Q6MJzEXgTxqK0yap3tslBs022UKQNR1nV6HR+haPTK4B75BH2ujLYd3foH3vMjxCQ==";
   };
   tuiSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
-    rev = "b166c2ecc03ab61ec5aee16fe69cdeaf0e2a03a9";
+    rev = "f7db605713a861b28c004b2dc18813bb74d61154";
     hash = "sha256-AU3SxnjucUA8yvQia+cw/q3cqItRCFb/njaiRoiOS9c=";
   };
   dshAuthSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-auth";
-    rev = "fba02bcf7fb57e3d9885f73882d5835ccdf526c4";
+    rev = "4e7cba3854e8874c8114bac2133aba3a7e1a65fe";
     hash = "sha256-ip/jdsm/YiPvVdZ0o2m/thImd+4ZmRjzQKzXvJ9dAK8=";
   };
   tuiRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.9.2.tgz";
-    hash = "sha512-LsjNnQ790sAGNllrNt3L8B1rdePcwRvwqSlQJ97uTh5skPaUkV9W41oqEYw1g19DZ6CEQ/8T3kKsI9pmQ8AynQ==";
+    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.0-beta.4.tgz";
+    hash = "sha512-+DAyd7uWgSibjxiTtC/SFODt/TdNrrmS9dSAYP53VNAhA6sFcJATp1qPNhG/31coVM+mb5HmZD5rwX60MC/cCQ==";
   };
   dshAuthRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-auth/-/dsh-auth-0.1.0.tgz";
@@ -94,7 +99,7 @@ let
   tuiEcosystemSpecSrc = pkgs.fetchFromGitHub {
     owner = "T-Auto";
     repo = "dsh-ecosystem-spec";
-    rev = "2d0236f7d4579814d9d177a58d03ebd168025960";
+    rev = "d28c267fe7fd775428ec2dccd65b0b7efd4dacee";
     hash = "sha256-7PK0j8gl3+1esTzjlrKOZkEei6OL13H/4JiIOf5LOR8=";
   };
   tuiStdSrc = pkgs.fetchFromGitHub {
@@ -210,7 +215,6 @@ let
       # Copy the pinned renderer and apply the guarded Oh-DSH adaptation.
       mkdir -p $out/lib/oh-dsh/tui-renderer
       cp -r upstream/dsh-TUI-release/lib \
-        upstream/dsh-TUI-release/skills \
         upstream/dsh-TUI-release/dsh-ecosystem-spec \
         upstream/dsh-TUI-release/presets \
         upstream/dsh-TUI-release/cordis.patch.yml \

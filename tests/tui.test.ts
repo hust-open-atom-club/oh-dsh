@@ -165,14 +165,12 @@ test('TUI bundle mounts Oh-DSH adapters before the upstream renderer', () => {
   const surface = patch.indexOf("name: '@oh-dsh/tui'")
   const marketplace = patch.indexOf("name: '@oh-dsh/plugin-marketplace'")
   const skins = patch.indexOf("name: '@oh-dsh/skins'")
-  const vision = patch.indexOf("name: '@oh-dsh/vision'")
   const marketplaceScene = patch.indexOf("name: '@oh-dsh/tui-marketplace'")
   const renderer = patch.indexOf("name: '@deepseek-harness-tui/dsh-tui'")
   assert.ok(surface >= 0
     && surface < marketplace
     && marketplace < skins
-    && skins < vision
-    && vision < marketplaceScene
+    && skins < marketplaceScene
     && marketplaceScene < renderer)
 })
 
