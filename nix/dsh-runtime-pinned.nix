@@ -73,7 +73,9 @@ stdenv.mkDerivation rec {
   installPhase = ''
     runHook preInstall
     mkdir -p $out/lib/dsh
-    cp -r lib config package.json node_modules $out/lib/dsh/
+    # 0.1.2 npm assemblies ship lib/ without the config/ tree rc.2 carried.
+    cp -r lib package.json node_modules $out/lib/dsh/
+    if [ -d config ]; then cp -r config $out/lib/dsh/; fi
     runHook postInstall
   '';
 
