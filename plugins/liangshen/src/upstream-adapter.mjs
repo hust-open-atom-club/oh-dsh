@@ -53,18 +53,24 @@ export function adaptDshLiangshenOwnership(runtimeRoot) {
   )
   const apiPath = dshPackageFilePath(
     runtimeRoot,
-    'dsh-host-apiproxy',
+    'dsh-agent-presets',
     'lib',
     'index.js',
   )
-  for (const path of [rosterPath, apiPath]) {
+  const wireSchemaPath = dshPackageFilePath(
+    runtimeRoot,
+    'dsh-agent-presets',
+    'lib',
+    'typert.host.js',
+  )
+  for (const path of [rosterPath, apiPath, wireSchemaPath]) {
     if (!existsSync(path)) {
       throw new Error(`Liangshen ownership adapter dependency is missing: ${path}`)
     }
   }
 
   const metadataAnchor = 'const METADATA_FILE = "preset.yml";'
-  const scanAnchor = 'async function scanRoot(root) {'
+  const scanAnchor = 'async function scanRoot(root, harnessBase) {'
   const rosterAnchor = [
     '\t\tconst metadata = await readPresetMetadata(directory);',
     '\t\tfound.push({',
@@ -110,28 +116,30 @@ export function adaptDshLiangshenOwnership(runtimeRoot) {
     ].join('\n')],
   ])
 
+  // The 0.1.2 presets API lives in dsh-agent-presets itself: the wire roster
+  // is remoteExportList and the wire schema the typert host's readonly result.
   const apiRosterAnchor = [
-    '\t\t\t\t\t\tid: preset.id,',
-    '\t\t\t\t\t\ttrust: preset.trust,',
-    '\t\t\t\t\t\tisDefault: preset.id === defaultId,',
+    '\t\t\t\t\tid: preset.id,',
+    '\t\t\t\t\ttrust: preset.trust,',
+    '\t\t\t\t\tisDefault: preset.id === defaultId,',
   ].join('\n')
   const apiSchemaAnchor = [
-    '\tid: z$1.string().min(1),',
-    '\ttrust: z$1.union([z$1.literal("system"), z$1.literal("user")]),',
-    '\tisDefault: z$1.boolean(),',
+    "  'trust': z.union([z.literal(\"system\"), z.literal(\"user\")]).readonly(),",
+    "  'isDefault': z.boolean().readonly(),",
   ].join('\n')
   patchFile(apiPath, [
     [apiRosterAnchor, [
-      '\t\t\t\t\t\tid: preset.id,',
-      '\t\t\t\t\t\ttrust: preset.trust,',
-      '\t\t\t\t\t\t...preset.managedBy === void 0 ? {} : { managedBy: preset.managedBy },',
-      '\t\t\t\t\t\tisDefault: preset.id === defaultId,',
+      '\t\t\t\t\tid: preset.id,',
+      '\t\t\t\t\ttrust: preset.trust,',
+      '\t\t\t\t\t...preset.managedBy === void 0 ? {} : { managedBy: preset.managedBy },',
+      '\t\t\t\t\tisDefault: preset.id === defaultId,',
     ].join('\n')],
+  ])
+  patchFile(wireSchemaPath, [
     [apiSchemaAnchor, [
-      '\tid: z$1.string().min(1),',
-      '\ttrust: z$1.union([z$1.literal("system"), z$1.literal("user")]),',
-      '\tmanagedBy: z$1.string().min(1).optional(),',
-      '\tisDefault: z$1.boolean(),',
+      "  'trust': z.union([z.literal(\"system\"), z.literal(\"user\")]).readonly(),",
+      "  'managedBy': z.string().readonly().optional(),",
+      "  'isDefault': z.boolean().readonly(),",
     ].join('\n')],
   ])
 }
@@ -148,28 +156,11 @@ export function adaptDshLiangshenPresentation(runtimeRoot) {
     'lib',
     'client.js',
   )
-  const connectionPath = dshPackageFilePath(
-    runtimeRoot,
-    'dsh-client-connection',
-    'lib',
-    'client.js',
-  )
-  for (const required of [path, connectionPath]) {
-    if (!existsSync(required)) {
-      throw new Error(`Liangshen browser adapter dependency is missing: ${required}`)
-    }
+  if (!existsSync(path)) {
+    throw new Error(`Liangshen browser adapter dependency is missing: ${path}`)
   }
-  const connectionSchemaAnchor = [
-    '\t\t\tid: string().min(1),',
-    '\t\t\ttrust: union([literal("system"), literal("user")]),',
-    '\t\t\tisDefault: boolean(),',
-  ].join('\n')
-  patchFile(connectionPath, [[connectionSchemaAnchor, [
-    '\t\t\tid: string().min(1),',
-    '\t\t\ttrust: union([literal("system"), literal("user")]),',
-    '\t\t\tmanagedBy: string().min(1).optional(),',
-    '\t\t\tisDefault: boolean(),',
-  ].join('\n')]])
+  // The 0.1.2 connection client carries no preset schema anymore (the roster
+  // rows are structural), so only the agent-preset renderer needs adapting.
 
   const englishAnchor = '\t\t\tpresetCordisDescription: "Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance.",'
   const chineseAnchor = '\t\t\tpresetCordisDescription: "用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、插件实验和 preset 创作指导。",'
@@ -227,42 +218,21 @@ export function adaptDshLiangshenPresentation(runtimeRoot) {
  */
 export function adaptTuiLiangshenPresentation(packageDir) {
   const types = join(packageDir, 'lib', 'types')
+  // The 0.1.2 renderer localizes roster entries itself through
+  // tOr(`preset-name-${id}`) / tOr(`preset-desc-${id}`), so the presentation
+  // adapter only registers the Liangshen dictionary entries; the channel's
+  // own mapping picks them up under lang=en.
   const messagesPath = join(types, 'i18n.js')
   const messagesAnchor = "    'preset-unavailable': { zh: 'Preset 不可用——当前组合未挂载 agent-presets 名册', en: 'Preset unavailable — the agent-presets roster is not mounted' },"
   patchFile(messagesPath, [[messagesAnchor, [
       messagesAnchor,
-      `    'preset-liangshen-name': { zh: ${JSON.stringify(LIANGSHEN_MESSAGES.zh.name)}, en: ${JSON.stringify(LIANGSHEN_MESSAGES.en.name)} },`,
-      `    'preset-liangshen-description': { zh: ${JSON.stringify(LIANGSHEN_MESSAGES.zh.description)}, en: ${JSON.stringify(LIANGSHEN_MESSAGES.en.description)} },`,
+      `    'preset-name-liangshen': { zh: ${JSON.stringify(LIANGSHEN_MESSAGES.zh.name)}, en: ${JSON.stringify(LIANGSHEN_MESSAGES.en.name)} },`,
+      `    'preset-desc-liangshen': { zh: ${JSON.stringify(LIANGSHEN_MESSAGES.zh.description)}, en: ${JSON.stringify(LIANGSHEN_MESSAGES.en.description)} },`,
     ].join('\n')]])
 
-  const channelPath = join(types, 'dsh-adapter', 'channel.js')
-  const channelAnchor = [
-      '                return list.map(preset => ({',
-      '                    id: preset.id,',
-      '                    ...(preset.name === undefined ? {} : { name: preset.name }),',
-      '                    ...(preset.description === undefined ? {} : { description: preset.description }),',
-      '                    ...(preset.broken === undefined ? {} : { broken: preset.broken }),',
-      '                    isDefault: preset.id === presets.defaultId,',
-      '                }));',
-    ].join('\n')
-  const channelReplacement = [
-      '                return list.map(preset => {',
-      `                    const isOhDshLiangshen = preset.managedBy === ${JSON.stringify(LIANGSHEN_OWNER)}`,
-      `                        && preset.id === ${JSON.stringify(LIANGSHEN_METADATA.id)}`,
-      `                        && preset.name === ${JSON.stringify(LIANGSHEN_METADATA.name)}`,
-      `                        && preset.description === ${JSON.stringify(LIANGSHEN_METADATA.description)};`,
-      '                    return {',
-      '                        id: preset.id,',
-      "                        ...(isOhDshLiangshen ? { name: t('preset-liangshen-name') }",
-      '                            : preset.name === undefined ? {} : { name: preset.name }),',
-      "                        ...(isOhDshLiangshen ? { description: t('preset-liangshen-description') }",
-      '                            : preset.description === undefined ? {} : { description: preset.description }),',
-      '                        ...(preset.broken === undefined ? {} : { broken: preset.broken }),',
-      '                        isDefault: preset.id === presets.defaultId,',
-      '                    };',
-      '                });',
-    ].join('\n')
-  patchFile(channelPath, [[channelAnchor, channelReplacement]])
+  // No channel patch: the 0.1.2 renderer localizes roster entries
+  // through the preset-name-*/preset-desc-* dictionary keys above.
+
 }
 
 /** Resolve one pinned DSH package file in pnpm or hoisted deployments. */

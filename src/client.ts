@@ -326,19 +326,48 @@ html[data-oh-dsh-desktop='true']:has(
 html[data-oh-dsh-desktop='true']:has(
   #root [role='presentation'] > [role='dialog']
 ) #oh-dsh-sidebar-root,
+/* The pinned summary and marketplace surface share the chrome layer's
+   stacking context (plugins/shared/chrome-layer.ts), so demoting the layer
+   carries both below the dialog backdrop. */
 html[data-oh-dsh-desktop='true']:has(
   #root [role='presentation'] > [role='dialog']
-) [data-oh-dsh-pinned-summary],
-html[data-oh-dsh-desktop='true']:has(
-  #root [role='presentation'] > [role='dialog']
-) #oh-dsh-plugin-marketplace-root {
+) #oh-dsh-chrome-layer {
   z-index: 999 !important;
 }
 
-html[data-oh-dsh-desktop='true']:has(
-  #root [role='presentation'] > [role='dialog']
-) #oh-dsh-plugin-marketplace-root {
-  position: relative;
+/* Portal overlays that hand the document a bare top-level dialog own their
+   own fixed chrome, and pinned upstream UI parks its lightbox close button
+   20px below the viewport top — inside the in-page titlebar row this surface
+   reserves on macOS and Windows, where the opaque strip paints over anything
+   below its z-index and half the control disappears. Structure, not classes:
+   the pinned runtime is hashed per build, so the contract is "a body-level
+   modal dialog's direct close button". macOS shares the reserved row; Linux
+   keeps its native frame and Web never loads the chrome stylesheet.
+
+   The lightbox backdrop keeps upstream's 40px gutter width but restores
+   its symmetry below the reserved row: uniform 40px on all four sides,
+   laid out inside the region under the strip (the strip replaces the top
+   gutter the viewport used to provide), and the image's own 100vh-based
+   ceiling shrinks by the titlebar and the gutters so tall previews never
+   re-overflow behind the strip. The close button rides the same gutter
+   grid at its corner. Upstream styles load after this sheet and win ties
+   at equal specificity, so the rules carry !important — the same
+   authority the sheet's dialog demotion rules already rely on. */
+html[data-oh-dsh-desktop-platform='darwin'] body > [role='dialog'][aria-modal='true'],
+html[data-oh-dsh-desktop-platform='win32'] body > [role='dialog'][aria-modal='true'] {
+  top: var(--oh-dsh-titlebar-height, 40px) !important;
+  padding: 40px !important;
+}
+
+html[data-oh-dsh-desktop-platform='darwin'] body > [role='dialog'][aria-modal='true'] > img,
+html[data-oh-dsh-desktop-platform='win32'] body > [role='dialog'][aria-modal='true'] > img {
+  max-height: calc(100vh - var(--oh-dsh-titlebar-height, 40px) - 80px) !important;
+}
+
+html[data-oh-dsh-desktop-platform='darwin'] body > [role='dialog'][aria-modal='true'] > button,
+html[data-oh-dsh-desktop-platform='win32'] body > [role='dialog'][aria-modal='true'] > button {
+  top: calc(var(--oh-dsh-titlebar-height, 40px) + 8px) !important;
+  right: 8px !important;
 }
 
 `
@@ -559,7 +588,10 @@ function installHeroBranding(): () => void {
 }
 
 function focusComposer(): void {
-  document.querySelector<HTMLTextAreaElement>('textarea')?.focus()
+  // The 0.1.2 conversation composer is a contenteditable div; the terminal
+  // input remains a textarea. The composer wins when both exist.
+  document.querySelector<HTMLElement>('[data-composer-input="true"]')?.focus()
+    ?? document.querySelector<HTMLTextAreaElement>('textarea')?.focus()
 }
 
 function findSettingsButton(): HTMLButtonElement | undefined {
@@ -584,6 +616,44 @@ function findSettingsButton(): HTMLButtonElement | undefined {
 
 function showSettings(): void {
   findSettingsButton()?.click()
+}
+
+/** Select the settings nav entry whose label matches, e.g. the About page. */
+function selectSettingsSection(pattern: RegExp): boolean {
+  const dialog = document.querySelector<HTMLDivElement>('[role="dialog"][aria-modal="true"]')
+  const nav = dialog?.querySelector('nav')
+  if (nav === null || nav === undefined) return false
+  const cell = [...nav.querySelectorAll<HTMLButtonElement>('button')]
+    .find(button => pattern.test([
+      button.textContent,
+      button.getAttribute('aria-label'),
+      button.getAttribute('title'),
+    ].filter(Boolean).join(' ')))
+  if (cell === undefined) return false
+  cell.click()
+  return true
+}
+
+function showAbout(): void {
+  // The About nav lives inside the settings panel, so open the dialog first.
+  // Clicking the trigger when the dialog is already open would close it, so
+  // only click while it is closed.
+  const dialogOpen = () => document.querySelector('[role="dialog"][aria-modal="true"]') !== null
+  if (!dialogOpen()) {
+    findSettingsButton()?.click()
+  }
+  // The panel and its nav mount on React's next commit after the trigger
+  // click (or after the settings plugin boots), so poll across frames until
+  // the nav renders, then select About. A timeout keeps an early menu click
+  // from looping forever if the settings trigger never appears.
+  const started = performance.now()
+  const attempt = (): void => {
+    if (selectSettingsSection(/about|关于/i)) return
+    if (performance.now() - started < 2_000) {
+      requestAnimationFrame(attempt)
+    }
+  }
+  attempt()
 }
 
 async function openPaths(workspaces: WorkspacesService, paths: readonly string[]): Promise<void> {
@@ -614,6 +684,9 @@ function dispatch(
       return
     case 'show-settings':
       showSettings()
+      return
+    case 'show-about':
+      showAbout()
       return
     case 'toggle-sidebar':
       panels.toggleSidebar()

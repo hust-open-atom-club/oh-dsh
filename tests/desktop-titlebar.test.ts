@@ -111,6 +111,27 @@ test('desktop chrome keeps platform title bars and panel controls distinct', () 
   assert.match(client, /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-panel-toolbar \{[\s\S]*?right: 8px/)
   assert.match(client, /data-oh-dsh-desktop-platform='win32'\] \.oh-dsh-panel-toolbar \{[\s\S]*?right: 154px/)
   assert.match(client, /\.oh-dsh-window-actions \{[\s\S]*?height: var\(--oh-dsh-titlebar-height\)/)
+  // Portal overlays with a bare top-level dialog (the pinned runtime's image
+  // lightbox) park their fixed close button 20px below the viewport top —
+  // under the opaque titlebar strip. On the platforms that reserve the row,
+  // the backdrop keeps upstream's 40px gutter width but restores its
+  // symmetry below the reserved row: uniform 40px on all four sides, the
+  // image's 100vh-based ceiling shrinks by the reserved row plus the two
+  // vertical gutters, and the close button rides the gutter grid at the
+  // top-right corner.
+  assert.match(
+    client,
+    /data-oh-dsh-desktop-platform='darwin'\] body > \[role='dialog'\]\[aria-modal='true'\],[\s\S]*?data-oh-dsh-desktop-platform='win32'\] body > \[role='dialog'\]\[aria-modal='true'\] \{[\s\S]*?top: var\(--oh-dsh-titlebar-height, 40px\) !important;[\s\S]*?padding: 40px !important/,
+  )
+  assert.match(
+    client,
+    /data-oh-dsh-desktop-platform='darwin'\] body > \[role='dialog'\]\[aria-modal='true'\] > img,[\s\S]*?data-oh-dsh-desktop-platform='win32'\] body > \[role='dialog'\]\[aria-modal='true'\] > img \{[\s\S]*?max-height: calc\(100vh - var\(--oh-dsh-titlebar-height, 40px\) - 80px\) !important/,
+  )
+  assert.match(
+    client,
+    /data-oh-dsh-desktop-platform='darwin'\] body > \[role='dialog'\]\[aria-modal='true'\] > button,[\s\S]*?data-oh-dsh-desktop-platform='win32'\] body > \[role='dialog'\]\[aria-modal='true'\] > button \{[\s\S]*?top: calc\(var\(--oh-dsh-titlebar-height, 40px\) \+ 8px\) !important;[\s\S]*?right: 8px !important/,
+  )
+  assert.doesNotMatch(client, /data-oh-dsh-desktop='true'\] body > \[role='dialog'\]\[aria-modal='true'\] > button/)
   assert.match(client, /body\[data-ds-dark-theme\] \.oh-dsh-menubar-brand img[\s\S]*?filter: brightness\(0\) invert\(1\)/)
   assert.match(client, /body::before \{[\s\S]*?z-index: 2147483645[\s\S]*?pointer-events: none/)
   assert.match(client, /\.oh-dsh-menubar \{[\s\S]*?z-index: 2147483646/)

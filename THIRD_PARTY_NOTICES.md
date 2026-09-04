@@ -11,12 +11,12 @@ releases and features are reviewed regularly.
 ## DeepSeek Harness
 
 - Project: <https://github.com/deepseek-ai/deepseek-harness>
-- Pinned npm release: `@deepseek-ai/dsh@0.1.1-rc.2`
+- Pinned npm release: `@deepseek-ai/dsh@0.1.2-alpha.3`
 - Declared license: MIT
 
 Oh-DSH packages the published DSH CLI release as its runtime. The release
 tarball and SHA-512 integrity are pinned in `dsh-source.json`; the dependency
-closure is pinned in `scripts/dsh-runtime-0.1.1-rc.2-lock.yaml`.
+closure is pinned in `scripts/dsh-runtime-0.1.2-alpha.3-lock.yaml`.
 
 ## dsh-web-panel
 
@@ -30,8 +30,8 @@ separate Web Terminal or shell plugin is required.
 ## DSH-better-sidebar
 
 - Project: <https://github.com/omdsh-dev/DSH-better-sidebar>
-- Pinned release: `v0.15.2`
-- Pinned revision: `d9b8f15d9eab018742f97d67e54b2398504894cd`
+- Pinned release: `v0.18.0-alpha.0`
+- Pinned revision: `9494774c4867cdb661c8f9a805c40f7982518868`
 - Declared license: MIT
 - Oh-DSH components: `@oh-dsh/better-sidebar-runtime` and
   `@oh-dsh/sidebar`
@@ -63,25 +63,12 @@ repository.
 Oh-DSH follows the ThemeService extension model while providing original
 skins, a desktop Settings interface, and Host-backed persistence.
 
-## dsh-vision
-
-- Project: <https://github.com/william-jin-cmu/dsh-vision>
-- Referenced revision: `72978aa176df8e01a685bf270a1b1d016660c492`
-- Declared license: BSD-3-Clause
-- Oh-DSH component: `@oh-dsh/vision`
-
-Oh-DSH adapts the upstream OpenAI-compatible vision bridge to the current DSH
-credentials, settings, tool-output, and cancellation contracts. The built-in
-Host is shared by Desktop, Web, and TUI, and local file resolution remains
-inside the active Session workspace. The upstream license is retained with the
-packaged plugin.
-
 ## dsh-context
 
 - Project: <https://github.com/bowenliang123/dsh-context>
-- Upstream package: `dsh-context@0.31.1`
-- Pinned release: `v0.31.1`
-- Pinned revision: `7e522ea342ba3a198b1eaa4557301212ae4098c9`
+- Upstream package: `dsh-context@0.41.0`
+- Pinned release: `v0.41.0`
+- Pinned revision: `3179715f57404b4429436685526674659b5e86e9`
 - Declared license: Apache-2.0
 - Oh-DSH component: built-in Desktop and Web context insight plugin
 
@@ -95,15 +82,15 @@ and keep the license with the packaged plugin.
 ## dsh-TUI
 
 - Project: <https://github.com/ccch1mneyyy/dsh-TUI>
-- Upstream package: `@deepseek-harness-tui/dsh-tui@0.9.2`
-- Pinned revision: `b166c2ecc03ab61ec5aee16fe69cdeaf0e2a03a9`
+- Upstream package: `@deepseek-harness-tui/dsh-tui@0.10.0-beta.4`
+- Pinned revision: `f7db605713a861b28c004b2dc18813bb74d61154`
 - Ecosystem specification: <https://github.com/T-Auto/dsh-ecosystem-spec>
-- Pinned ecosystem revision: `2d0236f7d4579814d9d177a58d03ebd168025960`
+- Pinned ecosystem revision: `d28c267fe7fd775428ec2dccd65b0b7efd4dacee`
 - Protocol packages: <https://github.com/Yan-Zero/dsh-std>
 - Pinned protocol revision: `614dfa1ac168db79fcf4577cf0ebb34e2e3b944b`
 - Bundled OAuth package: <https://github.com/ccch1mneyyy/dsh-auth>
   (`@deepseek-harness-tui/dsh-auth@0.1.0`, pinned revision
-  `fba02bcf7fb57e3d9885f73882d5835ccdf526c4`, MIT) — also mounted directly
+  `4e7cba3854e8874c8114bac2133aba3a7e1a65fe`, MIT) — also mounted directly
   as the built-in Desktop and Web host plugin behind the `/auth` command
 - Declared license: MIT
 - Oh-DSH component: `@oh-dsh/tui`

@@ -31,11 +31,22 @@ message times. Missing fields remain absent rather than being guessed. Loading,
 error, blank, no-session, and no-summary states each have explicit localized
 copy.
 
+The menu uses a dashboard order: session identity and status first, compact
+metadata next, optional Repository and Artwork sections, then the bounded
+summary body and action bar. Repository facts are read from the existing
+workspace and Better Sidebar Git endpoints and are shown only when the
+workspace is a repository; branch, clean/dirty state, change count, and
+ahead/behind counts are all optional, as is pull-request context. Artwork
+metadata is read from known optional drawing/canvas fields in the session or
+snapshot and is hidden for ordinary sessions; a drawing ID is promoted to the
+Artwork section badge when available. Failed or unavailable requests
+leave these sections hidden rather than changing the summary lifecycle.
+
 Summary text is rendered with DOM nodes and `textContent` plus a small,
 dependency-free Markdown presentation layer for paragraphs, lists, block
 quotes, inline code, and fenced code blocks. It truncates the preview at a
-stable 480-character limit and keeps the content in a 220px scrollable
-viewport inside a panel capped at 500px, so the action controls remain visible
+stable 480-character limit and keeps the content in a 170px scrollable
+viewport inside a panel capped at 520px, so the action controls remain visible
 without scrolling the whole menu. A localized control reveals or collapses the
 full summary within that bounded viewport. Untrusted HTML is never assigned to
 `innerHTML`; links are emitted only for `http` and `https` URLs. Copy uses the
@@ -108,7 +119,7 @@ regression test or test-only source scan was added because the repository has
 no DOM test harness for this plugin. The normal repository gates were run on
 the Node 24
 project runtime: `pnpm run typecheck`, the focused pinned-summary/layout tests,
-`pnpm test` (330 passed,
+`pnpm test` (328 passed,
 10 platform skips), `pnpm run build`, `pnpm run verify:agent-notes`,
 `pnpm run verify-translation-pairing`, and `git diff --check` all passed. The
 browser smoke command was attempted but cannot start on the headless server

@@ -55,6 +55,8 @@ web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可�
 | --- | --- | --- |
 | `--surface` | `tui` | `desktop`、`web` 或 `tui`，每个 surface 只安装自己的文件与启动器 |
 | `--version` | 最新稳定版 | 固定 Release 标签，如 `v0.1.8`。预发布不会被自动选中，只有在显式固定时才会安装 |
+| `--local` | 关闭 | 安装本仓库 `pnpm run dist:<surface>` 构建到 `release/` 的产物，而不是下载 Release。版本取自仓库的 `package.json`；重装同版本重建产物时配合 `--force` |
+| `--local-root` | 脚本所在目录 | 让 `--local` 指向另一个仓库检出 |
 | `--dest` | 见上表 | 目标目录 |
 | `--bin-dir` | `~/.local/bin` | `ohdsh` 启动器目录 |
 | `--repo` | `hust-open-atom-club/oh-dsh` | 从其他 fork 安装 |
@@ -63,9 +65,20 @@ web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可�
 | `--os`、`--arch` | 自动检测 | 覆盖目标选择（`darwin`/`linux`、`arm64`/`x64`） |
 
 等价的环境变量：`OH_DSH_SURFACE`、`OH_DSH_VERSION`、`OH_DSH_INSTALL_DIR`、
-`OH_DSH_BIN_DIR`、`OH_DSH_REPO`、`OH_DSH_OS`、`OH_DSH_ARCH`；命令行选项
-优先于环境变量。`GH_TOKEN`/`GITHUB_TOKEN` 用于 GitHub API 鉴权（在限流时
-有用），`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` 可为测试覆盖端点地址。
+`OH_DSH_BIN_DIR`、`OH_DSH_REPO`、`OH_DSH_OS`、`OH_DSH_ARCH`
+（`OH_DSH_LOCAL=1` 等价 `--local`）；命令行选项优先于环境变量。
+
+要测试自己正在改的分支，先构建对应表面，再直接从检出安装——不需要发布
+Release，也没有网络往返：
+
+```sh
+pnpm run dist:tui && sh install.sh --local --surface tui --force
+pnpm run dist:web && sh install.sh --local --surface web --force
+pnpm run dist:mac && sh install.sh --local --surface desktop --force
+```
+
+`GH_TOKEN`/`GITHUB_TOKEN` 用于 GitHub API 鉴权（在限流时有用），
+`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` 可为测试覆盖端点地址。
 
 升级、校验与卸载行为：
 
@@ -279,90 +292,24 @@ Agent preset 中选择；TUI 可以在空白会话中输入：
 也可以在启动时指定 TUI preset：`ohdsh tui --preset liangshen`。已经产生对话的
 会话遵循 blank-only 规则，选择会保存为下一次新会话的默认值。
 
-## 图片识别
+## 图片输入
 
-Desktop、Web 和 TUI 都会加载内置的 `@oh-dsh/vision`。图片粘贴、缩略图、附件保存
-和提交全部使用 DSH 原生 attachment rail。DeepSeek V4 的模型元数据在 DSH 中仍标记
-为 text-only，插件只在 Host 的最终图片能力校验处为 V4 放行，不接管输入栏，也不
-创建第二套图片气泡或引用协议。Host 会先用配置的视觉后端描述这些原生图片附件，再
-交给固定的 text-only 适配器序列化同一轮请求。`view_image` 仍可对明确给出的 Workspace
-图片路径、HTTP(S) URL 或 image data URL 做 OCR、图表读取、物体计数、截图排错与布局分析。
+Desktop、Web 和 TUI 使用 DSH 原生的多模态输入。把 PNG、JPEG、WebP 或 GIF 复制后
+粘贴到消息输入框（macOS 按 `⌘V`，Windows/Linux 按 `Ctrl+V`），或使用附件按钮：
+缩略图、删除、拖放、大小限制和提交全部由 DSH 原生 attachment rail 负责。具备原生
+图像理解能力的模型（如 DeepSeek V4 Flash）会直接消费这些附件，无需额外的视觉
+桥接、附加模型或单独的 API Key。
 
-在 Desktop 或 Web UI 中，复制一张 PNG、JPEG、WebP 或 GIF，把焦点放到消息输入框并
-按 `⌘V`（macOS）或 `Ctrl+V`（Windows/Linux）。当前 DSH 输入栏会在输入框内部显示
-原生缩略图，并负责删除、拖放、大小限制和提交；插件不会拦截这条流程。TUI 没有图形
-化缩略图，直接在消息中提供 Workspace 内的图片路径或 HTTP(S) URL，即可调用同一个
-`view_image` 工具。
-
-默认后端使用智谱 `glm-4.6v-flash`。在原生的“设置 → 插件 → 插件配置 → Vision”卡片中，
-先确认云端接口地址，再点击“获取智谱 Key”打开智谱控制台；复制回来的 Key 会以密码
-输入框显示，并保存到共享数据根目录的凭据文件（默认 `~/.ohdsh/.credentials.yaml`）：
-
-```yaml
-ZHIPUAI_API_KEY: your-api-key
-```
-
-凭据文件应保持仅当前用户可读，例如在 macOS/Linux 上执行
-`chmod 600 ~/.ohdsh/.credentials.yaml`。也可以在启动前 `export ZHIPUAI_API_KEY=...`。
-旧版本使用的 `VISION_API_KEY` 仍会作为迁移回退读取。
-
-后端和模型可在共享的 `~/.ohdsh/settings.yaml` 中覆盖：
-
-```yaml
-oh-dsh-vision:
-  baseURL: https://dashscope.aliyuncs.com/compatible-mode/v1
-  model: qwen3-vl-flash
-  apiKeyEnv: DASHSCOPE_API_KEY
-  maxTokens: 2048
-  timeoutMs: 60000
-maxImageBytes: 10485760
-```
-
-卡片只显示云端接口地址、云端模型和一个隐藏的智谱 Key 输入框；Key 不会回显到设置快照。
-重试、备用模型、超时、图片大小和本地 OCR/VLM 选项仍可由 Agent 或 `settings.yaml` 高级配置，
-不要求用户重复填写多个 Key。Claude/Anthropic Key 属于对应模型提供方，不会被当作智谱 Vision
-Key 使用。
-
-使用本地 Ollama 时不要求密钥：
-
-```yaml
-oh-dsh-vision:
-  baseURL: http://localhost:11434/v1
-  model: qwen3-vl:4b
-```
-
-插件始终优先使用云端凭据，并对云端备用模型进行有上限的重试。如果云端被限流、不可用
-或返回不兼容结果，会尝试配置的本地 OCR/VLM 模型；本地也失败后还会进行一次最终云端
-恢复，再提示你检查 Vision 卡片、换一把云端 Key 或安装本地模型。`localModel` 就是用户
-从本机 Ollama/LM Studio 兼容安装中选择的模型 ID；为空表示关闭本地回退。非本机端点才
-需要配置 `localApiKeyEnv`。
-
-```yaml
-oh-dsh-vision:
-  apiKeyEnv: ZHIPUAI_API_KEY
-  retryAttempts: 3
-  retryBackoffMs: 1000
-  localBaseURL: http://localhost:11434/v1
-  localModel: glm-ocr
-  localFallbackModels:
-    - qwen2.5-vl:7b
-```
-
-每个后端都会进行有上限的指数退避重试。两个后端都失败时，错误消息会提示用户检查
-云端 Key，或安装/配置本地 OpenAI-compatible OCR/VLM 模型。插件不会在仓库中内置或
-联网获取共享云端密钥；用户自己的授权凭据仍通过 DSH credentials 或配置的环境变量
-提供。
-
-本地图片路径只能位于当前 Session 的 Workspace 内，解析软链接后仍会检查边界；
-远程 URL 或本地图片内容只会在调用 `view_image` 时发送给所配置的视觉端点。浏览器
-附件按钮、粘贴和拖放都属于 DSH 原生图片输入；DeepSeek V4 的最终 admission check
-由插件放行，其他模型仍遵循各自的 image-input 元数据。
+原先为纯文本模型描述图片的内置 `@oh-dsh/vision` 桥接插件，已随原生多模态模型线
+一并移除。它的 `oh-dsh-vision` 设置命名空间与 `ZHIPUAI_API_KEY`/`VISION_API_KEY`
+凭据不再被读取。TUI 没有图形化缩略图，直接在消息中提供 Workspace 内的图片路径或
+HTTP(S) URL，即可使用同样的原生图片输入。
 
 ## 上下文洞察
 
 Desktop 和 Web 内置
 [dsh-context](https://github.com/bowenliang123/dsh-context)（固定版本
-`v0.31.1`）插件。它提供 Context 面板，展示上下文容量、余量、组成、历史、事件与
+`v0.41.0`）插件。它提供 Context 面板，展示上下文容量、余量、组成、历史、事件与
 消息统计，并提供 `/context` 命令在会话内快速查看当前上下文组成。该插件只做只读
 洞察：通过 DSH 自身驱动的 projection 观察会话，不会改动对话内容。
 
@@ -404,7 +351,11 @@ host 插件（固定在 dsh-TUI 子模块内；TUI 通过其 renderer 加载同�
 | 退出侧栏专注模式 | `Esc` |
 
 设置页支持中英文、模型、权限、Agent preset、插件配置和 Oh-DSH 皮肤。
-设置弹窗会覆盖并虚化所有工作区和侧栏内容。
+设置弹窗会覆盖并虚化所有工作区和侧栏内容。“关于”分区列出当前构建的版本
+信息：Oh-DSH 本身、固定的上游 DeepSeek Harness 运行时、内置插件和关键依赖。
+Desktop 端在同一分区即可完成整个更新流程——检查更新、带实时进度的下载和
+安装，无需离开页面；检查时若无法访问 GitHub，更新器会通过发布镜像重试
+一次。Web 端只展示版本信息，不显示更新卡片。
 
 Web 与 Desktop 可在设置页选择皮肤。TUI 输入 `/theme` 可选择相同的 Deep
 Current、Jade Circuit、Porcelain 和 Ember Dusk；选择立即生效并在重启后保留。

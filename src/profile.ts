@@ -14,12 +14,12 @@ export const TUI_PROFILE = 'tui'
 export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
   '@oh-dsh/desktop',
   '@oh-dsh/desktop-frame',
+  '@oh-dsh/about',
   '@oh-dsh/skins',
   '@oh-dsh/sidebar',
   '@oh-dsh/panel-controls',
   '@oh-dsh/pinned-summary',
   '@oh-dsh/plugin-marketplace',
-  '@oh-dsh/vision',
   // Pinned upstream plugin (upstream/dsh-context) staged under its npm name.
   'dsh-context',
 ] as const

@@ -102,6 +102,7 @@ export interface MarketplaceRepositoryStats {
 }
 
 export interface MarketplacePlugin {
+  builtin: boolean
   category: string
   description: string
   currentCommit: string | null

@@ -1,0 +1,249 @@
+.oh-dsh-about,
+.oh-dsh-about *,
+.oh-dsh-about *::before,
+.oh-dsh-about *::after {
+  /* The section mounts inside the host settings page, which ships no global
+     border-box reset; without this the rows' horizontal padding renders
+     outside the card grid track and overflows the card. */
+  box-sizing: border-box;
+}
+
+.oh-dsh-about {
+  --oh-about-chip-bg: color-mix(in srgb, var(--dsw-alias-brand-primary, #6d5ce6) 12%, transparent);
+  --oh-about-badge-bg: color-mix(in srgb, var(--dsw-alias-brand-primary, #6d5ce6) 12%, transparent);
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 4px 0 16px;
+  color: var(--dsw-alias-label-primary, #24292f);
+}
+
+/* Top-right ghost action (matches the mock's config-folder chip). */
+.oh-dsh-about-topbar {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 28px;
+}
+
+.oh-dsh-about-ghost,
+.oh-dsh-about-link,
+.oh-dsh-about-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 9%));
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-base, transparent);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.oh-dsh-about-ghost {
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary, #656d76);
+}
+
+.oh-dsh-about-ghost:hover { background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 4%)); }
+
+/* Centered hero: mark, name, subtitle, version badge. */
+.oh-dsh-about-hero {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 0 4px;
+  text-align: center;
+}
+
+.oh-dsh-about-mark {
+  display: block;
+  width: 68px;
+  height: 68px;
+  margin-bottom: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  /* The packaged app icon is the dsh-whale silhouette; resolve it like the
+     menubar brand does: black whale on a light tile, white whale on a dark
+     one, tile driven by the theme's brand mix. */
+  background: var(--oh-about-chip-bg);
+  filter: brightness(0);
+  opacity: 0.85;
+  /* Dragging the mark out of the page would drop it as an image attachment
+     into a session composer, so the hero image opts out of native drags. */
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+body[data-ds-dark-theme] .oh-dsh-about-mark {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+.oh-dsh-about-name { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.2px; }
+.oh-dsh-about-subtitle { margin: 0; color: var(--dsw-alias-label-secondary, #656d76); font-size: 13px; }
+
+.oh-dsh-about-badge {
+  margin-top: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--oh-about-badge-bg);
+  color: var(--dsw-alias-brand-primary, #6d5ce6);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section groups: small heading + one rounded card of rows. */
+.oh-dsh-about-group { display: grid; gap: 8px; }
+.oh-dsh-about-group > h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary, #24292f);
+}
+
+.oh-dsh-about-card {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-base, transparent);
+}
+
+.oh-dsh-about-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.oh-dsh-about-row { cursor: pointer; }
+button.oh-dsh-about-row:hover { background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 4%)); }
+
+.oh-dsh-about-card > * + * { border-top: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%)); }
+
+.oh-dsh-about-chip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--oh-about-chip-bg);
+  color: var(--dsw-alias-brand-primary, #6d5ce6);
+}
+
+.oh-dsh-about-chip-ok {
+  background: var(--dsw-alias-state-success-tertiary, #e5f6ec);
+  color: var(--dsw-alias-state-success-primary, #2da362);
+}
+
+.oh-dsh-about-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.oh-dsh-about-copy strong { font-size: 13px; font-weight: 600; }
+.oh-dsh-about-copy small,
+.oh-dsh-about p {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #656d76);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.oh-dsh-about-pill {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 5%));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oh-dsh-about-icon { flex: none; }
+
+/* Expandable component rows. */
+.oh-dsh-about-fold { display: grid; }
+.oh-dsh-about-chevron {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, #8c959f);
+  transition: transform 140ms ease;
+}
+.oh-dsh-about-chevron-open { transform: rotate(90deg); }
+
+.oh-dsh-about-versions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 2px 18px;
+  margin: 0;
+  padding: 4px 14px 12px 56px;
+}
+
+.oh-dsh-about-version {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 26px;
+  font-size: 12px;
+}
+
+.oh-dsh-about-empty {
+  grid-column: 1 / -1;
+  min-height: 26px;
+  color: var(--dsw-alias-label-secondary, #656d76);
+  font-size: 12px;
+}
+
+.oh-dsh-about-version dt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary, #656d76);
+}
+.oh-dsh-about-version dd {
+  margin: 0;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 5%));
+  font-variant-numeric: tabular-nums;
+}
+
+/* Software update row. */
+.oh-dsh-about-button { padding: 6px 14px; font-size: 12px; }
+.oh-dsh-about-button:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 4%));
+  color: var(--dsw-alias-brand-primary, #6d5ce6);
+}
+
+/* Footer links + copyright. */
+.oh-dsh-about-footer { display: grid; gap: 8px; justify-items: center; padding-top: 8px; }
+.oh-dsh-about-links { display: flex; align-items: center; gap: 14px; }
+.oh-dsh-about-link {
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-label-secondary, #656d76);
+  font-size: 12px;
+}
+.oh-dsh-about-link:hover { color: var(--dsw-alias-brand-primary, #6d5ce6); }
+.oh-dsh-about-separator { color: var(--dsw-alias-border-l2, rgb(0 0 0 / 14%)); }
+.oh-dsh-about-copyright { margin: 0; color: var(--dsw-alias-label-tertiary, #8c959f); font-size: 11px; }
+
+@media (max-width: 760px) {
+  .oh-dsh-about { max-width: none; }
+}

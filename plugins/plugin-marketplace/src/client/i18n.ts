@@ -10,6 +10,8 @@ export type MarketplaceMessage =
   | 'update-available'
   | 'not-installed'
   | 'managed'
+  | 'builtin'
+  | 'show-builtins'
   | 'all'
   | 'all-categories'
   | 'mechanism.repository'
@@ -122,6 +124,8 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'update-available': 'Update available',
     'not-installed': 'Not installed',
     managed: 'Oh-DSH managed',
+    builtin: 'Built-in',
+    'show-builtins': 'Show built-in plugins',
     all: 'All',
     'all-categories': 'All categories',
     'mechanism.repository': 'Repository',
@@ -233,6 +237,8 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'update-available': '有可用更新',
     'not-installed': '未安装',
     managed: '由 Oh-DSH 管理',
+    builtin: '内置',
+    'show-builtins': '显示内置插件',
     all: '全部',
     'all-categories': '全部分类',
     'mechanism.repository': '仓库插件',

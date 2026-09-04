@@ -32,9 +32,6 @@
     - id: oh-better-sidebar-runtime
       name: '@oh-dsh/better-sidebar-runtime'
 
-    - id: oh-vision
-      name: '@oh-dsh/vision'
-
     - id: oh-skins
       name: '@oh-dsh/skins'
 
@@ -49,6 +46,9 @@
 
     - id: oh-plugin-marketplace
       name: '@oh-dsh/plugin-marketplace'
+
+    - id: oh-about
+      name: '@oh-dsh/about'
 
     # Built-in context insight panel (upstream dsh-context, pinned under
     # upstream/dsh-context). Its host half is a plain Cordis plugin; the

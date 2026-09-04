@@ -18,6 +18,10 @@ class FakeUpdater extends EventEmitter {
   downloadResult = ['/tmp/Oh-DSH-Desktop-update.zip']
   quitCalls = 0
   installError: Error | undefined
+  feedURLs: unknown[] = []
+  setFeedURL(options: unknown) {
+    this.feedURLs.push(options)
+  }
   async checkForUpdates() {
     this.emit('checking-for-update')
     if (this.result?.isUpdateAvailable) this.emit('update-available', this.result.updateInfo)
@@ -308,4 +312,79 @@ test('manager does not bypass the proxy for unrelated failures', async () => {
   const state = await manager.check()
   assert.equal(state.status, 'error')
   assert.equal(bypassCalls, 0)
+})
+
+test('manager retries Node-style network failures on the mirror once per cycle', async () => {
+  const updater = new FakeUpdater()
+  let calls = 0
+  updater.checkForUpdates = async () => {
+    calls += 1
+    if (calls === 1) throw Object.assign(new Error('getaddrinfo ENOTFOUND github.com'), { code: 'ENOTFOUND' })
+    updater.emit('checking-for-update')
+    updater.emit('update-available', updateInfo('1.2.0'))
+    return { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  }
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+
+  const state = await manager.check()
+  assert.equal(state.status, 'available')
+  assert.equal(calls, 2)
+  assert.deepEqual(updater.feedURLs, [{
+    provider: 'generic',
+    url: 'https://gh-proxy.cn/https://github.com/hust-open-atom-club/oh-dsh/releases/latest/download/',
+  }])
+})
+
+test('manager does not retry non-network failures on the mirror', async () => {
+  const updater = new FakeUpdater()
+  updater.checkForUpdates = async () => { throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }) }
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+
+  const state = await manager.check()
+  assert.equal(state.status, 'error')
+  if (state.status === 'error') assert.equal(state.code, 'ENOSPC')
+  assert.deepEqual(updater.feedURLs, [])
+})
+
+test('mirror serves one update cycle, then the next check restores GitHub', async () => {
+  const updater = new FakeUpdater()
+  let calls = 0
+  updater.checkForUpdates = async () => {
+    calls += 1
+    if (calls === 1) {
+      const error = new Error('net::ERR_CONNECTION_TIMED_OUT')
+      updater.emit('error', error)
+      throw error
+    }
+    updater.emit('checking-for-update')
+    updater.emit('update-available', updateInfo('1.2.0'))
+    return { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  }
+  updater.downloadUpdate = async () => {
+    // While the mirror is active the download must not reset the feed yet.
+    assert.deepEqual(updater.feedURLs, [{
+      provider: 'generic',
+      url: 'https://gh-proxy.cn/https://github.com/hust-open-atom-club/oh-dsh/releases/latest/download/',
+    }])
+    updater.emit('download-progress', { percent: 50, transferred: 50, total: 100, bytesPerSecond: 10 })
+    updater.emit('update-downloaded', { downloadedFile: '/tmp/Oh-DSH-Desktop-update.zip' })
+    return ['/tmp/Oh-DSH-Desktop-update.zip']
+  }
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+
+  assert.equal((await manager.check()).status, 'available')
+  assert.equal((await manager.download()).status, 'downloaded')
+  assert.deepEqual(updater.feedURLs, [{
+    provider: 'generic',
+    url: 'https://gh-proxy.cn/https://github.com/hust-open-atom-club/oh-dsh/releases/latest/download/',
+  }])
+
+  assert.equal((await manager.check()).status, 'available')
+  assert.deepEqual(updater.feedURLs, [
+    {
+      provider: 'generic',
+      url: 'https://gh-proxy.cn/https://github.com/hust-open-atom-club/oh-dsh/releases/latest/download/',
+    },
+    { provider: 'github', owner: 'hust-open-atom-club', repo: 'oh-dsh' },
+  ])
 })

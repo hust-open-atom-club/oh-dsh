@@ -121,12 +121,12 @@ for (const row of [
   'oh-web',
   'oh-liangshen',
   'oh-better-sidebar-runtime',
-  'oh-vision',
   'oh-skins',
   'oh-pinned-summary',
   'oh-sidebar',
   'oh-panel-controls',
   'oh-plugin-marketplace',
+  'oh-about',
   'dsh-context',
   'dsh-auth',
 ]) {
@@ -157,7 +157,7 @@ function lineReader(stream, resolveReady) {
       const line = pending.slice(0, newline).replace(/\r$/, '')
       pending = pending.slice(newline + 1)
       lines.push(`[${stream}] ${line}`)
-      const match = /^dsh web: (http:\/\/127\.0\.0\.1:\d+)/.exec(line)
+      const match = /^dsh web: (http:\/\/127\.0\.0\.1:\d+\S*)/.exec(line)
       if (match?.[1] !== undefined) resolveReady(new URL(match[1]))
     }
   }
@@ -179,6 +179,41 @@ const ready = new Promise((resolve, reject) => {
   })
 })
 
+
+/** Session cookie minted through the launch-token exchange (undici fetch
+ * has no cookie jar, so the smoke carries the cookie by hand). */
+async function openAuthenticatedSession(baseUrl) {
+  // The freshly booted runtime can restart its web server while the loader
+  // tree settles; retry the token exchange across that window.
+  let lastError = 'token exchange did not run'
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      const exchange = await fetch(baseUrl, { redirect: 'manual' })
+      assert.equal(exchange.status, 303, 'token exchange must redirect')
+      const cookie = exchange.headers.get('set-cookie')?.split(';')[0]
+      assert.ok(cookie, 'token exchange must set a session cookie')
+      return cookie
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error)
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+  }
+  throw new Error(`token exchange failed after retries: ${lastError}`)
+}
+
+
+/** Fetch against the smoke runtime, retrying once on transport failures:
+ * the 0.1.2 web server closes idle keep-alive sockets and undici does not
+ * replay non-idempotent requests that race the close. */
+async function runtimeFetch(url, options) {
+  try {
+    return await fetch(url, options)
+  } catch (error) {
+    if (error instanceof TypeError === false) throw error
+    return await fetch(url, options)
+  }
+}
+
 const timeout = new Promise((_, reject) => {
   setTimeout(() => reject(new Error(`runtime readiness timed out\n${lines.join('\n')}`)), 60_000).unref()
 })
@@ -191,7 +226,8 @@ try {
     'liangshen',
     'agent.cordis.yml',
   )), 'Web Liangshen plugin did not install its preset')
-  const indexResponse = await fetch(base)
+  const sessionCookie = await openAuthenticatedSession(base)
+  const indexResponse = await runtimeFetch(base, { headers: { cookie: sessionCookie } })
   const index = await indexResponse.text()
   assert.equal(indexResponse.status, 200)
   assert.match(index, /<div id="root"><\/div>/)
@@ -216,8 +252,8 @@ try {
     '@oh-dsh/pinned-summary',
     '@oh-dsh/sidebar',
     '@oh-dsh/panel-controls',
-    '@oh-dsh/vision',
     '@oh-dsh/plugin-marketplace',
+    '@oh-dsh/about',
     'dsh-context',
   ]) {
     const row = bootEntries.find(entry => entry.id === pluginId)
@@ -232,7 +268,7 @@ try {
     assert.deepEqual(row.inject ?? [], manifest.dsh.client.inject ?? [])
     assert.equal(row.immediately === true, manifest.dsh.client.immediately === true)
     const bundleUrl = new URL(row.url, base)
-    const bundleResponse = await fetch(bundleUrl)
+    const bundleResponse = await runtimeFetch(bundleUrl, { headers: { cookie: sessionCookie } })
     const bundle = await bundleResponse.text()
     assert.equal(
       bundleResponse.status,
@@ -257,15 +293,6 @@ try {
     resources,
     'dsh-runtime',
     'node_modules',
-    '@oh-dsh',
-    'vision',
-    'dist',
-    'index.js',
-  )), '@oh-dsh/vision Host bundle is missing')
-  assert.ok(existsSync(join(
-    resources,
-    'dsh-runtime',
-    'node_modules',
     '@deepseek-harness-tui',
     'dsh-auth',
     'lib',
@@ -286,36 +313,38 @@ try {
 
   // The skins preferences server mounts on the web server.
   const preferencesUrl = new URL('/oh-dsh/skins/preferences', base)
-  const initialResponse = await fetch(preferencesUrl)
+  const initialResponse = await runtimeFetch(preferencesUrl, { headers: { cookie: sessionCookie } })
   const initial = await initialResponse.json()
   assert.equal(initialResponse.status, 200)
   assert.equal(initial.activeId, null)
   assert.equal(initial.fallbackTheme, 'system')
-  const saveResponse = await fetch(preferencesUrl, {
+  const saveResponse = await runtimeFetch(preferencesUrl, {
     method: 'PUT',
     headers: {
       'content-type': 'application/json',
+      cookie: sessionCookie,
       origin: base.origin,
     },
     body: JSON.stringify({ activeId: 'oh-dsh-skin-porcelain', fallbackTheme: 'dark' }),
   })
   assert.equal(saveResponse.status, 200, await saveResponse.text())
-  const saved = await fetch(preferencesUrl)
+  const saved = await runtimeFetch(preferencesUrl, { headers: { cookie: sessionCookie } })
   const persisted = await saved.json()
   assert.equal(persisted.activeId, 'oh-dsh-skin-porcelain')
   assert.equal(persisted.fallbackTheme, 'dark')
 
   // The plugin marketplace host serves its transaction bridge on the web server.
   const marketplaceUrl = new URL('/oh-dsh/plugin-marketplace', base)
-  const marketplaceSnapshotResponse = await fetch(marketplaceUrl)
+  const marketplaceSnapshotResponse = await runtimeFetch(marketplaceUrl, { headers: { cookie: sessionCookie } })
   const marketplaceSnapshot = await marketplaceSnapshotResponse.json()
   assert.equal(marketplaceSnapshotResponse.status, 200)
   assert.equal(Array.isArray(marketplaceSnapshot.catalog), true)
   assert.equal(typeof marketplaceSnapshot.lifecycle, 'object')
-  const marketplaceDispatchResponse = await fetch(marketplaceUrl, {
+  const marketplaceDispatchResponse = await runtimeFetch(marketplaceUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      cookie: sessionCookie,
       origin: base.origin,
     },
     body: JSON.stringify({ type: 'discard' }),
@@ -339,10 +368,10 @@ try {
   git('commit', '-m', 'web smoke baseline')
   writeFileSync(join(smokeRoot, 'web-smoke.txt'), 'after\n')
 
-  const workspaceFactsResponse = await fetch(new URL(
+  const workspaceFactsResponse = await runtimeFetch(new URL(
     `/oh-dsh/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
     base,
-  ))
+  ), { headers: { cookie: sessionCookie } })
   const workspaceFacts = await workspaceFactsResponse.json()
   assert.equal(workspaceFactsResponse.status, 200)
   assert.equal(workspaceFacts.kind, 'repository')
@@ -354,9 +383,9 @@ try {
   // The better-sidebar host serves session, Files, and Git through the same
   // /sidebar API the desktop distribution uses.
   const sidebarCall = async (method, payload) => {
-    const response = await fetch(new URL(`/sidebar/api/${method}`, base), {
+    const response = await runtimeFetch(new URL(`/sidebar/api/${method}`, base), {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', cookie: sessionCookie },
       body: JSON.stringify(payload),
     })
     const envelope = await response.json()

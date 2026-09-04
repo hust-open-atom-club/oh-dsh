@@ -46,6 +46,7 @@ test('review, pinned summary, and embedded side tools keep distinct layouts', ()
     /document\.addEventListener\('pointerdown', this\.#handleDocumentPointerDown\)/,
   )
   assert.match(workspace, /data-oh-dsh-summary-toggle=""/)
+  assert.match(workspace, /aria-haspopup="dialog"/)
   assert.match(summary, /closest\('\[data-oh-dsh-summary-toggle\]'\)/)
   assert.doesNotMatch(summary, /closest\('\.oh-dsh-panel-toolbar'\)/)
   assert.match(summary, /event\.key === 'Escape'/)

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { DesktopBridge, DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot, DesktopWindowState } from './contracts.ts'
+import type { AboutUpdateCommand, AboutUpdateSnapshot, DesktopBridge, DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot, DesktopWindowState } from './contracts.ts'
 import type { MarketplaceCommand, MarketplaceSnapshot } from '../plugins/plugin-marketplace/src/protocol.ts'
 
 const bridge: DesktopBridge = Object.freeze({
@@ -22,6 +22,25 @@ const bridge: DesktopBridge = Object.freeze({
   setMenuLocale: async (locale: 'en' | 'zh'): Promise<string[]> => {
     return await ipcRenderer.invoke('desktop:set-menu-locale', locale) as string[]
   },
+  openUpdater: async (): Promise<void> => {
+    await ipcRenderer.invoke('desktop:open-updater')
+  },
+  aboutUpdate: Object.freeze({
+    getSnapshot: async (): Promise<AboutUpdateSnapshot> => {
+      return await ipcRenderer.invoke('desktop:about-update:get-state') as AboutUpdateSnapshot
+    },
+    check: async (): Promise<AboutUpdateSnapshot> => {
+      return await ipcRenderer.invoke('desktop:about-update:check') as AboutUpdateSnapshot
+    },
+    command: async (command: AboutUpdateCommand): Promise<AboutUpdateSnapshot> => {
+      return await ipcRenderer.invoke('desktop:about-update:command', command) as AboutUpdateSnapshot
+    },
+    onState: (listener: (snapshot: AboutUpdateSnapshot) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, snapshot: AboutUpdateSnapshot): void => { listener(snapshot) }
+      ipcRenderer.on('desktop:about-update:state', wrapped)
+      return () => { ipcRenderer.removeListener('desktop:about-update:state', wrapped) }
+    },
+  }),
   onCommand: (listener: (command: DesktopCommand) => void): (() => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, command: DesktopCommand): void => { listener(command) }
     ipcRenderer.on('desktop:command', wrapped)

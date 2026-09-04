@@ -3,6 +3,8 @@ import { test } from 'node:test'
 import {
   latestSummary,
   summaryMetadata,
+  summaryArtworkMetadata,
+  summaryGitMetadata,
   summaryState,
   truncateSummary,
 } from '../plugins/pinned-summary/src/client.ts'
@@ -75,6 +77,43 @@ test('extracts model, tools, and time range from conversation nodes', () => {
       startedAt: 100,
       completedAt: 260,
     },
+  )
+})
+
+test('keeps optional repository and artwork metadata bounded to known fields', () => {
+  assert.deepEqual(
+    summaryGitMetadata(
+      { kind: 'repository', name: 'oh-dsh', ahead: 2, behind: 1 },
+      {
+        ok: true,
+        value: {
+          isRepo: true,
+          branch: 'issue-180',
+          entries: [{ path: 'README.md' }],
+          pullRequest: { number: 180, state: 'open' },
+        },
+      },
+    ),
+    {
+      repository: 'oh-dsh',
+      branch: 'issue-180',
+      clean: false,
+      changeCount: 1,
+      ahead: 2,
+      behind: 1,
+      pullRequest: { number: 180, state: 'open' },
+    },
+  )
+  assert.deepEqual(
+    summaryArtworkMetadata({
+      projectionValues: {
+        artwork: {
+          drawingId: 'drawing-1',
+        },
+        canvas: { width: 800, height: 600, format: 'png' },
+      },
+    }),
+    { id: 'drawing-1', width: 800, height: 600, format: 'png' },
   )
 })
 

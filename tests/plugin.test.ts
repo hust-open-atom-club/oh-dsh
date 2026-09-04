@@ -28,9 +28,12 @@ test('desktop Settings stays below portaled menus and above desktop surfaces', (
     client,
     /\[role='presentation'\]:has\(\s*> \[role='dialog'\]\s*\)[^{]*\{[^}]*z-index: 1000 !important;[^}]*backdrop-filter: blur\(/s,
   )
+  // The pinned summary and marketplace surface anchor inside the shared
+  // chrome layer, so the demotion list carries the layer instead of the two
+  // panels (demoting the layer carries both below the dialog backdrop).
   assert.match(
     client,
-    /:has\(\s*#root \[role='presentation'\] > \[role='dialog'\]\s*\) \.oh-dsh-panel-toolbar,[\s\S]*#oh-dsh-sidebar-root,[\s\S]*\[data-oh-dsh-pinned-summary\],[\s\S]*#oh-dsh-plugin-marketplace-root[^}]*\{[^}]*z-index: 999 !important;/s,
+    /:has\(\s*#root \[role='presentation'\] > \[role='dialog'\]\s*\) \.oh-dsh-panel-toolbar,[\s\S]*#oh-dsh-sidebar-root,[\s\S]*#oh-dsh-chrome-layer[^}]*\{[^}]*z-index: 999 !important;/s,
   )
 })
 
@@ -38,6 +41,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
   const clients = [
     '../plugins/skins/src/client/plugin.tsx',
     '../src/client.ts',
+    '../plugins/about/src/client/plugin.tsx',
     '../plugins/panel-controls/src/terminal/plugin.tsx',
     '../plugins/pinned-summary/src/client.ts',
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
@@ -51,6 +55,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
 
   const dictionaries = [
     '../plugins/skins/src/client/i18n.ts',
+    '../plugins/about/src/client/i18n.ts',
     '../plugins/panel-controls/src/terminal/i18n.ts',
     '../plugins/pinned-summary/src/i18n.ts',
     '../plugins/plugin-marketplace/src/client/i18n.ts',

@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/desktop",
   "productName": "Oh-DSH Desktop",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Oh-DSH: installable Desktop, Web, and TUI surfaces over DeepSeek Harness",
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",
@@ -35,7 +35,6 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@oh-dsh/desktop-frame",
         "@oh-dsh/panel-controls",
         "@oh-dsh/pinned-summary",
