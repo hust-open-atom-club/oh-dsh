@@ -22,7 +22,12 @@ let
   };
 
   # pnpm install needs the lockfile and supply-chain policy beside
-  # package.json; the npm tarball carries neither repository file.
+  # package.json; the npm tarball carries neither repository file. The
+  # workspace shim mirrors scripts/dsh-source.mjs resolveNpmAssembly: pnpm
+  # rejects a frozen install whose recorded overrides differ from the
+  # current configuration, and the committed lockfile pins the whole
+  # @deepseek-ai/dsh-* closure to the release line, so its own overrides
+  # section is copied verbatim.
   src = runCommand "dsh-runtime-pinned-src" { } ''
     mkdir -p $out
     tar -xzf ${tarball} -C $out --strip-components=1
@@ -35,6 +40,10 @@ let
       'minimumReleaseAgeExclude:' \
       "  - '@deepseek-ai/*'" \
       > $out/pnpm-workspace.yaml
+    awk '/^overrides:$/ { copying = 1 } copying && !/^overrides:$/ && /^[A-Za-z]/ { exit } copying { print }' \
+      $out/pnpm-lock.yaml >> $out/pnpm-workspace.yaml
+    test "$(tail -n +2 $out/pnpm-workspace.yaml | grep -c "^  '@deepseek-ai/")" -gt 0 \
+      || { echo "no overrides found in the pinned lockfile" >&2; exit 1; }
   '';
 in
 

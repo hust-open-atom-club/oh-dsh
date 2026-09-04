@@ -52,9 +52,6 @@ function run(args) {
   }
 }
 
-/**
- * Expose the built-in Vision settings section through DSH's existing
- * configuration-client boundary. The pinned release keeps a fixed allowlist;
- * patch only the checkout used for this build and restore the tracked source
- * immediately afterwards so the upstream checkout remains pristine.
- */
+run(['install', '--frozen-lockfile'])
+pinInnerPnpm()
+run(['run', 'build'])

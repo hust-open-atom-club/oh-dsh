@@ -34,6 +34,7 @@ jobs:
           grep -n "hash = \"sha256-" nix/oh-dsh.nix
       - name: Iterate builds until fixed-output hashes converge
         run: |
+          set -o pipefail
           for attempt in 1 2 3 4 5; do
             echo "=== attempt $attempt ==="
             if nix build --no-link .#oh-dsh-tui-pinned 2>&1 | tee /tmp/build.log; then
