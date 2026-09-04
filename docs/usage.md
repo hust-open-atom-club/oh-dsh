@@ -61,6 +61,8 @@ Options:
 | --- | --- | --- |
 | `--surface` | `tui` | `desktop`, `web`, or `tui`; each installs only its own files and launcher |
 | `--version` | latest stable | Pin a release tag such as `v0.1.8`. Prereleases are never selected implicitly; they install only when pinned explicitly |
+| `--local` | off | Install the artifacts this checkout's `pnpm run dist:<surface>` commands placed under `release/` instead of downloading a Release. The version comes from the checkout's `package.json`; combine with `--force` to reinstall a rebuilt same version |
+| `--local-root` | script directory | Point `--local` at another repository checkout |
 | `--dest` | see matrix above | Destination directory |
 | `--bin-dir` | `~/.local/bin` | Directory for the `ohdsh` launcher |
 | `--repo` | `hust-open-atom-club/oh-dsh` | Install from another fork |
@@ -70,10 +72,22 @@ Options:
 
 Equivalent environment variables: `OH_DSH_SURFACE`, `OH_DSH_VERSION`,
 `OH_DSH_INSTALL_DIR`, `OH_DSH_BIN_DIR`, `OH_DSH_REPO`, `OH_DSH_OS`, and
-`OH_DSH_ARCH`; options win over the environment. `GH_TOKEN`/`GITHUB_TOKEN`
-authenticate the GitHub API request (useful behind rate limits), and
-`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` override the endpoint bases for
-testing.
+`OH_DSH_ARCH` (`OH_DSH_LOCAL=1` matches `--local`); options win over the
+environment.
+
+To test a branch you are hacking on, build the surfaces you changed and
+install straight from the checkout — no release publishing or network
+round-trip involved:
+
+```sh
+pnpm run dist:tui && sh install.sh --local --surface tui --force
+pnpm run dist:web && sh install.sh --local --surface web --force
+pnpm run dist:mac && sh install.sh --local --surface desktop --force
+```
+
+`GH_TOKEN`/`GITHUB_TOKEN` authenticate the GitHub API request (useful
+behind rate limits), and `OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` override
+the endpoint bases for testing.
 
 Upgrade, verification, and uninstall behavior:
 

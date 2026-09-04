@@ -55,6 +55,8 @@ web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可�
 | --- | --- | --- |
 | `--surface` | `tui` | `desktop`、`web` 或 `tui`，每个 surface 只安装自己的文件与启动器 |
 | `--version` | 最新稳定版 | 固定 Release 标签，如 `v0.1.8`。预发布不会被自动选中，只有在显式固定时才会安装 |
+| `--local` | 关闭 | 安装本仓库 `pnpm run dist:<surface>` 构建到 `release/` 的产物，而不是下载 Release。版本取自仓库的 `package.json`；重装同版本重建产物时配合 `--force` |
+| `--local-root` | 脚本所在目录 | 让 `--local` 指向另一个仓库检出 |
 | `--dest` | 见上表 | 目标目录 |
 | `--bin-dir` | `~/.local/bin` | `ohdsh` 启动器目录 |
 | `--repo` | `hust-open-atom-club/oh-dsh` | 从其他 fork 安装 |
@@ -63,9 +65,20 @@ web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可�
 | `--os`、`--arch` | 自动检测 | 覆盖目标选择（`darwin`/`linux`、`arm64`/`x64`） |
 
 等价的环境变量：`OH_DSH_SURFACE`、`OH_DSH_VERSION`、`OH_DSH_INSTALL_DIR`、
-`OH_DSH_BIN_DIR`、`OH_DSH_REPO`、`OH_DSH_OS`、`OH_DSH_ARCH`；命令行选项
-优先于环境变量。`GH_TOKEN`/`GITHUB_TOKEN` 用于 GitHub API 鉴权（在限流时
-有用），`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` 可为测试覆盖端点地址。
+`OH_DSH_BIN_DIR`、`OH_DSH_REPO`、`OH_DSH_OS`、`OH_DSH_ARCH`
+（`OH_DSH_LOCAL=1` 等价 `--local`）；命令行选项优先于环境变量。
+
+要测试自己正在改的分支，先构建对应表面，再直接从检出安装——不需要发布
+Release，也没有网络往返：
+
+```sh
+pnpm run dist:tui && sh install.sh --local --surface tui --force
+pnpm run dist:web && sh install.sh --local --surface web --force
+pnpm run dist:mac && sh install.sh --local --surface desktop --force
+```
+
+`GH_TOKEN`/`GITHUB_TOKEN` 用于 GitHub API 鉴权（在限流时有用），
+`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` 可为测试覆盖端点地址。
 
 升级、校验与卸载行为：
 
