@@ -1,4 +1,4 @@
-import { defineStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { defineStore } from '@deepseek-ai/dsh-client-store'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
 import desktopSkinsCss from './skins.css'
 import {

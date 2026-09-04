@@ -2,6 +2,12 @@
 
 Status: implemented
 
+> **已被取代：** 下文的版本、依赖与 Nix 验证事实属于 0.1.1-rc.2 时期。渲染器
+> 钉版已随
+> [0.1.2-alpha.3 运行时升级](../../process/2026-09-03-dsh-0.1.2-alpha.3-upgrade.md)
+> 前进（dsh-TUI → v0.10.0-beta.4）。下文的 launcher/全屏契约与
+> stage-the-upstream-manifest 模式仍然有效。
+
 [English](2026-08-26-upstream-tui-0.9.2-upgrade.md) | 中文
 
 ## Problem

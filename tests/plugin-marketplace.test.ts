@@ -888,7 +888,11 @@ test('Agent gateway authenticates and defers runtime-restarting applies', async 
     assert.equal(accepted.deferred, true)
     assert.equal(setup.manager.getSnapshot().preview?.pluginId, 'safe-demo')
 
-    for (let attempt = 0; attempt < 30 && setup.manager.getSnapshot().preview !== null; attempt += 1) {
+    // The preview clears and the installed list commits in separate ticks on
+    // slow runners; wait for both rather than just the preview.
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const snapshot = setup.manager.getSnapshot()
+      if (snapshot.preview === null && snapshot.installed[0]?.pluginId === 'safe-demo') break
       await new Promise(resolve => { setTimeout(resolve, 5) })
     }
     assert.equal(setup.manager.getSnapshot().preview, null)

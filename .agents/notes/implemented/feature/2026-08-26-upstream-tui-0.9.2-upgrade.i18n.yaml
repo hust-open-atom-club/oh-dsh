@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-26-upstream-tui-0.9.2-upgrade.md
-2026-08-26-upstream-tui-0.9.2-upgrade.md: 25a6a48db2e6e25e84c899b10007cf0bb5668453
-2026-08-26-upstream-tui-0.9.2-upgrade.zh.md: 49e09a02f0833cabd0c422230e8b28cb317d0df5
+2026-08-26-upstream-tui-0.9.2-upgrade.md: a482731ff8c896d8380cf9281c5fcc1ae454a165
+2026-08-26-upstream-tui-0.9.2-upgrade.zh.md: c6be3e37e6cf7bdf5a09bbba3f75ae061a5ad41a

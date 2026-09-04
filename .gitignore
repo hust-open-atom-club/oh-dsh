@@ -11,3 +11,6 @@ result
 result-*
 .agent-workflows/
 coverage/
+# Generated Python bytecode from the Nix helper
+__pycache__/
+*.pyc

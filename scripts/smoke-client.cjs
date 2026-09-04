@@ -93,7 +93,7 @@ void app.whenReady().then(async () => {
         }
         return {
         body: document.body?.innerText ?? '',
-        vision: (() => {
+        attachment: (() => {
           const image = [...document.querySelectorAll('[data-composer-card] img')]
             .find(candidate => candidate instanceof HTMLImageElement
               && candidate.getClientRects().length > 0)
@@ -111,7 +111,7 @@ void app.whenReady().then(async () => {
                 button.getAttribute('title'),
               ].filter(Boolean).join(' ')))
             const remove = removeButtons.find(button => !button.disabled)
-            window.__OH_DSH_SMOKE_VISION_FACTS__ = {
+            window.__OH_DSH_SMOKE_ATTACHMENT_FACTS__ = {
               bubbleBottom: thumbnailRect.bottom,
               cardTop: cardRect.top,
               imageWidth: image.naturalWidth,
@@ -119,10 +119,10 @@ void app.whenReady().then(async () => {
               removeDisabled: remove?.disabled ?? null,
               status: 'ready',
             }
-            window.__OH_DSH_SMOKE_VISION_SEEN__ = true
-            if (window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ !== true) {
+            window.__OH_DSH_SMOKE_ATTACHMENT_SEEN__ = true
+            if (window.__OH_DSH_SMOKE_ATTACHMENT_REMOVE_REQUESTED__ !== true) {
               if (remove instanceof HTMLButtonElement) {
-                window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ = true
+                window.__OH_DSH_SMOKE_ATTACHMENT_REMOVE_REQUESTED__ = true
                 remove.focus()
                 remove.dispatchEvent(new MouseEvent('click', {
                   bubbles: true,
@@ -133,31 +133,32 @@ void app.whenReady().then(async () => {
               }
             }
           }
-          if (window.__OH_DSH_SMOKE_VISION_REQUESTED__ !== true) {
-            const textarea = [...document.querySelectorAll(
-              '[data-composer-card] textarea:not(:disabled):not([readonly])',
-            )].find(element => element instanceof HTMLTextAreaElement
+          if (window.__OH_DSH_SMOKE_ATTACHMENT_REQUESTED__ !== true) {
+            const composerInput = [...document.querySelectorAll(
+              '[data-composer-card] [data-composer-input="true"]',
+            )].find(element => element instanceof HTMLElement
+              && element.dataset.phase !== 'inert'
               && element.getClientRects().length > 0)
-            if (textarea instanceof HTMLTextAreaElement) {
+            if (composerInput instanceof HTMLElement) {
               const encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
               const binary = atob(encoded)
               const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
               const transfer = new DataTransfer()
-              transfer.items.add(new File([bytes], 'vision-smoke.png', { type: 'image/png' }))
+              transfer.items.add(new File([bytes], 'attachment-smoke.png', { type: 'image/png' }))
               const paste = new ClipboardEvent('paste', {
                 bubbles: true,
                 cancelable: true,
                 clipboardData: transfer,
               })
-              window.__OH_DSH_SMOKE_VISION_REQUESTED__ = true
-              textarea.dispatchEvent(paste)
+              window.__OH_DSH_SMOKE_ATTACHMENT_REQUESTED__ = true
+              composerInput.dispatchEvent(paste)
             } else {
               const workspaceTrigger = [...document.querySelectorAll(
-                '[data-composer-card] textarea[aria-label="Choose workspace"], '
-                + '[data-composer-card] textarea[aria-label="选择工作区"]',
-              )].find(element => element instanceof HTMLTextAreaElement
+                '[data-composer-card] [data-composer-input="true"][aria-label="Choose workspace"], '
+                + '[data-composer-card] [data-composer-input="true"][aria-label="选择工作区"]',
+              )].find(element => element instanceof HTMLElement
                 && element.getClientRects().length > 0)
-              if (workspaceTrigger instanceof HTMLTextAreaElement
+              if (workspaceTrigger instanceof HTMLElement
                 && workspaceTrigger.getAttribute('aria-expanded') !== 'true'
                 && Date.now() - (window.__OH_DSH_SMOKE_WORKSPACE_REQUESTED_AT__ ?? 0) > 500) {
                 window.__OH_DSH_SMOKE_WORKSPACE_REQUESTED_AT__ = Date.now()
@@ -202,13 +203,13 @@ void app.whenReady().then(async () => {
               && candidate.getClientRects().length > 0)
           return {
             error: null,
-            facts: window.__OH_DSH_SMOKE_VISION_FACTS__ ?? null,
-            removeAvailable: window.__OH_DSH_SMOKE_VISION_FACTS__?.removeLabel !== null
-              && window.__OH_DSH_SMOKE_VISION_FACTS__?.removeDisabled === false,
-            removed: window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ === true
+            facts: window.__OH_DSH_SMOKE_ATTACHMENT_FACTS__ ?? null,
+            removeAvailable: window.__OH_DSH_SMOKE_ATTACHMENT_FACTS__?.removeLabel !== null
+              && window.__OH_DSH_SMOKE_ATTACHMENT_FACTS__?.removeDisabled === false,
+            removed: window.__OH_DSH_SMOKE_ATTACHMENT_REMOVE_REQUESTED__ === true
               && current === null,
-            requested: window.__OH_DSH_SMOKE_VISION_REQUESTED__ === true,
-            seen: window.__OH_DSH_SMOKE_VISION_SEEN__ === true,
+            requested: window.__OH_DSH_SMOKE_ATTACHMENT_REQUESTED__ === true,
+            seen: window.__OH_DSH_SMOKE_ATTACHMENT_SEEN__ === true,
             workspaceOpenCount: window.__OH_DSH_SMOKE_WORKSPACE_OPEN_COUNT__ ?? 0,
             workspaceRequestCount: window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ ?? 0,
           }
@@ -294,8 +295,8 @@ void app.whenReady().then(async () => {
         ))
         return
       }
-      if (state.vision.error !== null) {
-        settle(new Error(`Pasted image thumbnail failed: ${state.vision.error}`))
+      if (state.attachment.error !== null) {
+        settle(new Error(`Pasted image thumbnail failed: ${state.attachment.error}`))
         return
       }
       // DSH owns the native AttachmentRail layout. Keep this smoke check
@@ -303,16 +304,16 @@ void app.whenReady().then(async () => {
       // card or as a floating bubble; only visibility and removal are ours.
       if (webSmoke
         && state.webReady === true
-        && state.vision.seen === true
-        && state.vision.removeAvailable === true) {
+        && state.attachment.seen === true
+        && state.attachment.removeAvailable === true) {
         settle()
         return
       }
       if (state.ready === true
         && state.navigation !== null
         && state.navigation.collapsed === true
-        && state.vision.seen === true
-        && state.vision.removeAvailable === true) {
+        && state.attachment.seen === true
+        && state.attachment.removeAvailable === true) {
         if (state.navigation.pluginsTop < 0
           || state.navigation.pluginsBottom > state.navigation.viewportHeight
           || state.navigation.settingsTop < 0
@@ -350,7 +351,7 @@ void app.whenReady().then(async () => {
       if (Date.now() - startedAt >= timeoutMs) {
         settle(new Error(
           `DSH Chromium client graph timed out:\n${state.body.trim()}\n`
-          + `Vision: ${JSON.stringify(state.vision)}`,
+          + `Vision: ${JSON.stringify(state.attachment)}`,
         ))
         return
       }

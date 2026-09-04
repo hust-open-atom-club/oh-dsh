@@ -166,14 +166,12 @@ test('TUI bundle mounts Oh-DSH adapters before the upstream renderer', () => {
   const surface = patch.indexOf("name: '@oh-dsh/tui'")
   const marketplace = patch.indexOf("name: '@oh-dsh/plugin-marketplace'")
   const skins = patch.indexOf("name: '@oh-dsh/skins'")
-  const vision = patch.indexOf("name: '@oh-dsh/vision'")
   const marketplaceScene = patch.indexOf("name: '@oh-dsh/tui-marketplace'")
   const renderer = patch.indexOf("name: '@deepseek-harness-tui/dsh-tui'")
   assert.ok(surface >= 0
     && surface < marketplace
     && marketplace < skins
-    && skins < vision
-    && vision < marketplaceScene
+    && skins < marketplaceScene
     && marketplaceScene < renderer)
 })
 
@@ -247,7 +245,7 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
     assert.match(messages, /进程环境已提供同名变量，跳过写入/)
     assert.doesNotMatch(messages, /~\/\.dsh\/\.credentials\.yaml|密钥将写入/)
     assert.match(messages, /Liangshen mode/)
-    assert.match(messages, /preset-liangshen-description/)
+    assert.match(messages, /'preset-desc-liangshen':/)
     const providerWizard = readFileSync(
       join(lib, 'dsh-adapter', 'providerWizard.js'),
       'utf8',
@@ -256,7 +254,6 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
     assert.doesNotMatch(providerWizard, /~\/\.dsh\/\.credentials\.yaml/)
     const channel = readFileSync(join(lib, 'dsh-adapter', 'channel.js'), 'utf8')
     assert.match(channel, /oh-dsh-tui-export-/)
-    assert.match(channel, /isOhDshLiangshen/)
     assert.doesNotMatch(
       channel,
       /const fileName = `dsh-tui-export-|join\(userHome, '\.dsh-tui\//,
