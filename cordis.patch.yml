@@ -23,6 +23,9 @@
     - id: oh-desktop-frame
       name: '@oh-dsh/desktop-frame'
 
+    - id: oh-update-button
+      name: '@oh-dsh/update-button'
+
     - id: oh-desktop
       name: '@oh-dsh/desktop'
 
