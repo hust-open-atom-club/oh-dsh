@@ -66,12 +66,6 @@ const pluginPackages = [
   { directory: 'about', id: '@oh-dsh/about' },
   { directory: 'better-sidebar-runtime', hostOnly: true },
   { directory: 'liangshen', hostOnly: true },
-  {
-    directory: 'vision',
-    id: '@oh-dsh/vision',
-    clientExternal: ['@deepseek-ai/*'],
-    external: ['@deepseek-ai/*'],
-  },
   { directory: 'tui', hostOnly: true },
   { directory: 'tui-marketplace', hostOnly: true },
   { directory: 'desktop-frame', id: '@oh-dsh/desktop-frame' },
@@ -221,7 +215,7 @@ for (const plugin of pluginPackages) {
         'react-dom/client',
         'react/jsx-runtime',
         ...(['skins', 'sidebar', 'desktop-frame'].includes(plugin.directory)
-          ? ['@deepseek-ai/dsh-client-runtime/client']
+          ? ['@deepseek-ai/dsh-client-store']
           : []),
       ],
       banner: {
@@ -255,8 +249,4 @@ mkdirSync(join(dist, 'plugins', 'tui'), { recursive: true })
 copyFileSync(
   join(root, 'plugins', 'tui', 'cordis.patch.yml'),
   join(dist, 'plugins', 'tui', 'cordis.patch.yml'),
-)
-copyFileSync(
-  join(root, 'plugins', 'vision', 'LICENSE'),
-  join(dist, 'plugins', 'vision', 'LICENSE'),
 )

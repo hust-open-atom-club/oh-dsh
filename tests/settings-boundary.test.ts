@@ -18,7 +18,7 @@ function fixture(layout = 'pnpm') {
       root,
       'node_modules',
       '@deepseek-ai',
-      'dsh-host-apiproxy',
+      'dsh-api-settings-controller',
       'lib',
       'index.js',
     )
@@ -26,20 +26,20 @@ function fixture(layout = 'pnpm') {
       root,
       'node_modules',
       '.pnpm',
-      '@deepseek-ai+dsh-host-apiproxy@0.1.1-rc.2',
+      '@deepseek-ai+dsh-api-settings-controller@0.1.2-alpha.3',
       'node_modules',
       '@deepseek-ai',
-      'dsh-host-apiproxy',
+      'dsh-api-settings-controller',
       'lib',
       'index.js',
     )
   mkdirSync(dirname(index), { recursive: true })
   writeFileSync(index, [
-    'const DEFAULT_MAX_MESSAGES = 50;',
+    'const MAX_DESCRIBE_REFS = 64;',
     'const snapshot = {',
     '  namespaces: settings.describe({ redactSecrets: true }).map(namespaceView)',
     '};',
-    'let branded = settingsNamespace(ns);',
+    'const namespace = parsed.data.ns;',
   ].join('\n'))
   return { root, index }
 }
@@ -52,7 +52,7 @@ test('settings boundary patches every assembled runtime idempotently', () => {
     restoreSettingsBoundary(root)
     assert.equal(readFileSync(index, 'utf8'), once)
     assert.match(once, /WEB_SETTINGS_NAMESPACES/)
-    assert.match(once, /ctx\.llm\.listConfigurableProviders\(\)/)
+    assert.match(once, /llm\.listConfigurableProviders\(\)/)
     assert.match(once, /settings-not-exposed/)
     assert.match(once, /"agent-presets"/)
   } finally {

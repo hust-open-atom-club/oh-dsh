@@ -6,7 +6,7 @@ import {
   useRef,
   useSyncExternalStore,
 } from 'react'
-import { defineStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { defineStore } from '@deepseek-ai/dsh-client-store'
 import { createRoot, type Root } from 'react-dom/client'
 import type { DesktopBridge } from '../../../../src/contracts.ts'
 import type { DesktopPanels } from '../../../panel-controls/src/client.ts'
@@ -46,6 +46,11 @@ import {
   type ComposerHistoryNode,
   type ComposerHistorySnapshot,
 } from './composer-input-history.ts'
+import {
+  focusComposerEnd,
+  isComposerInput,
+  readComposerCaret,
+} from './composer-history-dom.ts'
 import {
   historyDirectionForKey,
   isAtHistoryBoundary,
@@ -2063,13 +2068,6 @@ function pathBelongsToActiveWorkspace(
     || normalizedPath.startsWith(`${normalizedRoot}/`)
 }
 
-function isComposerTextarea(target: EventTarget | null): target is HTMLTextAreaElement {
-  return target instanceof HTMLTextAreaElement
-    && target.dataset.phase !== undefined
-    && !target.disabled
-    && !target.readOnly
-}
-
 export function apply(ctx: ClientContext): void {
   const locale = ctx.get('locale') as LocaleService
   const slots = ctx.get('slots') as SlotsService
@@ -2167,7 +2165,7 @@ export function apply(ctx: ClientContext): void {
       synchronizeHistory()
     }
     const resetComposerHistory = (target: EventTarget | null): void => {
-      if (!isComposerTextarea(target)) return
+      if (!isComposerInput(target)) return
       composerHistory.resetNavigation(sessions.list.getSnapshot().current)
     }
     const onComposerInput = (event: Event): void => {
@@ -2180,8 +2178,8 @@ export function apply(ctx: ClientContext): void {
       composerHistory.resetNavigation(sessions.list.getSnapshot().current)
     }
     const onComposerKeyDown = (event: KeyboardEvent): void => {
-      const textarea = event.target
-      if (!isComposerTextarea(textarea)) return
+      const composer = event.target
+      if (!isComposerInput(composer)) return
       const sessionId = sessions.list.getSnapshot().current
       if (sessionId === undefined) return
       if (hasOpenComposerTriggerMenu(inputTriggers, sessions, sessionId)) return
@@ -2193,11 +2191,13 @@ export function apply(ctx: ClientContext): void {
       if (direction === null) return
       const history = composerHistory.forSession(sessionId)
       const state = history.snapshot()
-      if (!isAtHistoryBoundary(textarea, direction, state.cursor !== null)) return
+      const caret = readComposerCaret(composer)
+      if (caret === null) return
+      if (!isAtHistoryBoundary(caret, direction, state.cursor !== null)) return
       if (state.entries.length === 0 || (direction === 'newer' && state.cursor === null)) return
       const input = composerInputForSession(ctx, sessions, sessionId)
       if (input === undefined) return
-      const result = history.navigate(direction, textarea.value)
+      const result = history.navigate(direction, caret.value)
       event.preventDefault()
       event.stopImmediatePropagation()
       if (!result.changed || result.value === null) {
@@ -2209,7 +2209,7 @@ export function apply(ctx: ClientContext): void {
       }
       input.setDraft(result.value)
       window.requestAnimationFrame(() => {
-        if (textarea.isConnected) textarea.setSelectionRange(result.value?.length ?? 0, result.value?.length ?? 0)
+        if (composer.isConnected) focusComposerEnd(composer)
       })
     }
     syncSession()

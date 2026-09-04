@@ -20,30 +20,46 @@ interface HostContext {
 }
 
 export const name = 'oh-dsh-skins'
-export const inject: string[] = []
+// Deliberately empty (the dsh-auth pattern): a hard code-level inject would
+// deadlock the TUI composition, which never mounts webServer. Instead, apply
+// registers two sibling FIRST-LEVEL dynamic injects — the 0.1.2 loader never
+// activates a nested `ctx.inject` created inside another inject's callback —
+// so the TUI palette mounts without webServer while browser surfaces wait
+// for the preferences server's carrier.
+export const inject: readonly string[] = []
 
-function mountSurface(ctx: HostContext): void {
+function surfaceDataRoot(ctx: HostContext): string {
   const surface = ctx.get(OH_DSH_SURFACE_SERVICE) as OhDshSurface | undefined
   const legacy = ctx.get('desktop') as DesktopCapability | undefined
-  const dataRoot = surface?.dataRoot ?? legacy?.appDataPath ?? ''
-  if (dataRoot === '') {
-    ctx.logger.warn('oh-dsh-skins: no writable data root; skin preferences disabled')
-    return
-  }
+  return surface?.dataRoot ?? legacy?.appDataPath ?? ''
+}
 
-  if (surface?.kind === 'tui') {
+export function apply(ctx: HostContext): void {
+  // Every surface: the TUI palette adapter needs no browser service.
+  ctx.inject([OH_DSH_SURFACE_SERVICE], surfaceCtx => {
+    const surface = surfaceCtx.get(OH_DSH_SURFACE_SERVICE) as OhDshSurface | undefined
+    if (surface?.kind !== 'tui') return
+    const dataRoot = surfaceDataRoot(surfaceCtx)
+    if (dataRoot === '') {
+      surfaceCtx.logger.warn('oh-dsh-skins: no writable data root; TUI palette adapter disabled')
+      return
+    }
     const tuiConfigRoot = process.env.OH_DSH_TUI_CONFIG_HOME
-    ctx.effect(() => {
+    surfaceCtx.effect(() => {
       mountTuiSkins(dataRoot, tuiConfigRoot)
     }, 'oh-dsh-skins: TUI palette adapter')
-    return
-  }
+  })
 
-  if (!hasBrowserSurface(surface?.kind) && legacy === undefined) {
-    ctx.logger.warn('oh-dsh-skins: unsupported surface; skin preferences disabled')
-    return
-  }
-  ctx.inject(['webServer'], browserCtx => {
+  // Browser surfaces: the preferences server follows its web server carrier.
+  ctx.inject([OH_DSH_SURFACE_SERVICE, 'webServer'], browserCtx => {
+    const surface = browserCtx.get(OH_DSH_SURFACE_SERVICE) as OhDshSurface | undefined
+    const legacy = browserCtx.get('desktop') as DesktopCapability | undefined
+    if (!hasBrowserSurface(surface?.kind) && legacy === undefined) return
+    const dataRoot = surfaceDataRoot(browserCtx)
+    if (dataRoot === '') {
+      browserCtx.logger.warn('oh-dsh-skins: no writable data root; skin preferences disabled')
+      return
+    }
     const webServer = browserCtx.get('webServer') as
       DesktopSkinPreferencesHostContext['webServer'] | undefined
     if (webServer === undefined) {
@@ -57,11 +73,4 @@ function mountSurface(ctx: HostContext): void {
       'oh-dsh-skins: skin preferences',
     )
   })
-}
-
-export function apply(ctx: HostContext): void {
-  // Static injection would make the TUI wait forever for webServer. Listen
-  // for the common surface first, then require browser services only for a
-  // browser-capable surface.
-  ctx.inject([OH_DSH_SURFACE_SERVICE], mountSurface)
 }

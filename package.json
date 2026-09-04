@@ -35,7 +35,6 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@oh-dsh/desktop-frame",
         "@oh-dsh/panel-controls",
         "@oh-dsh/pinned-summary",
