@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
 import {
   chmodSync,
   copyFileSync,
@@ -7,6 +8,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   readlinkSync,
@@ -755,17 +757,66 @@ function alignBetterSidebarPtyDependency(packageDir) {
 }
 
 
+function copyInstalledNodeModules(source, packageDir) {
+  const target = join(packageDir, 'node_modules')
+  mkdirSync(target, { recursive: true })
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    if (entry.name === '.bin' || entry.name === '.pnpm' || entry.name === '.modules.yaml') continue
+    cpSync(join(source, entry.name), join(target, entry.name), {
+      dereference: true,
+      preserveTimestamps: true,
+      recursive: true,
+    })
+  }
+}
+
+function installWindowsStandaloneDependencies(manifest, runtimeDependencies, packageDir) {
+  // Standalone install under the system temp dir: a directory inside this
+  // checkout would make pnpm adopt the repository workspace and fail the
+  // same unmatched --filter the deploy already reported.
+  const standalone = mkdtempSync(join(tmpdir(), 'oh-dsh-win-deps-'))
+  try {
+    writeFileSync(
+      join(standalone, 'package.json'),
+      `${JSON.stringify({
+        name: `${manifest.name}-windows-deps`,
+        private: true,
+        dependencies: runtimeDependencies,
+      }, undefined, 2)}\n`,
+    )
+    run(process.execPath, [
+      join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs'),
+      '--reporter=silent',
+      '--config.package-import-method=copy',
+      '--config.node-linker=hoisted',
+      '--ignore-scripts',
+      '--prod',
+      'install',
+    ], { cwd: standalone, env: process.env })
+    const source = join(standalone, 'node_modules')
+    if (!existsSync(source)) {
+      throw new Error(`pnpm did not install runtime dependencies for ${manifest.name}`)
+    }
+    copyInstalledNodeModules(source, packageDir)
+  } finally {
+    rmSync(standalone, { recursive: true, force: true })
+  }
+}
+
 function installWindowsPackageDependencies(sourceManifestPath, packageDir) {
   const manifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
   // Peer dependencies resolve from the staged runtime's hoisted tree (the
-  // dsh-context host imports zod and the scoped cordis/schemastery that way);
-  // only runtime dependencies need a pnpm deploy closure, and the workspace
-  // filter can never match an upstream-pinned package outside the workspace.
-  const runtimeDependencies = [
-    ...Object.keys(manifest.dependencies ?? {}),
-    ...Object.keys(manifest.optionalDependencies ?? {}),
-  ]
-  if (runtimeDependencies.length === 0) return
+  // dsh-context host imports the scoped cordis/schemastery that way); only
+  // runtime dependencies need an installed copy beside the package.
+  // Workspace packages take a --filter deploy closure so injected workspace
+  // links resolve; upstream-pinned manifests (dsh-context grew a zod
+  // dependency at v0.41.0) live outside the workspace, so the filter
+  // matches nothing there and the standalone install covers them instead.
+  const runtimeDependencies = {
+    ...(manifest.dependencies ?? {}),
+    ...(manifest.optionalDependencies ?? {}),
+  }
+  if (Object.keys(runtimeDependencies).length === 0) return
   const deployment = join(
     stage,
     'windows-dependencies',
@@ -784,20 +835,12 @@ function installWindowsPackageDependencies(sourceManifestPath, packageDir) {
   ], { cwd: root, env: process.env })
 
   const source = join(deployment, 'node_modules')
-  if (!existsSync(source)) {
-    throw new Error(`pnpm did not deploy runtime dependencies for ${manifest.name}`)
+  if (existsSync(source)) {
+    copyInstalledNodeModules(source, packageDir)
+    rmSync(deployment, { recursive: true, force: true })
+    return
   }
-  const target = join(packageDir, 'node_modules')
-  mkdirSync(target, { recursive: true })
-  for (const entry of readdirSync(source, { withFileTypes: true })) {
-    if (entry.name === '.bin' || entry.name === '.pnpm' || entry.name === '.modules.yaml') continue
-    cpSync(join(source, entry.name), join(target, entry.name), {
-      dereference: true,
-      preserveTimestamps: true,
-      recursive: true,
-    })
-  }
-  rmSync(deployment, { recursive: true, force: true })
+  installWindowsStandaloneDependencies(manifest, runtimeDependencies, packageDir)
 }
 
 
