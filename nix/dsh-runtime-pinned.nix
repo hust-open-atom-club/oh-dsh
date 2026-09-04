@@ -21,8 +21,10 @@ let
     hash = dshSourceSpec.integrity;
   };
 
-  # pnpm install needs the lockfile and supply-chain policy beside
-  # package.json; the npm tarball carries neither repository file. The
+  # pnpm install needs the lockfile, the devDependencies-stripped manifest
+  # (the published devDeps reference unpublished dsh-experimental-*
+  # packages), and the supply-chain policy beside package.json; the npm
+  # tarball carries none of these repository files. The
   # workspace shim mirrors scripts/dsh-source.mjs resolveNpmAssembly: pnpm
   # rejects a frozen install whose recorded overrides differ from the
   # current configuration, and the committed lockfile pins the whole
@@ -32,6 +34,7 @@ let
     mkdir -p $out
     tar -xzf ${tarball} -C $out --strip-components=1
     cp ${../.npmrc} $out/.npmrc
+    cp ${../scripts}/dsh-runtime-${dshSourceSpec.version}-package.json $out/package.json
     cp ${../scripts}/dsh-runtime-${dshSourceSpec.version}-lock.yaml $out/pnpm-lock.yaml
     printf '%s\n' \
       'packages:' \
