@@ -1,8 +1,8 @@
 name: Nix hash refresh (temporary)
 
 # One-off helper for the 0.1.2-alpha.3 upgrade PR: computes the fixed-output
-# hashes the nix assembly needs after the source pins moved. Prints each hash
-# as SRI; delete this workflow once the values land in nix/*.nix.
+# hashes the nix assembly needs after the source pins moved. Delete this
+# workflow once the values land in nix/*.nix.
 
 on:
   workflow_dispatch:
@@ -19,10 +19,10 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: Prefetch GitHub source hashes
         run: |
-          set -euo pipefail
           fetch() {
-            echo "### $1"
-            nix store prefetch-file --unpack --hash-type sha256 "$2" 2>&1 | grep -oE 'hash: .*' || true
+            echo "=== $1 ==="
+            nix store prefetch-file --unpack --json "$2" 2>/dev/null \
+              | python3 -c 'import json,sys; print("sha256:" + json.load(sys.stdin)["hash"])'
           }
           fetch better-sidebar https://github.com/omdsh-dev/DSH-better-sidebar/archive/9494774c4867cdb661c8f9a805c40f7982518868.tar.gz
           fetch dsh-TUI https://github.com/ccch1mneyyy/dsh-TUI/archive/f7db605713a861b28c004b2dc18813bb74d61154.tar.gz
@@ -30,10 +30,8 @@ jobs:
           fetch ecosystem-spec https://github.com/T-Auto/dsh-ecosystem-spec/archive/d28c267fe7fd775428ec2dccd65b0b7efd4dacee.tar.gz
       - name: Surface the pnpmDeps hashes from real builds
         run: |
-          set -euo pipefail
-          # Each fixed-output mismatch prints the actual hash; iterate until
-          # the build succeeds or only non-hash failures remain.
           for pkg in oh-dsh-web-pinned oh-dsh-desktop-pinned; do
-            echo "### $pkg"
-            nix build .#$pkg 2>&1 | grep -E 'got:|specified:|sha256' | head -8 || echo "built OK"
+            echo "=== $pkg ==="
+            nix build --no-link .#$pkg 2>&1 | tee /tmp/build.log || true
+            grep -E 'got:|specified:' /tmp/build.log || echo '(no hash mismatch reported)'
           done
