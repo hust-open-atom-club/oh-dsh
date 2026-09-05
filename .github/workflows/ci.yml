@@ -88,7 +88,27 @@ jobs:
         run: pnpm run typecheck
 
       - name: Run tests
+        if: matrix.os != 'ubuntu-24.04'
         run: pnpm test
+
+      - name: Run tests with coverage
+        if: matrix.os == 'ubuntu-24.04'
+        run: pnpm run test:coverage
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-24.04'
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload coverage report
+        if: matrix.os == 'ubuntu-24.04'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
 
       - name: Build
         run: pnpm run build
