@@ -1,0 +1,33 @@
+{
+  "name": "@oh-dsh/update-button",
+  "version": "0.1.0",
+  "description": "Sidebar update entry for Oh-DSH Desktop: discover and install remote updates from the sidebar shell",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "files": [
+    "dist/index.js",
+    "dist/client.js",
+    "dist/client.js.map"
+  ],
+  "devDependencies": {
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

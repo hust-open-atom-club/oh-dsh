@@ -10,6 +10,7 @@ tmp/
 result
 result-*
 .agent-workflows/
+.pnpm-store/
 
 # Generated Python bytecode from the Nix helper
 __pycache__/
