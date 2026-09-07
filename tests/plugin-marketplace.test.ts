@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { parseMarketplaceCatalog } from '../plugins/plugin-marketplace/src/catalog.ts'
@@ -765,6 +766,70 @@ test('production bundle build runs approved hooks in its own workspace', {
     assert.equal(existsSync(join(checkout, 'unexpected-prepack')), false)
     assert.equal(existsSync(join(helper, 'unexpected-prepare')), false)
     assert.equal(existsSync(join(candidateProfile, 'profile-built')), false)
+  } finally {
+    rmSync(sandboxRoot, { recursive: true, force: true })
+  }
+})
+
+test('bundle build dependencies survive the move into managed sources', async () => {
+  // The transaction manager renames a scripted checkout from the disposable
+  // bundle-builds directory into the profile's managed sources before the
+  // preview boots. pnpm's default isolated layout links dependencies with
+  // absolute paths into the preview's store, so those links dangle after the
+  // rename and the plugin fails to import them (observed as ERR_MODULE_NOT_FOUND
+  // for linkedom when previewing dsh-web-tools on Windows). buildBundle must
+  // therefore install with the hoisted layout, whose real directories travel
+  // with the checkout.
+  const sandboxRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-bundle-move-'))
+  const checkout = join(sandboxRoot, 'bundle-builds', 'move-fixture')
+  const sources = join(sandboxRoot, 'sources')
+  const moved = join(sources, 'move-fixture')
+  mkdirSync(checkout, { recursive: true })
+  writeFileSync(join(checkout, 'package.json'), JSON.stringify({
+    name: 'move-fixture',
+    private: true,
+    type: 'module',
+    dependencies: { 'is-odd': '3.0.1' },
+    scripts: { prepack: 'node prepack.mjs' },
+    version: '1.0.0',
+  }))
+  writeFileSync(join(checkout, 'prepack.mjs'), [
+    "import { writeFileSync } from 'node:fs'",
+    "import isOdd from 'is-odd'",
+    "writeFileSync(new URL('./prepacked', import.meta.url), `${isOdd(1)}\\n`)",
+    '',
+  ].join('\n'))
+  writeFileSync(join(checkout, 'resolve.mjs'), [
+    "import isOdd from 'is-odd'",
+    "process.stdout.write(String(isOdd(3)))",
+    '',
+  ].join('\n'))
+
+  try {
+    const platform = new ProductionMarketplacePlatform({
+      cliEntry: '/unused/dsh.mjs',
+      cwd: checkout,
+      env: process.env,
+      nodeBinary: process.execPath,
+      pnpmEntry: fileURLToPath(new URL('../node_modules/pnpm/bin/pnpm.mjs', import.meta.url)),
+    })
+    await platform.buildBundle({
+      checkout,
+      sandboxRoot,
+      scripts: ['prepack'],
+      // Windows has no write-restricted preview launcher; the dependency
+      // contract under test lives in the pnpm invocation, not confinement.
+      sandboxed: false,
+    })
+    assert.equal(readFileSync(join(checkout, 'prepacked'), 'utf8'), 'true\n')
+    // The rename is the production step the transaction manager performs.
+    mkdirSync(sources, { recursive: true })
+    renameSync(checkout, moved)
+    const resolution = spawnSync(process.execPath, [
+      join(moved, 'resolve.mjs'),
+    ], { cwd: moved, encoding: 'utf8' })
+    assert.equal(resolution.status, 0, resolution.stderr)
+    assert.equal(resolution.stdout.trim(), 'true')
   } finally {
     rmSync(sandboxRoot, { recursive: true, force: true })
   }

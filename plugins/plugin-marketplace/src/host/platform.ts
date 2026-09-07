@@ -505,10 +505,23 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       TMPDIR: temporary,
     }, this.#ghPath)
     const requested = new Set(input.scripts)
+    // Every pnpm invocation in this flow must pin node-linker=hoisted. The
+    // built checkout is renamed from the disposable bundle-builds directory
+    // into the applied profile's managed sources and must keep resolving its
+    // dependencies there. pnpm's default isolated layout, and any command that
+    // re-reads .modules.yaml without an explicit linker, links packages with
+    // absolute junctions/symlinks into the checkout's .pnpm tree; on Windows
+    // those links dangle once the tree is renamed, and the plugin then fails
+    // to boot with ERR_MODULE_NOT_FOUND for its own dependencies (observed
+    // with linkedom while previewing dsh-web-tools). The hoisted layout writes
+    // real directories that travel with the checkout — the same layout dsh
+    // profiles and Windows package staging already use.
+    const linker = ['--config.node-linker=hoisted']
     const commands = [
       {
         args: [
           this.#options.pnpmEntry,
+          ...linker,
           'install',
           '--ignore-scripts',
           existsSync(join(input.checkout, 'pnpm-lock.yaml'))
@@ -524,6 +537,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
         .map(script => ({
           args: [
             this.#options.pnpmEntry,
+            ...linker,
             '--config.enable-pre-post-scripts=false',
             'run',
             script,
