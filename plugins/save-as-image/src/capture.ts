@@ -25,6 +25,14 @@ const CONTENT_PADDING_FLOOR_PX = 8
 const CONTENT_PADDING_CEILING_PX = 48
 /** Summed channel distance below which a pixel counts as background. */
 const BACKGROUND_TOLERANCE = 24
+/** Canvas rows read back per band when locating the drawn content bottom. */
+const SCAN_BAND_ROWS = 1024
+/**
+ * How often the tail headroom may double when a render measures content all
+ * the way down to the canvas floor — the signature that the drift ate the
+ * slack and a plain crop would clip the tail.
+ */
+const MAX_SLACK_GROWTHS = 2
 
 /** Build the download file name for one finalized assistant message. */
 export function captureFileName(messageId: string): string {
@@ -70,8 +78,9 @@ function parseBackgroundColor(color: string | undefined): [number, number, numbe
 /**
  * Row index of the last drawn content row, scanning upward for pixels that
  * differ from the background. A transparent export (no skin color) counts
- * any opaque pixel as content. Returns the canvas height when nothing is
- * detected, keeping the full render.
+ * any opaque pixel as content. Pixels are read back band by band so a tall
+ * render never materializes one full-image buffer. Returns the canvas
+ * height when nothing is detected, keeping the full render.
  */
 function measureContentBottom(
   canvas: HTMLCanvasElement,
@@ -79,19 +88,23 @@ function measureContentBottom(
 ): number {
   const context = canvas.getContext('2d')
   if (context === null) throw new Error('save-as-image: 2d context unavailable')
-  const { data, width } = context.getImageData(0, 0, canvas.width, canvas.height)
-  const channel = (offset: number): number => data[offset] ?? 0
-  for (let y = canvas.height - 1; y >= 0; y -= 1) {
-    let hits = 0
-    for (let x = 0; x < width && hits < 2; x += 4) {
-      const index = (y * width + x) * 4
-      const opaque = channel(index + 3) >= 128
-      const differs = Math.abs(channel(index) - background[0])
-        + Math.abs(channel(index + 1) - background[1])
-        + Math.abs(channel(index + 2) - background[2]) > BACKGROUND_TOLERANCE
-      if (opaque && (background[3] < 128 || differs)) hits += 1
+  let bandFloor = canvas.height
+  while (bandFloor > 0) {
+    const bandHeight = Math.min(SCAN_BAND_ROWS, bandFloor)
+    const bandTop = bandFloor - bandHeight
+    const { data, width } = context.getImageData(0, bandTop, canvas.width, bandHeight)
+    const channel = (offset: number): number => data[offset] ?? 0
+    for (let y = bandHeight - 1; y >= 0; y -= 1) {
+      for (let x = 0; x < width; x += 2) {
+        const index = (y * width + x) * 4
+        const opaque = channel(index + 3) >= 128
+        const differs = Math.abs(channel(index) - background[0])
+          + Math.abs(channel(index + 1) - background[1])
+          + Math.abs(channel(index + 2) - background[2]) > BACKGROUND_TOLERANCE
+        if (opaque && (background[3] < 128 || differs)) return bandTop + y
+      }
     }
-    if (hits >= 2) return y
+    bandFloor = bandTop
   }
   return canvas.height
 }
@@ -122,32 +135,50 @@ async function renderBlob(
   // handling differs from the live layout, so the drawn content can drift
   // out of the node's box by a few percent on tall responses — sizing the
   // canvas to the box alone clips the tail. Render with tail headroom,
-  // measure where the content actually ends, and crop to it.
+  // measure where the content actually ends, and crop to it. Content
+  // measuring all the way down to the canvas floor means the drift ate the
+  // headroom, so it doubles and re-renders instead of silently cropping.
   const rect = node.getBoundingClientRect()
   const contentHeight = Math.ceil(rect.height)
-  const bottomSlack = Math.max(
+  let bottomSlack = Math.max(
     MIN_BOTTOM_SLACK_PX,
     Math.ceil(contentHeight * BOTTOM_SLACK_RATIO),
   )
-  const options = {
-    pixelRatio,
-    width: Math.ceil(rect.width),
-    height: contentHeight + bottomSlack,
-    ...(fontEmbedCSS === undefined ? { skipFonts: true } : { fontEmbedCSS }),
-    ...(backgroundColor === undefined ? {} : { backgroundColor }),
-  }
-  const rendered = await toCanvas(node, options)
-  // The library's dimension guard may scale an oversized canvas down; every
-  // css-space offset follows the canvas' real scale, not the requested ratio.
-  const scale = rendered.height / (contentHeight + bottomSlack)
   const background = parseBackgroundColor(backgroundColor)
-  const padding = Math.round(nodeContentPadding(node) * scale)
-  const contentBottom = measureContentBottom(rendered, background)
+  for (let growth = 0; ; growth += 1) {
+    const options = {
+      pixelRatio,
+      width: Math.ceil(rect.width),
+      height: contentHeight + bottomSlack,
+      ...(fontEmbedCSS === undefined ? { skipFonts: true } : { fontEmbedCSS }),
+      ...(backgroundColor === undefined ? {} : { backgroundColor }),
+    }
+    const rendered = await toCanvas(node, options)
+    // The library's dimension guard may scale an oversized canvas down; every
+    // css-space offset follows the canvas' real scale, not the requested ratio.
+    const scale = rendered.height / (contentHeight + bottomSlack)
+    const padding = Math.round(nodeContentPadding(node) * scale)
+    const contentBottom = measureContentBottom(rendered, background)
+    if (contentBottom < rendered.height - 2 || growth >= MAX_SLACK_GROWTHS) {
+      return frameRender(rendered, contentBottom, padding, backgroundColor)
+    }
+    bottomSlack *= 2
+  }
+}
+
+/**
+ * Crop the render to the measured content plus the node's own padding, and
+ * widen it by one padding on each side — the node box hugs the text, and the
+ * frame lets the image breathe like the live widget. The frame uses the same
+ * skin background; a transparent export stays transparent there.
+ */
+function frameRender(
+  rendered: HTMLCanvasElement,
+  contentBottom: number,
+  padding: number,
+  backgroundColor: string | undefined,
+): Promise<Blob> {
   const cropBottom = Math.min(rendered.height, contentBottom + 1 + padding)
-  // The node box hugs the text on both sides; widen the export by one
-  // padding on each so the image breathes like the live widget. The filled
-  // frame uses the same skin background; a transparent export stays
-  // transparent there.
   const cropped = document.createElement('canvas')
   cropped.width = rendered.width + padding * 2
   cropped.height = cropBottom
@@ -158,9 +189,10 @@ async function renderBlob(
     context.fillRect(0, 0, cropped.width, cropped.height)
   }
   context.drawImage(rendered, padding, 0)
-  const blob = await canvasToPng(cropped)
-  if (blob === null) throw new Error('save-as-image: capture produced no image')
-  return blob
+  return canvasToPng(cropped).then(blob => {
+    if (blob === null) throw new Error('save-as-image: capture produced no image')
+    return blob
+  })
 }
 
 /**
