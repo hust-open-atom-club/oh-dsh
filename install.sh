@@ -13,6 +13,7 @@
 #     | bash
 #   sh install.sh --surface web --version v0.1.8
 #   sh install.sh --uninstall --surface desktop
+#   sh install.sh --local --surface tui        # install the local repo build
 #
 # Unix/macOS only; Windows uses install.ps1 from the same repository.
 # On Windows under Git Bash, run install.ps1 from PowerShell instead.
@@ -50,6 +51,15 @@ Options:
                           (default ~/.local/share/oh-dsh/<surface>).
       --bin-dir DIR     Directory receiving the `ohdsh` launcher symlink for
                         web/tui (default ~/.local/bin).
+      --local           Install the artifacts this repository's
+                        pnpm run dist:<surface> commands placed under
+                        release/ instead of downloading a GitHub Release.
+                        The script must run from a repository checkout
+                        (see --local-root for another path), and --version /
+                        --repo are rejected beside it. The installed
+                        version is the checkout's package.json version.
+      --local-root DIR  Repository checkout to install from with --local
+                        (default: the directory containing install.sh).
       --repo SLUG       GitHub owner/repo (default hust-open-atom-club/oh-dsh).
       --uninstall       Remove the installed surface instead of installing.
       --force           Reinstall even when the same version is installed.
@@ -61,6 +71,7 @@ Options:
 Environment:
   OH_DSH_SURFACE, OH_DSH_VERSION, OH_DSH_INSTALL_DIR, OH_DSH_BIN_DIR,
   OH_DSH_REPO       Same meaning as the matching options; options win.
+  OH_DSH_LOCAL      Same as --local when set to 1.
   OH_DSH_OS, OH_DSH_ARCH   Same meaning as --os/--arch.
   OH_DSH_API_BASE, OH_DSH_DOWNLOAD_BASE
                    Override the GitHub API and download base URLs.
@@ -98,6 +109,8 @@ os_arg=${OH_DSH_OS:-}
 arch_arg=${OH_DSH_ARCH:-}
 force=0
 uninstall=0
+local_install=${OH_DSH_LOCAL:-0}
+local_root=
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -124,6 +137,16 @@ while [ "$#" -gt 0 ]; do
     --repo)
       [ "$#" -ge 2 ] || die "$1 requires a value"
       repo=$2
+      shift 2
+      ;;
+    --local)
+      local_install=1
+      shift
+      ;;
+    --local-root)
+      [ "$#" -ge 2 ] || die "$1 requires a value"
+      local_root=$2
+      local_install=1
       shift 2
       ;;
     --force)
@@ -160,7 +183,7 @@ case "$surface" in
 esac
 
 [ -n "${HOME:-}" ] || die 'HOME is not set; cannot determine default locations'
-command -v curl >/dev/null 2>&1 || die 'curl is required (https://curl.se)'
+[ "$local_install" = 1 ] || command -v curl >/dev/null 2>&1   || die 'curl is required (https://curl.se)'
 
 api_base=${OH_DSH_API_BASE:-$API_BASE_DEFAULT}
 download_base=${OH_DSH_DOWNLOAD_BASE:-$DOWNLOAD_BASE_DEFAULT}
@@ -838,29 +861,56 @@ fi
 
 make_workdir
 
-if [ -n "$version_arg" ]; then
-  case "$version_arg" in
-    v*) tag=$version_arg ;;
-    *) tag="v$version_arg" ;;
+if [ "$local_install" = 1 ]; then
+  [ -z "$version_arg" ] || die '--local installs the checkout version; --version cannot be combined with it'
+  [ "$repo" = "$REPO_DEFAULT" ] || die '--local installs this checkout; --repo cannot be combined with it'
+  if [ -n "$local_root" ]; then
+    local_checkout=$local_root
+  else
+    local_checkout=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) \
+      || die 'failed to resolve the directory containing install.sh'
+  fi
+  [ -f "$local_checkout/package.json" ] \
+    || die "$local_checkout is not a repository checkout (package.json missing); --local needs the repo after pnpm run dist:<surface>"
+  version=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$local_checkout/package.json" | head -n 1)
+  case "$version" in
+    ''|*[!A-Za-z0-9._+-]*) die "could not read a valid version from $local_checkout/package.json" ;;
   esac
-  release_path="/repos/$repo/releases/tags/$tag"
+  tag="v$version"
+  local_artifact_dir=$local_checkout/release
+  # The asset name is resolved by the shared case below; the local file must
+  # exist under release/ with exactly that name.
 else
-  release_path="/repos/$repo/releases/latest"
-fi
+  if [ -n "$version_arg" ]; then
+    case "$version_arg" in
+      v*) tag=$version_arg ;;
+      *) tag="v$version_arg" ;;
+    esac
+    release_path="/repos/$repo/releases/tags/$tag"
+  else
+    release_path="/repos/$repo/releases/latest"
+  fi
 
-log "Resolving $([ -n "$version_arg" ] && printf 'release %s' "$tag" || printf 'latest stable release') from $repo"
-release_json=$(gh_curl "$api_base$release_path") \
-  || die "failed to fetch release information from $api_base$release_path"
-[ -n "$release_json" ] || die "empty release response from $api_base$release_path"
+  log "Resolving $([ -n "$version_arg" ] && printf 'release %s' "$tag" || printf 'latest stable release') from $repo"
+  release_json=$(gh_curl "$api_base$release_path") \
+    || die "failed to fetch release information from $api_base$release_path"
+  [ -n "$release_json" ] || die "empty release response from $api_base$release_path"
+fi
 
 if [ -z "${tag:-}" ]; then
   tag=$(json_tag "$release_json")
   [ -n "$tag" ] || die 'could not read tag_name from the release response'
 fi
-case "$tag" in
-  v*) version=${tag#v} ;;
-  *) version=$tag ;;
-esac
+if [ "$local_install" != 1 ]; then
+  if [ -z "${tag:-}" ]; then
+    tag=$(json_tag "$release_json")
+    [ -n "$tag" ] || die 'could not read tag_name from the release response'
+  fi
+  case "$tag" in
+    v*) version=${tag#v} ;;
+    *) version=$tag ;;
+  esac
+fi
 
 case "$surface:$os" in
   desktop:darwin)
@@ -873,9 +923,16 @@ case "$surface:$os" in
   tui:*) asset="oh-dsh-tui-$version-$os-$arch.tar.gz" ;;
 esac
 
-digest=$(json_asset_digest "$release_json" "$asset")
-[ -n "$digest" ] \
-  || die "release $tag publishes no sha256 digest for $asset; verify the asset list at https://github.com/$repo/releases/tag/$tag"
+if [ "$local_install" = 1 ]; then
+  local_artifact=$local_artifact_dir/$asset
+  [ -f "$local_artifact" ] \
+    || die "$local_artifact_dir does not contain $asset; build it first (pnpm run dist:$surface produces release/ for this checkout)"
+  digest=$(sha256_file "$local_artifact")
+else
+  digest=$(json_asset_digest "$release_json" "$asset")
+  [ -n "$digest" ] \
+    || die "release $tag publishes no sha256 digest for $asset; verify the asset list at https://github.com/$repo/releases/tag/$tag"
+fi
 
 # Refuse un-markable values before anything is downloaded or replaced, so a
 # release identifier the marker cannot record never strands the install.
@@ -903,17 +960,23 @@ fi
 # Download and verify
 # ---------------------------------------------------------------------------
 
-archive="$workdir/$asset"
-url="$download_base/$repo/releases/download/$tag/$asset"
-log "Downloading $asset"
-download_curl -o "$archive" "$url" \
-  || die "failed to download $url"
+if [ "$local_install" = 1 ]; then
+  archive=$local_artifact
+  log "Installing locally built $asset from $local_artifact_dir"
+  log "Local build sha256:$digest"
+else
+  archive="$workdir/$asset"
+  url="$download_base/$repo/releases/download/$tag/$asset"
+  log "Downloading $asset"
+  download_curl -o "$archive" "$url" \
+    || die "failed to download $url"
 
-actual=$(sha256_file "$archive")
-if [ "$actual" != "$digest" ]; then
-  die "checksum mismatch for $asset: expected sha256:$digest, got sha256:$actual; the previous installation was left untouched"
+  actual=$(sha256_file "$archive")
+  if [ "$actual" != "$digest" ]; then
+    die "checksum mismatch for $asset: expected sha256:$digest, got sha256:$actual; the previous installation was left untouched"
+  fi
+  log "Verified sha256:$digest"
 fi
-log "Verified sha256:$digest"
 
 # ---------------------------------------------------------------------------
 # Install: web and tui

@@ -55,10 +55,10 @@ function buildSurfaceFixture() {
     writeFile(join(repo, 'dist'), name, 'desktop:' + name + '\n')
   }
 
-  // Generic compiled plugins (vision adds a LICENSE, tui adds its patch).
+  // Generic compiled plugins (tui adds its patch beside the bundle).
   for (const name of [
     'about', 'desktop-frame', 'skins', 'sidebar', 'panel-controls',
-    'pinned-summary', 'plugin-marketplace', 'save-as-image', 'vision',
+    'pinned-summary', 'plugin-marketplace', 'save-as-image',
     'liangshen', 'tui',
     'tui-marketplace',
   ]) {
@@ -69,7 +69,6 @@ function buildSurfaceFixture() {
     writeFile(join(repo, 'dist', 'plugins', name), 'client.js', 'export {}\n')
     writeFile(join(repo, 'dist', 'plugins', name), 'client.js.map', 'map\n')
   }
-  writeFile(join(repo, 'dist', 'plugins', 'vision'), 'LICENSE', 'MIT\n')
   writeFile(join(repo, 'dist', 'plugins', 'tui'), 'cordis.patch.yml', 'patch: tui\n')
 
   // better-sidebar-runtime (dependency wiring covered by its own test).
@@ -94,7 +93,6 @@ function buildSurfaceFixture() {
   })
   writeFile(join(repo, 'upstream', 'dsh-TUI', 'lib'), 'index.js', 'export {}\n')
   writeFile(join(repo, 'upstream', 'dsh-TUI', 'presets', 'liangshen'), 'preset.yml', 'id: liangshen\n')
-  writeFile(join(repo, 'upstream', 'dsh-TUI', 'skills'), 'skill.md', 'skill\n')
   writeFile(join(repo, 'upstream', 'dsh-TUI', 'dsh-ecosystem-spec'), 'spec.yml', 'spec\n')
   writeFile(join(repo, 'upstream', 'dsh-TUI'), 'cordis.patch.yml', 'patch: tui\n')
   writeFile(join(repo, 'upstream', 'dsh-TUI'), 'cordis.yml', 'cordis: tui\n')
@@ -155,7 +153,6 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/save-as-image',
     '@oh-dsh/sidebar',
     '@oh-dsh/skins',
-    '@oh-dsh/vision',
     'dsh-context',
   ])
   assert.deepEqual(sorted(SURFACE_PACKAGE_NAMES.web), [
@@ -169,7 +166,6 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/save-as-image',
     '@oh-dsh/sidebar',
     '@oh-dsh/skins',
-    '@oh-dsh/vision',
     '@oh-dsh/web',
     'dsh-context',
   ])
@@ -179,7 +175,6 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/skins',
     '@oh-dsh/tui',
     '@oh-dsh/tui-marketplace',
-    '@oh-dsh/vision',
   ])
   assert.deepEqual(sorted(ALL_SURFACE_PACKAGE_NAMES), sorted(
     SURFACE_PACKAGE_NAMES.desktop,
@@ -196,7 +191,7 @@ test('web surface installs exactly the official web closure', () => {
     const modules = join(runtime, 'node_modules')
     for (const name of [
       '@oh-dsh/web', '@oh-dsh/liangshen', '@oh-dsh/better-sidebar-runtime',
-      '@oh-dsh/vision', '@oh-dsh/about', '@oh-dsh/skins',
+      '@oh-dsh/about', '@oh-dsh/skins',
       '@oh-dsh/pinned-summary', '@oh-dsh/sidebar', '@oh-dsh/panel-controls',
       '@oh-dsh/plugin-marketplace', '@oh-dsh/save-as-image', 'dsh-context',
       '@deepseek-harness-tui/dsh-auth',
@@ -249,7 +244,7 @@ test('full closure installs every official package and adapts the renderer', () 
     const renderer = join(modules, '@deepseek-harness-tui', 'dsh-tui')
     assert.equal(existsSync(join(renderer, 'lib', 'index.js')), true)
     assert.equal(existsSync(join(renderer, 'presets', 'liangshen', 'preset.yml')), true)
-    assert.equal(existsSync(join(renderer, 'skills', 'skill.md')), true)
+    // dsh-TUI 0.10.0 no longer ships a top-level skills tree.
     assert.equal(existsSync(join(renderer, 'dsh-ecosystem-spec', 'spec.yml')), true)
     assert.equal(existsSync(join(renderer, 'cordis.patch.yml')), true)
     assert.equal(adapterCalls.length, 2, 'renderer adapters applied')
@@ -276,7 +271,7 @@ test('tui closure excludes web, desktop, and the Liangshen plugin', () => {
     const modules = join(runtime, 'node_modules')
     for (const name of [
       '@deepseek-harness-tui/dsh-tui', '@oh-dsh/tui', '@oh-dsh/tui-marketplace',
-      '@oh-dsh/skins', '@oh-dsh/plugin-marketplace', '@oh-dsh/vision',
+      '@oh-dsh/skins', '@oh-dsh/plugin-marketplace',
     ]) {
       assert.equal(existsSync(join(modules, ...name.split('/'))), true, name + ' registered')
     }

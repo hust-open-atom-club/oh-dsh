@@ -52,60 +52,6 @@ function run(args) {
   }
 }
 
-/**
- * Expose the built-in Vision settings section through DSH's existing
- * configuration-client boundary. The pinned release keeps a fixed allowlist;
- * patch only the checkout used for this build and restore the tracked source
- * immediately afterwards so the upstream checkout remains pristine.
- */
-function withVisionSettingsNamespace(build) {
-  const path = join(
-    dshSource,
-    'packages', 'host', 'apiproxy', 'src', 'api-proxy.ts',
-  )
-  const source = readFileSync(path, 'utf8')
-  const original = "  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',\n"
-  const replacement = `${original}  'oh-dsh-vision',\n`
-  if (!source.includes(original)) {
-    throw new Error('pinned DSH API proxy settings allowlist changed; Vision patch needs review')
-  }
-  let restored = false
-  const restore = () => {
-    if (restored) return
-    restored = true
-    writeFileSync(path, source)
-  }
-  const signals = process.platform === 'win32'
-    ? ['SIGINT', 'SIGTERM']
-    : ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
-  const handlers = new Map()
-  const handleSignal = (signal) => {
-    try {
-      restore()
-    } finally {
-      // A signal listener suppresses Node's default termination. Restore the
-      // checkout first, then re-raise the same signal so the build still
-      // exits with the expected status.
-      process.removeListener('exit', restore)
-      process.kill(process.pid, signal)
-    }
-  }
-  process.once('exit', restore)
-  for (const signal of signals) {
-    const handler = () => { handleSignal(signal) }
-    handlers.set(signal, handler)
-    process.once(signal, handler)
-  }
-  try {
-    writeFileSync(path, source.replace(original, replacement))
-    return build()
-  } finally {
-    restore()
-    process.removeListener('exit', restore)
-    for (const [signal, handler] of handlers) process.removeListener(signal, handler)
-  }
-}
-
 run(['install', '--frozen-lockfile'])
 pinInnerPnpm()
-withVisionSettingsNamespace(() => run(['run', 'build']))
+run(['run', 'build'])

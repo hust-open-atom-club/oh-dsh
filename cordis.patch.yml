@@ -32,9 +32,6 @@
     - id: oh-better-sidebar-runtime
       name: '@oh-dsh/better-sidebar-runtime'
 
-    - id: oh-vision
-      name: '@oh-dsh/vision'
-
     - id: oh-skins
       name: '@oh-dsh/skins'
 

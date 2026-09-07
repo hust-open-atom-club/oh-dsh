@@ -326,19 +326,13 @@ html[data-oh-dsh-desktop='true']:has(
 html[data-oh-dsh-desktop='true']:has(
   #root [role='presentation'] > [role='dialog']
 ) #oh-dsh-sidebar-root,
+/* The pinned summary and marketplace surface share the chrome layer's
+   stacking context (plugins/shared/chrome-layer.ts), so demoting the layer
+   carries both below the dialog backdrop. */
 html[data-oh-dsh-desktop='true']:has(
   #root [role='presentation'] > [role='dialog']
-) [data-oh-dsh-pinned-summary],
-html[data-oh-dsh-desktop='true']:has(
-  #root [role='presentation'] > [role='dialog']
-) #oh-dsh-plugin-marketplace-root {
+) #oh-dsh-chrome-layer {
   z-index: 999 !important;
-}
-
-html[data-oh-dsh-desktop='true']:has(
-  #root [role='presentation'] > [role='dialog']
-) #oh-dsh-plugin-marketplace-root {
-  position: relative;
 }
 
 /* Portal overlays that hand the document a bare top-level dialog own their
@@ -594,7 +588,10 @@ function installHeroBranding(): () => void {
 }
 
 function focusComposer(): void {
-  document.querySelector<HTMLTextAreaElement>('textarea')?.focus()
+  // The 0.1.2 conversation composer is a contenteditable div; the terminal
+  // input remains a textarea. The composer wins when both exist.
+  document.querySelector<HTMLElement>('[data-composer-input="true"]')?.focus()
+    ?? document.querySelector<HTMLTextAreaElement>('textarea')?.focus()
 }
 
 function findSettingsButton(): HTMLButtonElement | undefined {

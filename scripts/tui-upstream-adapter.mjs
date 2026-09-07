@@ -160,13 +160,29 @@ function disableUpstreamUpdateCheck(path) {
   const before = `    void checkForTuiUpdate().then((update) => {
         if (update === undefined || exited || updateRequested)
             return;
-        channel.notify(t('update-available', { current: update.current, latest: update.latest }), { color: 'warning', timeoutMs: 12000 });
+        const key = update.isStandalone ? 'update-standalone-available' : 'update-available';
+        // A standalone release without a SHA256SUMS asset (published before the
+        // checksum workflow landed) still updates, but the notice must say the
+        // package's integrity cannot be verified — silent degradation is exactly
+        // how the unverified-download window went unnoticed.
+        const suffix = update.isStandalone && update.checksumUrl === undefined
+            ? \` \${t('update-standalone-no-checksum')}\`
+            : '';
+        channel.notify(\`\${t(key, { current: update.current, latest: update.latest })}\${suffix}\`, { color: 'warning', timeoutMs: 12000 });
     });`
   const after = `    if (process.env.DSH_OH_TUI !== '1') {
         void checkForTuiUpdate().then((update) => {
             if (update === undefined || exited || updateRequested)
                 return;
-            channel.notify(t('update-available', { current: update.current, latest: update.latest }), { color: 'warning', timeoutMs: 12000 });
+            const key = update.isStandalone ? 'update-standalone-available' : 'update-available';
+            // A standalone release without a SHA256SUMS asset (published before the
+            // checksum workflow landed) still updates, but the notice must say the
+            // package's integrity cannot be verified — silent degradation is exactly
+            // how the unverified-download window went unnoticed.
+            const suffix = update.isStandalone && update.checksumUrl === undefined
+                ? \` \${t('update-standalone-no-checksum')}\`
+                : '';
+            channel.notify(\`\${t(key, { current: update.current, latest: update.latest })}\${suffix}\`, { color: 'warning', timeoutMs: 12000 });
         });
     }`
   replaceOnce(path, before, after)
@@ -235,7 +251,7 @@ export function adaptTuiRendererPackage(packageDir) {
   for (const [before, after] of [
     ['Show the dsh-tui configuration source', 'Show the Oh-DSH TUI configuration source'],
     ['Update dsh-tui and restart', 'Update Oh-DSH TUI and restart'],
-    ['Practice programming with dsh-tui', 'Practice programming with Oh-DSH TUI'],
+    // beta.4 dropped the "Practice programming" preset command.
     ['Restart dsh-tui and resume this session', 'Restart Oh-DSH TUI and resume this session'],
     ['Exit dsh-tui', 'Exit Oh-DSH TUI'],
   ]) {
@@ -254,8 +270,10 @@ export function adaptTuiRendererPackage(packageDir) {
   replaceEvery(plugin, 'dsh-tui crashed:', 'Oh-DSH TUI crashed:')
   replaceEvery(
     plugin,
-    'Updating @deepseek-harness-tui/dsh-tui and restarting…',
-    'Updating Oh-DSH TUI and restarting…',
+    // beta.4 replaced the "Updating … and restarting" notice with exit-time
+    // failure lines naming the package.
+    'dsh-tui update failed',
+    'Oh-DSH TUI update failed',
   )
   replaceOnce(
     plugin,

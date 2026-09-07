@@ -60,7 +60,6 @@ the smallest supported distribution.
 | `@oh-dsh/pinned-summary` | Native | Session summary, half-height card, and content-gutter management |
 | `@oh-dsh/plugin-marketplace` | Adopts lifecycle ideas from `plugin-registry` and `dsh-hub` | One Loader, isolated preview, risk approval, TOFU source lock, and recovery |
 | `@oh-dsh/skins` | Downstream implementation of the `dsh-skins` ThemeService model | One skin id set, Host persistence, Web/Desktop CSS, and TUI palette adapters |
-| `@oh-dsh/vision` | Adapts [`dsh-vision`](https://github.com/william-jin-cmu/dsh-vision) | Cross-surface `view_image` Host tool with cloud/local OCR fallback; DeepSeek V4 is admitted at the final image-capability check and its native attachments are described before the pinned text-only adapter, while DSH owns paste, thumbnails, and submission through its native attachment rail; reuses DSH credentials and settings |
 | `@deepseek-harness-tui/dsh-tui` | Pins [`dsh-TUI`](https://github.com/ccch1mneyyy/dsh-TUI) | Upstream owns terminal rendering, session interaction, commands, extension seams, and terminal compatibility |
 | `@oh-dsh/tui` | Downstream Profile adapter for `dsh-TUI` | Unified `ohdsh tui`, Oh-DSH TUI identity, defaults, packaging, and DSH data boundary |
 
@@ -99,12 +98,11 @@ same transaction and risk approval and cannot bypass the Loader.
 
 - Web binds to loopback by default; LAN exposure requires trusted authorities.
 - Files, PTY, and Git requests are bound to the active Session and Workspace.
-- Local `view_image` reads are bound to the active Session workspace; remote
-  vision requests go only to the user-configured endpoint.
+- Local `view_image` reads are bound to the active Session workspace.
 - Desktop/Web image paste, thumbnails, and submission remain owned by DSH's
-  attachment store and native attachment rail; `@oh-dsh/vision` augments the
-  final DeepSeek V4 image-admission capability check and describes those native
-  attachments before the pinned text-only adapter serializes the request.
+  attachment store and native attachment rail; natively multimodal models
+  such as DeepSeek V4 Flash consume the attachments directly (the former
+  `@oh-dsh/vision` bridge plugin is removed).
 - Marketplace candidate, current, and previous states remain separate.
 - A source receives a TOFU lock on first use; later commit changes need review.
 - The Electron bridge exists only on Desktop; Web does not emulate its rights.

@@ -493,6 +493,14 @@ async function getUpdateManager(): Promise<DesktopUpdateManager> {
   const packageType = app.isPackaged
     ? await detectPackageType(process.resourcesPath)
     : 'unsupported'
+  if (app.isPackaged) {
+    // electron-updater logs to the raw console by default, printing
+    // "Checking for update" plus full network-error stack traces into the
+    // launching terminal. The manager already routes every outcome —
+    // including the mirror fallback and network failures — through onLog
+    // and the update state, so the duplicate console channel is noise.
+    autoUpdater.logger = null
+  }
   const manager = new DesktopUpdateManager({
     currentVersion: app.getVersion(),
     appIsPackaged: app.isPackaged,

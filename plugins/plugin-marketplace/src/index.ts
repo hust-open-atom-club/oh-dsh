@@ -12,21 +12,65 @@ import { mountMarketplaceWebBridge } from './host/web-bridge.ts'
 interface HostContext {
   effect(effect: () => (() => void) | void, label?: string): void
   get(name: string): unknown
-  inject(
-    names: string[],
-    callback: (ctx: HostContext & Record<string, unknown>) => void,
-  ): void
+  inject(names: string[], callback: (ctx: HostContext) => void): void
   logger: { warn(message: string): void }
   provide(name: string, value: unknown): void
 }
 
 export const name = 'oh-dsh-plugin-marketplace'
-export const inject: string[] = []
+// Deliberately empty (the dsh-auth pattern): a hard code-level inject would
+// deadlock compositions without the carrier service (desktop uses the
+// Electron IPC bridge). Instead, apply registers sibling FIRST-LEVEL dynamic
+// injects per carrier — the 0.1.2 loader never activates a nested
+// `ctx.inject` created inside another inject's callback.
+export const inject: readonly string[] = []
 
 /** Facts other Host plugins can inspect without receiving Electron access. */
 export interface PluginMarketplaceHost {
   catalog: 'public-dsh-catalog'
   preview: 'isolated-profile'
+}
+
+interface MountedMarketplaceHost {
+  manager: ReturnType<typeof createSurfaceMarketplaceHost>['manager']
+  previewProxy: ReturnType<typeof createSurfaceMarketplaceHost>['previewProxy']
+}
+
+/** Create the surface manager, or log why this composition stays inert. */
+function mountSurfaceHost(
+  ctx: HostContext,
+  surface: OhDshSurface & { kind: 'web' | 'tui' },
+): MountedMarketplaceHost | undefined {
+  if (process.env.OH_DSH_MARKETPLACE_PREVIEW === '1') {
+    ctx.logger.warn('plugin-marketplace: disabled inside an isolated preview runtime')
+    return undefined
+  }
+  if (process.env.OH_DSH_READ_ONLY === '1') {
+    // Viewer mode keeps the shared pluginMarketplace service available so
+    // dependent surfaces (for example the TUI marketplace scene) still
+    // activate; the manager refuses every mutating transaction.
+    ctx.logger.warn('plugin-marketplace: read-only viewer mode; transactions disabled')
+  }
+  if (surface.dataRoot === '') {
+    ctx.logger.warn('plugin-marketplace: no writable data root; host disabled')
+    return undefined
+  }
+  try {
+    const host = createSurfaceMarketplaceHost({
+      environment: process.env,
+      kind: surface.kind,
+      onLog: line => ctx.logger.warn(`[marketplace] ${line}`),
+      ...(process.env.OH_DSH_READ_ONLY === '1' ? { readOnly: true } : {}),
+      surface,
+    })
+    ctx.provide('pluginMarketplace', marketplaceBridge(host.manager))
+    return host
+  } catch (error) {
+    ctx.logger.warn(
+      `plugin-marketplace: host disabled: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return undefined
+  }
 }
 
 export function apply(ctx: HostContext): void {
@@ -35,73 +79,45 @@ export function apply(ctx: HostContext): void {
     preview: 'isolated-profile',
   } satisfies PluginMarketplaceHost))
 
-  // Desktop keeps its Electron-owned transaction manager and IPC bridge.
-  // Web and TUI run the same manager in their DSH host process and expose
-  // it to their own UI carrier (HTTP bridge or slash-command renderer).
-  // Preview runtimes must not mount a nested transaction owner: their host
-  // would target the candidate profile the outer transaction is reviewing.
-  ctx.inject([OH_DSH_SURFACE_SERVICE], surfaceCtx => {
-    const surface = surfaceCtx.get(OH_DSH_SURFACE_SERVICE) as OhDshSurface | undefined
-    if (surface === undefined || (surface.kind !== 'web' && surface.kind !== 'tui')) {
+  // Web carrier: the HTTP bridge follows the surface and its web server.
+  ctx.inject([OH_DSH_SURFACE_SERVICE, 'webServer'], webCtx => {
+    const surface = webCtx.get(OH_DSH_SURFACE_SERVICE) as OhDshSurface | undefined
+    if (surface?.kind !== 'web') return
+    const host = mountSurfaceHost(webCtx, surface as OhDshSurface & { kind: 'web' })
+    if (host === undefined) return
+    const webServer = webCtx.get('webServer') as
+      Parameters<typeof mountMarketplaceWebBridge>[0]['webServer'] | undefined
+    if (webServer === undefined) {
+      webCtx.logger.warn('plugin-marketplace: web HTTP bridge is unavailable')
       return
     }
-    if (process.env.OH_DSH_MARKETPLACE_PREVIEW === '1') {
-      surfaceCtx.logger.warn('plugin-marketplace: disabled inside an isolated preview runtime')
-      return
-    }
-    if (process.env.OH_DSH_READ_ONLY === '1') {
-      // Viewer mode keeps the shared pluginMarketplace service available so
-      // dependent surfaces (for example the TUI marketplace scene) still
-      // activate; the manager refuses every mutating transaction.
-      surfaceCtx.logger.warn('plugin-marketplace: read-only viewer mode; transactions disabled')
-    }
-    if (surface.dataRoot === '') {
-      surfaceCtx.logger.warn('plugin-marketplace: no writable data root; host disabled')
-      return
-    }
-    let host
-    try {
-      host = createSurfaceMarketplaceHost({
-        environment: process.env,
-        kind: surface.kind,
-        onLog: line => surfaceCtx.logger.warn(`[marketplace] ${line}`),
-        ...(process.env.OH_DSH_READ_ONLY === '1' ? { readOnly: true } : {}),
-        surface,
-      })
-    } catch (error) {
-      surfaceCtx.logger.warn(
-        `plugin-marketplace: host disabled: ${error instanceof Error ? error.message : String(error)}`,
-      )
-      return
-    }
-    const { manager, previewProxy } = host
-    surfaceCtx.provide('pluginMarketplace', marketplaceBridge(manager))
-
-    if (surface.kind === 'web') {
-      surfaceCtx.inject(['webServer'], webCtx => {
-        const bridgeCtx = webCtx as unknown as typeof webCtx & {
-          webServer: Parameters<typeof mountMarketplaceWebBridge>[0]['webServer']
-        }
-        bridgeCtx.effect(() => {
-          const disposers = [
-            mountMarketplaceWebBridge(bridgeCtx, manager),
-            ...(previewProxy === null ? [] : [previewProxy.mount(bridgeCtx)]),
-          ]
-          return () => {
-            for (const dispose of disposers) dispose()
-          }
-        }, 'oh-dsh-plugin-marketplace: web HTTP bridge and preview proxy')
-      })
-      return
-    }
-    surfaceCtx.inject(['commands'], commandCtx => {
-      const bridgeCtx = commandCtx as unknown as typeof commandCtx & {
-        commands: Parameters<typeof mountMarketplaceTuiCommand>[0]
+    webCtx.effect(() => {
+      const disposers = [
+        mountMarketplaceWebBridge({ logger: webCtx.logger, webServer }, host.manager),
+        ...(host.previewProxy === null ? [] : [host.previewProxy.mount({ webServer })]),
+      ]
+      return () => {
+        for (const dispose of disposers) dispose()
       }
-      bridgeCtx.effect(
-        () => mountMarketplaceTuiCommand(bridgeCtx.commands),
-        'oh-dsh-plugin-marketplace: TUI command',
-      )
-    })
+    }, 'oh-dsh-plugin-marketplace: web HTTP bridge and preview proxy')
   })
+
+  // TUI carrier: the slash command follows the surface and the command registry.
+  ctx.inject([OH_DSH_SURFACE_SERVICE, 'commands'], tuiCtx => {
+    const surface = tuiCtx.get(OH_DSH_SURFACE_SERVICE) as OhDshSurface | undefined
+    if (surface?.kind !== 'tui') return
+    const host = mountSurfaceHost(tuiCtx, surface as OhDshSurface & { kind: 'tui' })
+    if (host === undefined) return
+    const commands = tuiCtx.get('commands') as
+      Parameters<typeof mountMarketplaceTuiCommand>[0] | undefined
+    if (commands === undefined) {
+      tuiCtx.logger.warn('plugin-marketplace: TUI command registry is unavailable')
+      return
+    }
+    tuiCtx.effect(
+      () => mountMarketplaceTuiCommand(commands),
+      'oh-dsh-plugin-marketplace: TUI command',
+    )
+  })
+
 }

@@ -58,10 +58,13 @@
   flex-direction: column !important;
 }
 
+/* Anchored inside the shared chrome layer (shared/chrome-layer.ts), which
+   already reserves the titlebar row: the surface spans the layer with plain
+   absolute offsets instead of viewport coordinates. */
 .oh-marketplace-surface {
-  position: fixed;
+  position: absolute;
   z-index: 8800;
-  top: var(--oh-dsh-titlebar-height, 40px);
+  top: 0;
   right: 0;
   bottom: 0;
   left: var(--oh-marketplace-left, 0px);

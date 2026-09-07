@@ -1,4 +1,4 @@
-declare module '@deepseek-ai/dsh-client-runtime/client' {
+declare module '@deepseek-ai/dsh-client-store' {
   export interface EngineStoreHandle<State> {
     readonly __state?: State
   }

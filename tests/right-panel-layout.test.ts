@@ -39,13 +39,14 @@ test('review, pinned summary, and embedded side tools keep distinct layouts', ()
   assert.match(summary, /transform: translateY\(-8px\) scale\(0\.98\);/)
   assert.match(
     summary,
-    /\[data-oh-dsh-summary-body\]\s*\{[^}]*flex: 0 1 auto;[^}]*min-height: 0;[^}]*overflow: auto;/s,
+    /\[data-oh-dsh-summary-body\]\s*\{[^}]*flex: 0 1 auto;[^}]*min-height: 0;[^}]*overflow: hidden;/s,
   )
   assert.match(
     summary,
     /document\.addEventListener\('pointerdown', this\.#handleDocumentPointerDown\)/,
   )
   assert.match(workspace, /data-oh-dsh-summary-toggle=""/)
+  assert.match(workspace, /aria-haspopup="dialog"/)
   assert.match(summary, /closest\('\[data-oh-dsh-summary-toggle\]'\)/)
   assert.doesNotMatch(summary, /closest\('\.oh-dsh-panel-toolbar'\)/)
   assert.match(summary, /event\.key === 'Escape'/)

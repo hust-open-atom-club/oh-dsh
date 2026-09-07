@@ -10,3 +10,7 @@ tmp/
 result
 result-*
 .agent-workflows/
+
+# Generated Python bytecode from the Nix helper
+__pycache__/
+*.pyc

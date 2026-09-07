@@ -13,14 +13,13 @@ const ALLOWLIST = [
   'ui-onboarding',
   'agent-presets',
   'settings',
-  'oh-dsh-vision',
 ]
 
 const CONSTANT = [
   '\n/**',
-  ' * Downstream configuration-client boundary restored for the pinned rc.7',
-  ' * release: settings.describe filters and every settings write refuse',
-  ' * namespaces outside this allowlist with `settings-not-exposed`.',
+  ' * Downstream configuration-client boundary restored for the pinned release:',
+  ' * settings.describe filters and every settings write refuse namespaces',
+  ' * outside this allowlist with `settings-not-exposed`.',
   ' * Model-provider namespaces remain exposed.',
   ' */',
   'const WEB_SETTINGS_NAMESPACES = new Set([',
@@ -33,37 +32,38 @@ const DESCRIBE_ANCHOR =
 const DESCRIBE_REPLACEMENT = [
   'namespaces: settings.describe({ redactSecrets: true }).filter((descriptor) => {',
   '\t\t\t\t\tif (WEB_SETTINGS_NAMESPACES.has(String(descriptor.ns))) return true',
-  '\t\t\t\t\tfor (const entry of ctx.llm.listConfigurableProviders()) {',
+  '\t\t\t\t\tconst llm = this.ctx.get("llm")',
+  '\t\t\t\t\tif (llm === void 0) return false',
+  '\t\t\t\t\tfor (const entry of llm.listConfigurableProviders()) {',
   '\t\t\t\t\t\tif (entry.settingsNs === String(descriptor.ns)) return true',
   '\t\t\t\t\t}',
   '\t\t\t\t\treturn false',
   '\t\t\t\t}).map(namespaceView)',
 ].join('\n')
-const WRITE_ANCHOR = 'branded = settingsNamespace(ns);'
+const WRITE_ANCHOR = 'const namespace = parsed.data.ns;'
 const WRITE_GUARD = [
-  '\t\tif (WEB_SETTINGS_NAMESPACES.has(ns) === false && ctx.llm.listConfigurableProviders().every((entry) => entry.settingsNs !== ns)) {',
-  '\t\t\treturn err(request, {',
-  '\t\t\t\tcode: "settings-not-exposed",',
-  '\t\t\t\tmessage: `settings namespace "${ns}" is not exposed to configuration clients`,',
-  '\t\t\t\tdetails: { ns },',
-  '\t\t\t})',
+  '\t\tif (WEB_SETTINGS_NAMESPACES.has(namespace) === false) {',
+  '\t\t\tconst llm = this.ctx.get("llm")',
+  '\t\t\tif (llm === void 0 || llm.listConfigurableProviders().every((entry) => entry.settingsNs !== namespace)) {',
+  '\t\t\t\tthrow new RemoteError("settings-not-exposed", `settings namespace "${namespace}" is not exposed to configuration clients`, { ns: namespace });',
+  '\t\t\t}',
   '\t\t}',
 ].join('\n')
-const CONSTANT_ANCHOR = 'const DEFAULT_MAX_MESSAGES = 50;'
+const CONSTANT_ANCHOR = 'const MAX_DESCRIBE_REFS = 64;'
 
-function apiProxyIndex(runtimeRoot) {
+function settingsControllerIndex(runtimeRoot) {
   const store = join(runtimeRoot, 'node_modules', '.pnpm')
   if (existsSync(store)) {
     const entry = readdirSync(store, { withFileTypes: true })
       .find(candidate => candidate.isDirectory()
-        && candidate.name.startsWith('@deepseek-ai+dsh-host-apiproxy@'))
+        && candidate.name.startsWith('@deepseek-ai+dsh-api-settings-controller@'))
     if (entry !== undefined) {
       return join(
         store,
         entry.name,
         'node_modules',
         '@deepseek-ai',
-        'dsh-host-apiproxy',
+        'dsh-api-settings-controller',
         'lib',
         'index.js',
       )
@@ -76,21 +76,23 @@ function apiProxyIndex(runtimeRoot) {
     runtimeRoot,
     'node_modules',
     '@deepseek-ai',
-    'dsh-host-apiproxy',
+    'dsh-api-settings-controller',
     'lib',
     'index.js',
   )
   if (existsSync(hoisted)) return hoisted
 
-  throw new Error('dsh-host-apiproxy is missing from the staged runtime')
+  throw new Error('dsh-api-settings-controller is missing from the staged runtime')
 }
 
 /**
- * Restore Oh-DSH's configuration-client boundary in an assembled rc.7
- * runtime. Both regular staging and Nix assembly call this function.
+ * Restore Oh-DSH's configuration-client boundary in an assembled runtime
+ * (the 0.1.2 line moved the settings remote from dsh-host-apiproxy into
+ * dsh-api-settings-controller). Both regular staging and Nix assembly call
+ * this function.
  */
 export function restoreSettingsBoundary(runtimeRoot) {
-  const indexPath = apiProxyIndex(runtimeRoot)
+  const indexPath = settingsControllerIndex(runtimeRoot)
   const source = readFileSync(indexPath, 'utf8')
   if (source.includes(CONSTANT)) {
     console.log('Settings namespace boundary already restored')
@@ -98,19 +100,19 @@ export function restoreSettingsBoundary(runtimeRoot) {
   }
   if (source.includes('WEB_SETTINGS_NAMESPACES')) {
     throw new Error(
-      'dsh-host-apiproxy settings boundary has an unexpected shape; review needed',
+      'dsh-api-settings-controller settings boundary has an unexpected shape; review needed',
     )
   }
   for (const anchor of [CONSTANT_ANCHOR, DESCRIBE_ANCHOR, WRITE_ANCHOR]) {
     if (source.includes(anchor) === false) {
-      throw new Error(`dsh-host-apiproxy settings boundary anchor missing: ${anchor}`)
+      throw new Error(`dsh-api-settings-controller settings boundary anchor missing: ${anchor}`)
     }
   }
   let next = source.replace(CONSTANT_ANCHOR, CONSTANT_ANCHOR + CONSTANT)
   next = next.replace(DESCRIBE_ANCHOR, DESCRIBE_REPLACEMENT)
   next = next.replace(WRITE_ANCHOR, WRITE_ANCHOR + '\n' + WRITE_GUARD)
   writeFileSync(indexPath, next)
-  console.log('Restored the settings namespace boundary on the staged api-proxy')
+  console.log('Restored the settings namespace boundary on the staged settings controller')
 }
 
 const invokedPath = process.argv[1] === undefined

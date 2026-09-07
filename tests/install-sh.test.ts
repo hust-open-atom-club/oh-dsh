@@ -5,6 +5,7 @@ import { readFileSync, realpathSync } from 'node:fs'
 import {
   access,
   chmod,
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -195,6 +196,68 @@ async function makeSandbox(
 const skipOnWindows = process.platform === 'win32'
   ? 'install.sh targets macOS and Linux'
   : false
+
+test('a --local install uses the checkout build without touching the network', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    // A checkout with a built artifact but nothing published: any network
+    // resolution would fail the install.
+    const checkout = await mkdtemp(join(tmpdir(), 'oh-dsh-local-repo-'))
+    await writeFile(
+      join(checkout, 'package.json'),
+      JSON.stringify({ name: '@oh-dsh/desktop', version: '0.1.9-local.1' }, undefined, 2) + '\n',
+    )
+    await mkdir(join(checkout, 'release'), { recursive: true })
+    const archive = await makeSurfaceArchive('tui', '0.1.9-local.1', 'linux', 'x64', 'local-tui-build')
+    await writeFile(join(checkout, 'release', archive.name), archive.bytes)
+    await copyFile(installSh, join(checkout, 'install.sh'))
+
+    const { home, env } = await makeSandbox(github, { SHELL: '/bin/bash' })
+    const result = await runInstaller(
+      ['--local-root', checkout, '--os', 'linux', '--arch', 'x64'],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /Installing locally built oh-dsh-tui-0\.1\.9-local\.1-linux-x64\.tar\.gz/)
+    const marker = await readFile(
+      join(home, '.local', 'share', 'oh-dsh', 'tui', '.oh-dsh-install.env'),
+      'utf8',
+    )
+    assert.match(marker, /OH_DSH_INSTALL_VERSION=0\.1\.9-local\.1/)
+    assert.match(marker, /OH_DSH_INSTALL_ASSET=oh-dsh-tui-0\.1\.9-local\.1-linux-x64\.tar\.gz/)
+    const launched = runLauncher(join(home, '.local', 'bin', 'ohdsh'), ['tui'], env)
+    assert.equal(launched.status, 0, launched.stderr)
+    assert.match(launched.stdout, /local-tui-build/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a --local install reports the missing build artifact instead of installing', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const checkout = await mkdtemp(join(tmpdir(), 'oh-dsh-local-repo-'))
+    await writeFile(
+      join(checkout, 'package.json'),
+      JSON.stringify({ name: '@oh-dsh/desktop', version: '0.1.9-local.1' }, undefined, 2) + '\n',
+    )
+    await mkdir(join(checkout, 'release'), { recursive: true })
+    await copyFile(installSh, join(checkout, 'install.sh'))
+
+    const { env } = await makeSandbox(github)
+    const result = await runInstaller(
+      ['--local-root', checkout, '--surface', 'web', '--os', 'linux', '--arch', 'x64'],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /does not contain oh-dsh-web-0\.1\.9-local\.1-linux-x64\.tar\.gz/)
+    assert.match(result.stderr, /pnpm run dist:web/)
+  } finally {
+    await github.stop()
+  }
+})
 
 test('command-line installers default to TUI', () => {
   assert.match(readFileSync(installSh, 'utf8'), /surface=\$\{OH_DSH_SURFACE:-tui\}/)

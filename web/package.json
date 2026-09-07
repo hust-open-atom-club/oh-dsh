@@ -24,7 +24,6 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-layout",
         "@oh-dsh/skins",
         "@oh-dsh/pinned-summary",

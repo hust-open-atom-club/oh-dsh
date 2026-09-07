@@ -19,7 +19,6 @@ test('about plugin registers one settings section over injected versions', () =>
   const manifest = JSON.parse(read('plugins/about/package.json'))
   assert.equal(manifest.name, '@oh-dsh/about')
   assert.deepEqual(manifest.dsh.client.inject, [
-    '@deepseek-ai/dsh-client-runtime',
     '@deepseek-ai/dsh-client-locale',
     '@deepseek-ai/dsh-client-ui-slots',
     '@deepseek-ai/dsh-client-ui-settings',

@@ -2,6 +2,12 @@
 
 Status: implemented
 
+> **Superseded:** the version, dependency, and Nix-verification facts below
+> describe the 0.1.1-rc.2 era. The renderer pin moved on with the
+> [0.1.2-alpha.3 runtime upgrade](../../process/2026-09-03-dsh-0.1.2-alpha.3-upgrade.md)
+> (dsh-TUI → v0.10.0-beta.4). The launcher/fullscreen contract and the
+> stage-the-upstream-manifest pattern below still stand.
+
 English | [中文](2026-08-26-upstream-tui-0.9.2-upgrade.zh.md)
 
 ## Problem

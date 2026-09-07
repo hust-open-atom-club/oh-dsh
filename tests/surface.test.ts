@@ -34,10 +34,12 @@ test('every bundled plugin adapts explicitly per surface', () => {
   const skins = readFileSync(join(root, 'plugins/skins/src/index.ts'), 'utf8')
   assert.match(skins, /OH_DSH_SURFACE_SERVICE/)
   assert.match(skins, /hasBrowserSurface/)
-  assert.match(skins, /surface\?\.kind === 'tui'/)
+  assert.match(skins, /surface\?\.kind !== 'tui'/)
   assert.match(skins, /mountTuiSkins/)
-  assert.match(skins, /ctx\.inject\(\[OH_DSH_SURFACE_SERVICE\], mountSurface\)/)
-  assert.match(skins, /ctx\.inject\(\['webServer'\]/)
+  // Sibling FIRST-LEVEL injects: the 0.1.2 loader never activates a nested
+  // `ctx.inject` created inside another inject's callback.
+  assert.match(skins, /ctx\.inject\(\[OH_DSH_SURFACE_SERVICE\], surfaceCtx =>/)
+  assert.match(skins, /ctx\.inject\(\[OH_DSH_SURFACE_SERVICE, 'webServer'\], browserCtx =>/)
 
   const sidebar = readFileSync(join(root, 'plugins/sidebar/src/index.ts'), 'utf8')
   assert.match(sidebar, /export const inject = \['webServer'\]/)

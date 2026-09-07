@@ -13,6 +13,7 @@ import {
   createMarketplaceHttpBridge,
   waitForMarketplaceRestart,
 } from './http.ts'
+import { acquireChromeLayer, releaseChromeLayer } from '../../../shared/chrome-layer.ts'
 import { localeTag } from '../../../shared/i18n.ts'
 import { useTranslate } from '../../../shared/use-i18n.ts'
 import type {
@@ -382,7 +383,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
 
     this.#element = document.createElement('div')
     this.#element.id = 'oh-dsh-plugin-marketplace-root'
-    document.body.append(this.#element)
+    acquireChromeLayer().append(this.#element)
     this.#root = createRoot(this.#element)
     this.#root.render(
       <MarketplaceSurface
@@ -432,6 +433,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     this.#footerStack = null
     this.#element?.remove()
     this.#style?.remove()
+    releaseChromeLayer()
     this.#state = { available: false, open: false }
     for (const listener of this.#listeners) listener()
     delete document.documentElement.dataset.ohDshMarketplaceOpen

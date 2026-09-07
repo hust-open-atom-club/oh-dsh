@@ -117,7 +117,7 @@ function lineReader(stream, resolveReady) {
       const line = pending.slice(0, newline).replace(/\r$/, '')
       pending = pending.slice(newline + 1)
       lines.push(`[${stream}] ${line}`)
-      const match = /^dsh web: (http:\/\/127\.0\.0\.1:\d+)/.exec(line)
+      const match = /^dsh web: (http:\/\/127\.0\.0\.1:\d+\S*)/.exec(line)
       if (match?.[1] !== undefined) resolveReady(new URL(match[1]))
     }
   }
@@ -138,6 +138,41 @@ const ready = new Promise((resolve, reject) => {
     reject(new Error(`runtime exited before readiness (code=${String(code)}, signal=${String(signal)})\n${lines.join('\n')}`))
   })
 })
+
+
+/** Session cookie minted through the launch-token exchange (undici fetch
+ * has no cookie jar, so the smoke carries the cookie by hand). */
+async function openAuthenticatedSession(baseUrl) {
+  // The freshly booted runtime can restart its web server while the loader
+  // tree settles; retry the token exchange across that window.
+  let lastError = 'token exchange did not run'
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      const exchange = await fetch(baseUrl, { redirect: 'manual' })
+      assert.equal(exchange.status, 303, 'token exchange must redirect')
+      const cookie = exchange.headers.get('set-cookie')?.split(';')[0]
+      assert.ok(cookie, 'token exchange must set a session cookie')
+      return cookie
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error)
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+  }
+  throw new Error(`token exchange failed after retries: ${lastError}`)
+}
+
+
+/** Fetch against the smoke runtime, retrying once on transport failures:
+ * the 0.1.2 web server closes idle keep-alive sockets and undici does not
+ * replay non-idempotent requests that race the close. */
+async function runtimeFetch(url, options) {
+  try {
+    return await fetch(url, options)
+  } catch (error) {
+    if (error instanceof TypeError === false) throw error
+    return await fetch(url, options)
+  }
+}
 
 const timeout = new Promise((_, reject) => {
   setTimeout(() => reject(new Error(`runtime readiness timed out\n${lines.join('\n')}`)), 60_000).unref()
@@ -160,10 +195,11 @@ try {
     'lib',
     'index.js',
   )).href)
+  const harnessBase = pathToFileURL(join(resources, 'dsh-runtime', 'node_modules')).href
   const managedRoster = await agentPresetModule.discoverPresets([{
     path: join(dshHome, '.agent-presets'),
     trust: 'user',
-  }])
+  }], harnessBase)
   const managedLiangshen = managedRoster.find(preset => preset.id === 'liangshen')
   assert.equal(managedLiangshen?.managedBy, '@deepseek-harness-tui/dsh-tui')
 
@@ -179,7 +215,7 @@ try {
   const unmanagedRoster = await agentPresetModule.discoverPresets([{
     path: unmanagedRoot,
     trust: 'user',
-  }])
+  }], harnessBase)
   assert.equal(unmanagedRoster[0]?.trust, 'user')
   assert.equal(unmanagedRoster[0]?.name, '梁神模式')
   assert.equal(
@@ -188,7 +224,8 @@ try {
   )
   assert.equal(unmanagedRoster[0]?.managedBy, undefined)
 
-  const indexResponse = await fetch(base)
+  const sessionCookie = await openAuthenticatedSession(base)
+  const indexResponse = await runtimeFetch(base, { headers: { cookie: sessionCookie } })
   const index = await indexResponse.text()
   assert.equal(indexResponse.status, 200)
   assert.match(index, /<div id="root"><\/div>/)
@@ -219,7 +256,7 @@ try {
     assert.deepEqual(row.inject ?? [], manifest.dsh.client.inject ?? [])
     assert.equal(row.immediately === true, manifest.dsh.client.immediately === true)
     const bundleUrl = new URL(row.url, base)
-    const bundleResponse = await fetch(bundleUrl)
+    const bundleResponse = await runtimeFetch(bundleUrl, { headers: { cookie: sessionCookie } })
     const bundle = await bundleResponse.text()
     assert.equal(
       bundleResponse.status,
@@ -268,9 +305,9 @@ try {
   }
 
   const sidebarCall = async (method, payload) => {
-    const response = await fetch(new URL(`/sidebar/api/${method}`, base), {
+    const response = await runtimeFetch(new URL(`/sidebar/api/${method}`, base), {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', cookie: sessionCookie },
       body: JSON.stringify(payload),
     })
     const envelope = await response.json()
@@ -300,10 +337,10 @@ try {
   })
   assert.match(commitDiff.diff, /review-smoke\.txt/)
 
-  const workspaceFactsResponse = await fetch(new URL(
+  const workspaceFactsResponse = await runtimeFetch(new URL(
     `/oh-dsh/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
     base,
-  ))
+  ), { headers: { cookie: sessionCookie } })
   const workspaceFacts = await workspaceFactsResponse.json()
   assert.equal(workspaceFactsResponse.status, 200)
   assert.equal(workspaceFacts.kind, 'repository')

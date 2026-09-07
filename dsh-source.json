@@ -1,8 +1,8 @@
 {
   "source": "npm",
   "package": "@deepseek-ai/dsh",
-  "version": "0.1.1-rc.2",
-  "integrity": "sha512-UP1UIh6q3Gme/yXRn/QL2P8IsVlv8Shpg22TRJIZPsCRWLm4CBiA1MUvXmJAfsOEETBMLAl+xWPtFw6ICsN3wg==",
-  "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.1.1-rc.2.tgz",
+  "version": "0.1.2-alpha.3",
+  "integrity": "sha512-VvATzYmQ4LMJREJ9e2POKksSHRfqP3y9pghplLBaQBuw2BqfbC0mQUVsaPwxe4wlcpj+riEgn8OJB01YnpF+3A==",
+  "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.1.2-alpha.3.tgz",
   "packageManager": "pnpm@11.20.0"
 }

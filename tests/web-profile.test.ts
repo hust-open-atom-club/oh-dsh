@@ -114,7 +114,6 @@ test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
     'oh-web',
     'oh-liangshen',
     'oh-better-sidebar-runtime',
-    'oh-vision',
     'oh-skins',
     'oh-pinned-summary',
     'oh-sidebar',

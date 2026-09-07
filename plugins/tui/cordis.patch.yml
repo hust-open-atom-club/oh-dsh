@@ -18,9 +18,6 @@
   - id: oh-skins
     name: '@oh-dsh/skins'
 
-  - id: oh-vision
-    name: '@oh-dsh/vision'
-
   - id: oh-tui-marketplace
     name: '@oh-dsh/tui-marketplace'
 
