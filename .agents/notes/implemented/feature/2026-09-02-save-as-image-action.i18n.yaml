@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-02-save-as-image-action.md
-2026-09-02-save-as-image-action.md: f927e47f18e0801dbb2b58a56c972c53bb40cdd1
-2026-09-02-save-as-image-action.zh.md: 7243c64b88fd52bce993985482fe57bd484e784f
+2026-09-02-save-as-image-action.md: ef015091be4f4109d8c36a0b5ff19897465fb6e3
+2026-09-02-save-as-image-action.zh.md: 047e6e7c40e0d99a9acfdfa363ba44de89d3b646

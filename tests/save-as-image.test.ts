@@ -129,6 +129,7 @@ test('capture stays browser-local and degrades instead of failing the export', (
   assert.match(captureSource, /renderBlob\(node, 1, fontEmbedCSS, backgroundColor\)/)
   assert.match(captureSource, /--dsw-alias-bg-base/)
   assert.match(captureSource, /\{ backgroundColor \}/)
+  assert.match(captureSource, /Math\.ceil\(rect\.height\)/)
   assert.match(captureSource, /URL\.createObjectURL/)
   assert.match(captureSource, /anchor\.download = fileName/)
   assert.match(captureSource, /URL\.revokeObjectURL/)

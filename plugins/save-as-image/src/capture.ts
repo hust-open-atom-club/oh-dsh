@@ -38,8 +38,15 @@ async function renderBlob(
   fontEmbedCSS: string | undefined,
   backgroundColor: string | undefined,
 ): Promise<Blob> {
+  // html-to-image sizes the canvas from node.clientHeight/clientWidth, which
+  // truncate fractional layout heights — a response whose rendered box ends at
+  // e.g. 812.67 CSS pixels loses its last partial line. getBoundingClientRect
+  // keeps the fraction, so ceil it instead of letting the library truncate.
+  const rect = node.getBoundingClientRect()
   const options = {
     pixelRatio,
+    width: Math.ceil(rect.width),
+    height: Math.ceil(rect.height),
     ...(fontEmbedCSS === undefined ? { skipFonts: true } : { fontEmbedCSS }),
     ...(backgroundColor === undefined ? {} : { backgroundColor }),
   }
