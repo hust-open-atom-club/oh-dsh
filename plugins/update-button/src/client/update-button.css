@@ -1,0 +1,153 @@
+/* Sidebar update entry styles. Two independent, unrelated icon instances:
+   the wide instance renders while expanded (28px download control in the logo
+   row left of the collapse toggle), the rail instance while collapsed (36px
+   update control in its own row below the whale). Which instance is displayed
+   follows the frame's data-sidebar-collapsed attribute; nothing is ever
+   relocated, so the whale row is never disturbed. */
+
+.oh-dsh-desktop-frame-sidebar-content .oh-dsh-sidebar-update-host {
+  display: none;
+}
+
+.oh-dsh-desktop-frame-sidebar-content .oh-dsh-sidebar-update-host--wide {
+  display: contents;
+}
+
+.oh-dsh-desktop-frame[data-sidebar-collapsed] .oh-dsh-sidebar-update-host--wide {
+  display: none;
+}
+
+.oh-dsh-desktop-frame-sidebar-content .oh-dsh-sidebar-update-host--rail {
+  display: none;
+}
+
+.oh-dsh-desktop-frame[data-sidebar-collapsed] .oh-dsh-sidebar-update-host--rail {
+  display: contents;
+}
+
+.oh-dsh-desktop-frame-sidebar-content .oh-dsh-sidebar-update-entry {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  transition: opacity 150ms var(--ds-ease-in-out);
+}
+
+/* Update-available badge: a small dot when the state says an update exists. */
+.oh-dsh-desktop-frame-sidebar-content
+  .oh-dsh-sidebar-update-entry[data-update-mode='available']::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f04438;
+  border: 1.5px solid var(--dsw-specific-sidebar-fill);
+  box-sizing: border-box;
+}
+
+.oh-dsh-desktop-frame-sidebar-content .oh-dsh-sidebar-update-entry:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.oh-dsh-desktop-frame-sidebar-content .oh-dsh-sidebar-update-entry:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+
+.oh-dsh-desktop-frame-sidebar-content .oh-dsh-sidebar-update-entry svg {
+  display: block;
+}
+
+/* Off-layout clone that fades out at the wide icon's position on collapse. */
+.oh-dsh-sidebar-update-fade-clone {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 150ms var(--ds-ease-in-out);
+}
+
+.oh-dsh-desktop-frame[data-sidebar-collapsed] .oh-dsh-sidebar-update-entry {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  align-self: flex-start;
+  margin: 0 0 12px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.oh-dsh-desktop-frame[data-sidebar-collapsed] .oh-dsh-sidebar-update-entry svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Rail instance: while collapsed the icon stays painted at opacity 0 until
+   its entry animation runs, so the fold commit can never flash it. The entry
+   motion matches the other rail controls: ~150ms settle wait, then a 150ms
+   slide in from the rail-right edge (.railIn rhythm); `forwards` keeps it
+   visible afterwards. */
+.oh-dsh-desktop-frame[data-sidebar-collapsed] .oh-dsh-sidebar-update-host--rail
+  .oh-dsh-sidebar-update-entry {
+  opacity: 0;
+}
+
+.oh-dsh-desktop-frame[data-sidebar-collapsed] .oh-dsh-sidebar-update-host--rail
+  .oh-dsh-sidebar-update-entry.oh-dsh-sidebar-update-rail-enter {
+  /* Same parameters as upstream .railIn: applied ~150ms into the collapse,
+     then a 150ms slide from the rail-right edge. */
+  animation: oh-dsh-update-rail-in 150ms var(--ds-ease-in-out) 150ms forwards;
+}
+
+@keyframes oh-dsh-update-rail-in {
+  from { opacity: 0; transform: translateX(49px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Custom tooltip bubble. Mirror of the upstream dsh-client-ui-primitives
+   Tooltip look (tokens, geometry, fade) so sidebar tooltips read as one
+   family; the element is appended to document.body because sidebar rows clip
+   positioned children. */
+.oh-dsh-sidebar-update-tooltip {
+  position: fixed;
+  z-index: 100;
+  width: max-content;
+  max-width: 50vw;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-static-neutral-bluish-00);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+  pointer-events: none;
+  animation: oh-dsh-update-tooltip-in 150ms var(--ds-ease-in-out);
+  transform: translateY(-50%);
+}
+
+@keyframes oh-dsh-update-tooltip-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oh-dsh-sidebar-update-tooltip {
+    animation: none;
+  }
+}

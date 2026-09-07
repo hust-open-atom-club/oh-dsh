@@ -59,7 +59,7 @@ function buildSurfaceFixture() {
   for (const name of [
     'about', 'desktop-frame', 'skins', 'sidebar', 'panel-controls',
     'pinned-summary', 'plugin-marketplace', 'save-as-image',
-    'liangshen', 'tui',
+    'update-button', 'liangshen', 'tui',
     'tui-marketplace',
   ]) {
     writeManifest(join(repo, 'plugins', name), {
@@ -153,6 +153,7 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/save-as-image',
     '@oh-dsh/sidebar',
     '@oh-dsh/skins',
+    '@oh-dsh/update-button',
     'dsh-context',
   ])
   assert.deepEqual(sorted(SURFACE_PACKAGE_NAMES.web), [

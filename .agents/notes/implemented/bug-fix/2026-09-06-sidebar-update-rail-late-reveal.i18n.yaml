@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-06-sidebar-update-rail-late-reveal.md
+2026-09-06-sidebar-update-rail-late-reveal.md: 02481e43a39d02565717ddfcfffc669458b73168
+2026-09-06-sidebar-update-rail-late-reveal.zh.md: 7f00004446de2c8dfc769993afc6b037d696773e

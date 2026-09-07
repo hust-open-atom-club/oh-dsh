@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <img src="./assets/oh-dsh-desktop-readme.png" alt="Oh-DSH Desktop 界面展示" width="100%">
+  <img src="./assets/oh-dsh-surfaces.svg" alt="Oh-DSH 三种交互界面：Web、Desktop 与 TUI" width="100%">
 </p>
 
 Oh-DSH 将 DeepSeek Harness、Node.js、本地开发工具和内置插件打包为可安装的

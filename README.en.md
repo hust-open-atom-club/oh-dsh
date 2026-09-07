@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <img src="./assets/oh-dsh-desktop-readme.png" alt="Oh-DSH Desktop interface" width="100%">
+  <img src="./assets/oh-dsh-surfaces.svg" alt="Oh-DSH surfaces: Web, Desktop, and TUI" width="100%">
 </p>
 
 Oh-DSH packages DeepSeek Harness, Node.js, local development tools, and bundled

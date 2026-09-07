@@ -69,6 +69,7 @@ const pluginPackages = [
   { directory: 'tui', hostOnly: true },
   { directory: 'tui-marketplace', hostOnly: true },
   { directory: 'desktop-frame', id: '@oh-dsh/desktop-frame' },
+  { directory: 'update-button', id: '@oh-dsh/update-button' },
   { directory: 'skins', id: '@oh-dsh/skins' },
   { directory: 'sidebar', id: '@oh-dsh/sidebar' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
