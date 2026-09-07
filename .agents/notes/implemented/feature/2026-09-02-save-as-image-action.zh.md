@@ -18,6 +18,8 @@ Issue #181 要求为单条回复提供「保存为图片」操作，让一条已
 
 **渲染用 `html-to-image`，直接打进 client bundle。** `toBlob` 以 `pixelRatio: 2` 产出 PNG；对高到撑爆画布预算的回复，同一调用会以 `pixelRatio: 1` 重试一次，第二次仍失败则向上冒泡为该行的失败反馈，而不是被吞掉。字体先用 `getFontEmbedCSS` 预解析并以 `fontEmbedCSS` 传入渲染；若预解析抛错，渲染降级为 `skipFonts: true`——issue 明确要求字体嵌入失败损失的是保真度，而不是导出本身。该包是普通 npm 依赖、由 esbuild 打包，而 `@deepseek-ai/*` 保持 external、运行时经宿主 ModuleLoader 解析，与反馈包对 primitives 的依赖方式完全一致。
 
+**导出绘制当前皮肤的背景色。** `toBlob` 默认产出透明画布，而被捕获节点自身的不透明图层不包含页面背景——背景挂在克隆体不会携带的祖先层上。暗色皮肤下导出的结果就是「透明底上的浅色文字」，一旦贴到白色表面（工单、聊天、幻灯片）上几乎不可见。渲染时在被捕获节点自身上用 `getComputedStyle` 解析 `--dsw-alias-bg-base`——自定义属性会从当前主题应用处沿继承链读到——并把该值作为 `backgroundColor` 传入两次渲染；解析为空时省略该选项，保持在无皮肤 surface 上的既有行为。皮肤目录为每个已发布皮肤都定义了该变量，主题色仍然只有目录这一个所有者。
+
 **结果永不离开本机。** blob 通过对象 URL 以 `dsh-response-<净化后的消息 id>.png` 触发下载。该插件不声明任何 Host Remote、不注册工具、不加端点：manifest 的 `dsh.client.inject` 就是反馈包的清单去掉 `api-remotes`。一条源码级契约测试把这一点钉死：断言插件源码中既无 `fetch(` 也无 `XMLHttpRequest`。
 
 **反馈状态与共享操作条保持一致。** 控件是宿主 primitives 包 `Tooltip` 内的 28px 图标按钮（`IconDownloadOutline16`，保存成功后换成 `IconCheckOutline16` 约 1.5 秒），渲染期间禁用并把文案切换为 `status.capturing`，失败时用与反馈相同的 `role="status"` 内联文案。它的词典放在 `oh-dsh.save-as-image` locale 命名空间里，zh 是键集的事实来源，两个 surface 因此都能拿到双语文案。

@@ -36,19 +36,37 @@ async function renderBlob(
   node: HTMLElement,
   pixelRatio: number,
   fontEmbedCSS: string | undefined,
+  backgroundColor: string | undefined,
 ): Promise<Blob> {
-  const options = fontEmbedCSS === undefined
-    ? { pixelRatio, skipFonts: true }
-    : { pixelRatio, fontEmbedCSS }
+  const options = {
+    pixelRatio,
+    ...(fontEmbedCSS === undefined ? { skipFonts: true } : { fontEmbedCSS }),
+    ...(backgroundColor === undefined ? {} : { backgroundColor }),
+  }
   const blob = await toBlob(node, options)
   if (blob === null) throw new Error('save-as-image: capture produced no image')
   return blob
 }
 
 /**
- * Render the response node to a PNG blob. Font embedding failure degrades to
- * `skipFonts` instead of failing the export, and an oversized render retries
- * once at unit pixel ratio before the error propagates.
+ * Resolve the active skin's base background so the export stays readable in
+ * dark themes: the captured node paints its own opaque layers, but the page
+ * background sits on ancestors the clone does not carry, and without an
+ * explicit color the canvas renders transparent — light text on a transparent
+ * PNG reads as invisible once pasted onto a white surface. Reading the custom
+ * property from the node itself picks up whichever skin layer is active.
+ */
+function skinBaseBackground(node: HTMLElement): string | undefined {
+  const value = getComputedStyle(node).getPropertyValue('--dsw-alias-bg-base').trim()
+  return value === '' ? undefined : value
+}
+
+/**
+ * Render the response node to a PNG blob. The active skin's base background
+ * is painted onto the canvas so dark themes stay readable. Font embedding
+ * failure degrades to `skipFonts` instead of failing the export, and an
+ * oversized render retries once at unit pixel ratio before the error
+ * propagates.
  */
 export async function captureAssistantStep(node: HTMLElement): Promise<Blob> {
   let fontEmbedCSS: string | undefined
@@ -57,10 +75,11 @@ export async function captureAssistantStep(node: HTMLElement): Promise<Blob> {
   } catch {
     fontEmbedCSS = undefined
   }
+  const backgroundColor = skinBaseBackground(node)
   try {
-    return await renderBlob(node, 2, fontEmbedCSS)
+    return await renderBlob(node, 2, fontEmbedCSS, backgroundColor)
   } catch {
-    return await renderBlob(node, 1, fontEmbedCSS)
+    return await renderBlob(node, 1, fontEmbedCSS, backgroundColor)
   }
 }
 
