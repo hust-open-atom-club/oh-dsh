@@ -144,12 +144,20 @@ async function renderBlob(
   const padding = Math.round(nodeContentPadding(node) * scale)
   const contentBottom = measureContentBottom(rendered, background)
   const cropBottom = Math.min(rendered.height, contentBottom + 1 + padding)
+  // The node box hugs the text on both sides; widen the export by one
+  // padding on each so the image breathes like the live widget. The filled
+  // frame uses the same skin background; a transparent export stays
+  // transparent there.
   const cropped = document.createElement('canvas')
-  cropped.width = rendered.width
+  cropped.width = rendered.width + padding * 2
   cropped.height = cropBottom
   const context = cropped.getContext('2d')
   if (context === null) throw new Error('save-as-image: 2d context unavailable')
-  context.drawImage(rendered, 0, 0)
+  if (backgroundColor !== undefined) {
+    context.fillStyle = backgroundColor
+    context.fillRect(0, 0, cropped.width, cropped.height)
+  }
+  context.drawImage(rendered, padding, 0)
   const blob = await canvasToPng(cropped)
   if (blob === null) throw new Error('save-as-image: capture produced no image')
   return blob

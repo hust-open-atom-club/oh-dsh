@@ -135,6 +135,8 @@ test('capture stays browser-local and degrades instead of failing the export', (
   assert.match(captureSource, /MIN_BOTTOM_SLACK_PX = 128/)
   assert.match(captureSource, /measureContentBottom\(/)
   assert.match(captureSource, /contentBottom \+ 1 \+ padding/)
+  assert.match(captureSource, /rendered\.width \+ padding \* 2/)
+  assert.match(captureSource, /fillStyle = backgroundColor/)
   assert.match(captureSource, /URL\.createObjectURL/)
   assert.match(captureSource, /anchor\.download = fileName/)
   assert.match(captureSource, /URL\.revokeObjectURL/)
