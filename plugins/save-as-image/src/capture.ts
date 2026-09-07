@@ -1,11 +1,30 @@
 /** Browser-local PNG capture of one rendered assistant response. */
 
-import { getFontEmbedCSS, toBlob } from 'html-to-image'
+import { getFontEmbedCSS, toCanvas } from 'html-to-image'
 
 const FLOW_ITEM_SELECTOR = '[data-chat-flow-kind]'
 const ASSISTANT_STEP_KIND = 'assistant-step'
 /** Sibling hops the strip row may sit above the response node. */
 const MAX_SIBLING_HOPS = 10
+/**
+ * Tail headroom over the node box, as a fraction of its height. The
+ * foreignObject re-layout inside html-to-image treats block margins
+ * differently from the live flex layout, so a tall response renders a few
+ * percent taller than its live box and a canvas sized to the box clips the
+ * last lines. The canvas grows by this slack, the render is then measured,
+ * and the export crops to the drawn content.
+ */
+const BOTTOM_SLACK_RATIO = 0.05
+/** Tail headroom floor so short responses keep room for boundary drift. */
+const MIN_BOTTOM_SLACK_PX = 128
+/**
+ * Background rows kept beyond the drawn content on each end, mirroring the
+ * node's own padding. Clamped against degenerate computed styles.
+ */
+const CONTENT_PADDING_FLOOR_PX = 8
+const CONTENT_PADDING_CEILING_PX = 48
+/** Summed channel distance below which a pixel counts as background. */
+const BACKGROUND_TOLERANCE = 24
 
 /** Build the download file name for one finalized assistant message. */
 export function captureFileName(messageId: string): string {
@@ -32,25 +51,106 @@ export function findAssistantStep(anchor: Element): HTMLElement {
   throw new Error('save-as-image: assistant response node not found')
 }
 
+/** Materialize a CSS color into RGBA for pixel comparison. */
+function parseBackgroundColor(color: string | undefined): [number, number, number, number] {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  const context = canvas.getContext('2d')
+  if (context === null) throw new Error('save-as-image: 2d context unavailable')
+  context.clearRect(0, 0, 1, 1)
+  if (color !== undefined) {
+    context.fillStyle = color
+    context.fillRect(0, 0, 1, 1)
+  }
+  const { data } = context.getImageData(0, 0, 1, 1)
+  return [data[0] ?? 0, data[1] ?? 0, data[2] ?? 0, data[3] ?? 0]
+}
+
+/**
+ * Row index of the last drawn content row, scanning upward for pixels that
+ * differ from the background. A transparent export (no skin color) counts
+ * any opaque pixel as content. Returns the canvas height when nothing is
+ * detected, keeping the full render.
+ */
+function measureContentBottom(
+  canvas: HTMLCanvasElement,
+  background: [number, number, number, number],
+): number {
+  const context = canvas.getContext('2d')
+  if (context === null) throw new Error('save-as-image: 2d context unavailable')
+  const { data, width } = context.getImageData(0, 0, canvas.width, canvas.height)
+  const channel = (offset: number): number => data[offset] ?? 0
+  for (let y = canvas.height - 1; y >= 0; y -= 1) {
+    let hits = 0
+    for (let x = 0; x < width && hits < 2; x += 4) {
+      const index = (y * width + x) * 4
+      const opaque = channel(index + 3) >= 128
+      const differs = Math.abs(channel(index) - background[0])
+        + Math.abs(channel(index + 1) - background[1])
+        + Math.abs(channel(index + 2) - background[2]) > BACKGROUND_TOLERANCE
+      if (opaque && (background[3] < 128 || differs)) hits += 1
+    }
+    if (hits >= 2) return y
+  }
+  return canvas.height
+}
+
+/**
+ * The node's own padding, reused as the export's framing so the image
+ * breathes exactly like the live widget.
+ */
+function nodeContentPadding(node: HTMLElement): number {
+  const padding = Number.parseFloat(getComputedStyle(node).paddingBottom)
+  const value = Number.isNaN(padding) ? 0 : padding
+  return Math.min(Math.max(value, CONTENT_PADDING_FLOOR_PX), CONTENT_PADDING_CEILING_PX)
+}
+
+function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise(resolve => {
+    canvas.toBlob(resolve, 'image/png')
+  })
+}
+
 async function renderBlob(
   node: HTMLElement,
   pixelRatio: number,
   fontEmbedCSS: string | undefined,
   backgroundColor: string | undefined,
 ): Promise<Blob> {
-  // html-to-image sizes the canvas from node.clientHeight/clientWidth, which
-  // truncate fractional layout heights — a response whose rendered box ends at
-  // e.g. 812.67 CSS pixels loses its last partial line. getBoundingClientRect
-  // keeps the fraction, so ceil it instead of letting the library truncate.
+  // html-to-image rasterizes through a foreignObject whose block-margin
+  // handling differs from the live layout, so the drawn content can drift
+  // out of the node's box by a few percent on tall responses — sizing the
+  // canvas to the box alone clips the tail. Render with tail headroom,
+  // measure where the content actually ends, and crop to it.
   const rect = node.getBoundingClientRect()
+  const contentHeight = Math.ceil(rect.height)
+  const bottomSlack = Math.max(
+    MIN_BOTTOM_SLACK_PX,
+    Math.ceil(contentHeight * BOTTOM_SLACK_RATIO),
+  )
   const options = {
     pixelRatio,
     width: Math.ceil(rect.width),
-    height: Math.ceil(rect.height),
+    height: contentHeight + bottomSlack,
     ...(fontEmbedCSS === undefined ? { skipFonts: true } : { fontEmbedCSS }),
     ...(backgroundColor === undefined ? {} : { backgroundColor }),
   }
-  const blob = await toBlob(node, options)
+  const rendered = await toCanvas(node, options)
+  // The library's dimension guard may scale an oversized canvas down; every
+  // css-space offset follows the canvas' real scale, not the requested ratio.
+  const scale = rendered.height / (contentHeight + bottomSlack)
+  const background = parseBackgroundColor(backgroundColor)
+  const padding = Math.round(nodeContentPadding(node) * scale)
+  const contentBottom = measureContentBottom(rendered, background)
+  const cropBottom = Math.min(rendered.height, contentBottom + 1 + padding)
+  const cropped = document.createElement('canvas')
+  cropped.width = rendered.width
+  cropped.height = cropBottom
+  const context = cropped.getContext('2d')
+  if (context === null) throw new Error('save-as-image: 2d context unavailable')
+  context.drawImage(rendered, 0, 0)
+  const blob = await canvasToPng(cropped)
   if (blob === null) throw new Error('save-as-image: capture produced no image')
   return blob
 }

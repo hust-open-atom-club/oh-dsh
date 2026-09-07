@@ -16,11 +16,11 @@ Issue #181 要求为单条回复提供「保存为图片」操作，让一条已
 
 **捕获目标靠结构定位，而不是靠过滤。** 每个聊天节点都是会话列表下并列的 `<div class="flowItem" data-chat-anchor-key=… data-chat-flow-kind=…>`，而操作条位于另一个兄弟节点里，其根节点带 `data-turn-tail`。控件从自己的按钮向上找到这行 turn-tail，再沿 `previousElementSibling`（上限十跳）走到最近的 `data-chat-flow-kind="assistant-step"` 元素。由于操作条是独立的兄弟节点，被捕获的子树**在结构上**就不包含操作控件——不需要 `filter` 回调，不需要埋隐藏标记，也不需要与操作条自身标记保持同步。DOM 里并没有可用来定位的 `data-message-id` 属性，而要求上游补一个就意味着改动被钉死的源码。
 
-**渲染用 `html-to-image`，直接打进 client bundle。** `toBlob` 以 `pixelRatio: 2` 产出 PNG；对高到撑爆画布预算的回复，同一调用会以 `pixelRatio: 1` 重试一次，第二次仍失败则向上冒泡为该行的失败反馈，而不是被吞掉。字体先用 `getFontEmbedCSS` 预解析并以 `fontEmbedCSS` 传入渲染；若预解析抛错，渲染降级为 `skipFonts: true`——issue 明确要求字体嵌入失败损失的是保真度，而不是导出本身。该包是普通 npm 依赖、由 esbuild 打包，而 `@deepseek-ai/*` 保持 external、运行时经宿主 ModuleLoader 解析，与反馈包对 primitives 的依赖方式完全一致。
+**渲染用 `html-to-image`，直接打进 client bundle。** 渲染走 `toCanvas`、以 `pixelRatio: 2` 产出；对高到撑爆画布预算的回复，以 `pixelRatio: 1` 重试一次，第二次仍失败则向上冒泡为该行的失败反馈，而不是被吞掉。字体先用 `getFontEmbedCSS` 预解析并以 `fontEmbedCSS` 传入渲染；若预解析抛错，渲染降级为 `skipFonts: true`——issue 明确要求字体嵌入失败损失的是保真度，而不是导出本身。该包是普通 npm 依赖、由 esbuild 打包，而 `@deepseek-ai/*` 保持 external、运行时经宿主 ModuleLoader 解析，与反馈包对 primitives 的依赖方式完全一致。
 
-**导出绘制当前皮肤的背景色。** `toBlob` 默认产出透明画布，而被捕获节点自身的不透明图层不包含页面背景——背景挂在克隆体不会携带的祖先层上。暗色皮肤下导出的结果就是「透明底上的浅色文字」，一旦贴到白色表面（工单、聊天、幻灯片）上几乎不可见。渲染时在被捕获节点自身上用 `getComputedStyle` 解析 `--dsw-alias-bg-base`——自定义属性会从当前主题应用处沿继承链读到——并把该值作为 `backgroundColor` 传入两次渲染；解析为空时省略该选项，保持在无皮肤 surface 上的既有行为。皮肤目录为每个已发布皮肤都定义了该变量，主题色仍然只有目录这一个所有者。
+**导出绘制当前皮肤的背景色。** `toCanvas` 默认产出透明画布，而被捕获节点自身的不透明图层不包含页面背景——背景挂在克隆体不会携带的祖先层上。暗色皮肤下导出的结果就是「透明底上的浅色文字」，一旦贴到白色表面（工单、聊天、幻灯片）上几乎不可见。渲染时在被捕获节点自身上用 `getComputedStyle` 解析 `--dsw-alias-bg-base`——自定义属性会从当前主题应用处沿继承链读到——并把该值作为 `backgroundColor` 传入两次渲染；解析为空时省略该选项，保持在无皮肤 surface 上的既有行为。皮肤目录为每个已发布皮肤都定义了该变量，主题色仍然只有目录这一个所有者。
 
-**画布保留节点的小数尺寸。** `toBlob` 默认取 `clientHeight`/`clientWidth`，会向下截掉小数布局高度——回复的渲染框落在分数 CSS 像素时，最后一行会被切掉一截（表现为底部一行只剩上沿）。渲染在两次尝试中都显式传 `getBoundingClientRect()` 的 `Math.ceil` 结果作为 `width`/`height`，保证整个框都进画布。
+**画布靠量测，不靠信任。** `html-to-image` 经由 `foreignObject` 光栅化，其块级 margin 的处理与 live 的 flex 布局不同，长回复画出来的内容会比 DOM 盒子高几个百分点——在 3161px 的回复上实测漂移约 44px——按盒子尺寸定画布就会切掉最后几行，表现为最后一行只剩上沿。因此渲染时画布在盒子高度之外追加尾部余量（高度的 5%，下限 128px），然后读回绘制像素、找到最后一行与背景色不同的位置，按「内容 + 节点自身 padding」裁切，导出的留白与 live 控件完全一致，对未来的重排漂移也天然免疫。库的画布尺寸守卫可能把超大渲染整体缩小；所有偏移都跟随画布的真实比例，而不是请求的像素比。
 
 **结果永不离开本机。** blob 通过对象 URL 以 `dsh-response-<净化后的消息 id>.png` 触发下载。该插件不声明任何 Host Remote、不注册工具、不加端点：manifest 的 `dsh.client.inject` 就是反馈包的清单去掉 `api-remotes`。一条源码级契约测试把这一点钉死：断言插件源码中既无 `fetch(` 也无 `XMLHttpRequest`。
 
