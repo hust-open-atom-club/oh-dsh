@@ -436,7 +436,10 @@ try {
       socket.send(JSON.stringify({ type: 'resize', cols: 80, rows: 24 }))
       // Split the marker so the echoed command line never contains it; only
       // real execution produces `OH_DSH_WEB_TERMINAL_SMOKE`.
-      socket.send("printf '%s%s\\n' OH_DSH_WEB_TERMINAL_ SMOKE; exit\r")
+      const terminalCommand = process.platform === 'win32'
+        ? "Write-Output ('OH_DSH_WEB_TERMINAL_' + 'SMOKE'); exit"
+        : "printf '%s%s\\n' OH_DSH_WEB_TERMINAL_ SMOKE; exit"
+      socket.send(`${terminalCommand}\r`)
     })
     socket.addEventListener('message', (event) => {
       output += String(event.data)
