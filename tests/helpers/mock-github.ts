@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 
 export const MOCK_REPO = 'hust-open-atom-club/oh-dsh'
 
-type MockAsset = { name: string; bytes: Buffer; sha256: string }
+type MockAsset = { name: string; bytes: Buffer; sha256: string; truncated?: boolean }
 
 /**
  * Minimal GitHub REST + release-download mock shared by the installer test
@@ -50,6 +50,15 @@ export class MockGitHub {
           const key = `${download[1]}/${download[2]}`
           this.downloads.set(key, (this.downloads.get(key) ?? 0) + 1)
           if (req.headers.authorization !== undefined) this.authorizedDownloads += 1
+          if (asset.truncated) {
+            res.writeHead(200, {
+              'content-type': 'application/octet-stream',
+              'content-length': asset.bytes.length,
+            })
+            res.write(asset.bytes.subarray(0, Math.max(1, Math.floor(asset.bytes.length / 2))))
+            res.destroy()
+            return
+          }
           send(200, asset.bytes, 'application/octet-stream')
           return
         }
@@ -94,6 +103,12 @@ export class MockGitHub {
     const asset = this.releases.get(tag)?.find(candidate => candidate.name === name)
     if (asset === undefined) throw new Error(`unknown asset ${tag}/${name}`)
     asset.bytes = bytes
+  }
+
+  truncateAsset(tag: string, name: string): void {
+    const asset = this.releases.get(tag)?.find(candidate => candidate.name === name)
+    if (asset === undefined) throw new Error(`unknown asset ${tag}/${name}`)
+    asset.truncated = true
   }
 
   releaseJson(tag: string): string {
