@@ -254,6 +254,7 @@ try {
     '@oh-dsh/panel-controls',
     '@oh-dsh/plugin-marketplace',
     '@oh-dsh/about',
+    '@oh-dsh/save-as-image',
     'dsh-context',
   ]) {
     const row = bootEntries.find(entry => entry.id === pluginId)

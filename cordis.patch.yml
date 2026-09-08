@@ -53,6 +53,9 @@
     - id: oh-about
       name: '@oh-dsh/about'
 
+    - id: oh-save-as-image
+      name: '@oh-dsh/save-as-image'
+
     # Built-in context insight panel (upstream dsh-context, pinned under
     # upstream/dsh-context). Its host half is a plain Cordis plugin; the
     # dsh.client declaration in its staged manifest loads the browser half.

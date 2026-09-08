@@ -71,6 +71,7 @@ export const SURFACE_PACKAGE_NAMES = Object.freeze({
     '@oh-dsh/panel-controls',
     '@oh-dsh/pinned-summary',
     '@oh-dsh/plugin-marketplace',
+    '@oh-dsh/save-as-image',
     '@oh-dsh/update-button',
     'dsh-context',
     '@deepseek-harness-tui/dsh-auth',
@@ -85,6 +86,7 @@ export const SURFACE_PACKAGE_NAMES = Object.freeze({
     '@oh-dsh/sidebar',
     '@oh-dsh/panel-controls',
     '@oh-dsh/plugin-marketplace',
+    '@oh-dsh/save-as-image',
     'dsh-context',
     '@deepseek-harness-tui/dsh-auth',
   ]),
@@ -1036,6 +1038,7 @@ function installDesktopPackages(surface = 'all') {
       'panel-controls',
       'pinned-summary',
       'plugin-marketplace',
+      'save-as-image',
       'update-button',
     ].map(directory => ({
       manifest: join(root, 'plugins', directory, 'package.json'),

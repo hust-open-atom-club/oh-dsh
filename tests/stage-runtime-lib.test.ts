@@ -58,7 +58,8 @@ function buildSurfaceFixture() {
   // Generic compiled plugins (tui adds its patch beside the bundle).
   for (const name of [
     'about', 'desktop-frame', 'skins', 'sidebar', 'panel-controls',
-    'pinned-summary', 'plugin-marketplace', 'update-button', 'liangshen', 'tui',
+    'pinned-summary', 'plugin-marketplace', 'save-as-image',
+    'update-button', 'liangshen', 'tui',
     'tui-marketplace',
   ]) {
     writeManifest(join(repo, 'plugins', name), {
@@ -149,6 +150,7 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/panel-controls',
     '@oh-dsh/pinned-summary',
     '@oh-dsh/plugin-marketplace',
+    '@oh-dsh/save-as-image',
     '@oh-dsh/sidebar',
     '@oh-dsh/skins',
     '@oh-dsh/update-button',
@@ -162,6 +164,7 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/panel-controls',
     '@oh-dsh/pinned-summary',
     '@oh-dsh/plugin-marketplace',
+    '@oh-dsh/save-as-image',
     '@oh-dsh/sidebar',
     '@oh-dsh/skins',
     '@oh-dsh/web',
@@ -191,7 +194,8 @@ test('web surface installs exactly the official web closure', () => {
       '@oh-dsh/web', '@oh-dsh/liangshen', '@oh-dsh/better-sidebar-runtime',
       '@oh-dsh/about', '@oh-dsh/skins',
       '@oh-dsh/pinned-summary', '@oh-dsh/sidebar', '@oh-dsh/panel-controls',
-      '@oh-dsh/plugin-marketplace', 'dsh-context', '@deepseek-harness-tui/dsh-auth',
+      '@oh-dsh/plugin-marketplace', '@oh-dsh/save-as-image', 'dsh-context',
+      '@deepseek-harness-tui/dsh-auth',
     ]) {
       assert.equal(existsSync(join(modules, ...name.split('/'))), true, name + ' registered')
     }
