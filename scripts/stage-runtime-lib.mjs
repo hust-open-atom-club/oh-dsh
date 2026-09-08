@@ -1241,6 +1241,102 @@ function ensureLinuxLandlockLauncher() {
 }
 
 
+// npm invocations that map onto the same pnpm subcommand verbatim. Kept
+// conservative on purpose: anything outside this table fails with guidance
+// instead of silently diverging from npm semantics. The subcommand table
+// lives inside translateNpmInvocation because the staged forwarder embeds
+// the function source verbatim and it must stay self-contained.
+/**
+ * Translate an npm/nx invocation onto the bundled pnpm CLI. `args` excludes
+ * the npm/npx token itself; `mode` is 'npm' or 'npx'. Throws on invocations
+ * with no faithful pnpm translation so callers fail with guidance instead of
+ * silently diverging from npm behavior. Must stay self-contained: the staged
+ * npm-forward.mjs embeds this function's source verbatim.
+ */
+function translateNpmInvocation(args, mode = 'npm') {
+  const passthrough = new Set([
+    'run', 'install', 'add', 'test', 'start', 'stop', 'restart', 'exec',
+    'pack', 'publish', 'rebuild', 'link', 'unlink', 'update', 'audit',
+    'ls', 'list', 'outdated', 'init', 'version', 'help',
+    '--version', '-v', '--help',
+  ])
+  if (mode === 'npx') {
+    // -y/--yes is npm-only; pnpm exec installs nothing to confirm.
+    return ['exec', ...args.filter(argument => argument !== '-y' && argument !== '--yes')]
+  }
+  if (args.length === 0) {
+    throw new Error('npm invoked without a subcommand; the bundled Oh-DSH runtime ships pnpm only')
+  }
+  // npm accepts global flags before the subcommand; only --prefix has a
+  // pnpm spelling (--dir), so hoist it out before dispatching.
+  const hoisted = []
+  const positioned = []
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index]
+    if (argument === '--prefix' && index + 1 < args.length) {
+      hoisted.push('--dir', args[index + 1])
+      index += 1
+    } else if (argument.startsWith('--prefix=')) {
+      hoisted.push('--dir=' + argument.slice('--prefix='.length))
+    } else {
+      positioned.push(argument)
+    }
+  }
+  if (positioned.length === 0) {
+    throw new Error('npm invoked without a subcommand; the bundled Oh-DSH runtime ships pnpm only')
+  }
+  const [subcommand, ...rest] = positioned
+  let forwarded
+  if (subcommand === 'ci') {
+    forwarded = ['install', '--frozen-lockfile', ...rest]
+  } else if (subcommand === 'i') {
+    forwarded = ['install', ...rest]
+  } else if (subcommand === 't') {
+    forwarded = ['test', ...rest]
+  } else if (subcommand === 'uninstall' || subcommand === 'rm' || subcommand === 'r') {
+    forwarded = ['remove', ...rest]
+  } else if (subcommand === 'run-script') {
+    forwarded = ['run', ...rest]
+  } else if (passthrough.has(subcommand)) {
+    forwarded = [subcommand, ...rest]
+  } else {
+    throw new Error(
+      `npm ${subcommand} has no bundled translation; the Oh-DSH runtime ships pnpm only — rewrite the script to call pnpm directly`,
+    )
+  }
+  return [...hoisted, ...forwarded]
+}
+
+function npmForwarderSource() {
+  return [
+    '#!/usr/bin/env node',
+    '// Oh-DSH npm compatibility forwarder: lifecycle scripts in third-party',
+    '// marketplace plugins invoke npm/npx, but the bundled runtime ships pnpm',
+    '// only. This shim translates the common invocations onto the sibling pnpm',
+    '// package and fails with guidance for npm-specific behavior.',
+    "import { spawn } from 'node:child_process'",
+    "import { dirname, join } from 'node:path'",
+    "import { fileURLToPath } from 'node:url'",
+    '',
+    `const translateNpmInvocation = ${translateNpmInvocation.toString()}`,
+    '',
+    "const [invocation, ...args] = process.argv.slice(2)",
+    "const pnpmEntry = join(dirname(fileURLToPath(import.meta.url)), 'pnpm', 'bin', 'pnpm.mjs')",
+    'let translated',
+    'try {',
+    '  translated = translateNpmInvocation(args, invocation)',
+    '} catch (error) {',
+    "  console.error(`npm: ${error instanceof Error ? error.message : String(error)}`)",
+    '  process.exit(1)',
+    '}',
+    'const child = spawn(process.execPath, [pnpmEntry, ...translated], { stdio: \'inherit\' })',
+    "child.on('error', error => { console.error(error); process.exit(1) })",
+    "child.on('close', code => { process.exit(code ?? 1) })",
+    '',
+  ].join('\n')
+}
+
+
 /**
  * Stage a complete, self-contained pnpm distribution beside the node
  * runtime. Scripted Marketplace previews resolve this entry through
@@ -1280,6 +1376,53 @@ function stagePnpmIntoNodeRuntime({ pnpmSource }) {
   }
 }
 
+/**
+ * Stage npm/npx launchers that forward onto the bundled pnpm distribution
+ * installed by stagePnpmIntoNodeRuntime. Third-party marketplace lifecycle
+ * scripts overwhelmingly assume npm is on PATH; the host process puts the
+ * node-runtime directory first, so these launchers make `npm run build`
+ * resolve to pnpm instead of a dangling stock shim (Windows distributions
+ * drop npm.cmd/npx.cmd at the runtime root, which pruneNodeRuntime deletes).
+ * Run this after pruning so the forwarding launchers replace the stock ones.
+ */
+function stageNpmForwardingShims() {
+  const modules = isWindowsNode ? join(nodeRuntime, 'node_modules') : join(nodeRuntime, 'lib', 'node_modules')
+  mkdirSync(modules, { recursive: true })
+  writeFileSync(join(modules, 'npm-forward.mjs'), npmForwarderSource())
+  if (isWindowsNode) {
+    for (const name of ['npm', 'npx']) {
+      writeFileSync(
+        join(nodeRuntime, `${name}.cmd`),
+        `@ECHO off\r\n"%~dp0node.exe" "%~dp0node_modules\\npm-forward.mjs" ${name} %*\r\n`,
+      )
+      writeFileSync(
+        join(nodeRuntime, `${name}.ps1`),
+        [
+          '$exe = if ($MyInvocation.MyCommand -is [string]) { $MyInvocation.MyCommand } else { $MyInvocation.MyCommand.Path }',
+          '$root = Split-Path -Parent $exe',
+          '& (Join-Path $root "node.exe") (Join-Path $root "node_modules\\npm-forward.mjs") ' + name + ' @args',
+          'exit $LASTEXITCODE',
+          '',
+        ].join('\r\n'),
+      )
+      rmSync(join(nodeRuntime, name), { force: true })
+    }
+  } else {
+    mkdirSync(join(nodeRuntime, 'bin'), { recursive: true })
+    for (const name of ['npm', 'npx']) {
+      const launcher = join(nodeRuntime, 'bin', name)
+      rmSync(launcher, { force: true })
+      writeFileSync(launcher, [
+        '#!/bin/sh',
+        'dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)',
+        'exec "$dir/bin/node" "$dir/lib/node_modules/npm-forward.mjs" ' + name + ' "$@"',
+        '',
+      ].join('\n'))
+      chmodSync(launcher, 0o755)
+    }
+  }
+}
+
   return {
     portableSymlink,
     exposeHoistedPackages,
@@ -1312,6 +1455,8 @@ function stagePnpmIntoNodeRuntime({ pnpmSource }) {
     ensureLinuxLandlockLauncher,
     pruneRuntimeDevelopmentFiles,
     stagePnpmIntoNodeRuntime,
+    stageNpmForwardingShims,
+    translateNpmInvocation,
   }
 }
 
@@ -1369,6 +1514,20 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === libPath) {
       npmRelease: true,
       run: cliRun,
     }).stagePnpmIntoNodeRuntime({ pnpmSource: source })
+  } else if (command === 'stage-npm-shims') {
+    const nodeRuntime = resolve(cliOption(args, '--target'))
+    createStageRuntime({
+      root: nodeRuntime,
+      stage: join(nodeRuntime, '.stage'),
+      runtime: nodeRuntime,
+      nodeRuntime,
+      dshSource: nodeRuntime,
+      isWindowsNode: args.includes('--is-windows'),
+      nodePlatform: 'linux',
+      nodeArch: 'x64',
+      npmRelease: true,
+      run: cliRun,
+    }).stageNpmForwardingShims()
   } else if (command === 'restore-executable-helpers') {
     const runtime = resolve(cliOption(args, '--runtime'))
     createStageRuntime({
@@ -1385,7 +1544,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === libPath) {
     }).restoreExecutableHelpers()
   } else {
     throw new Error(
-      `unknown stage-runtime command: ${String(command)} (expected install-packages, stage-pnpm, or restore-executable-helpers)`,
+      `unknown stage-runtime command: ${String(command)} (expected install-packages, stage-pnpm, stage-npm-shims, or restore-executable-helpers)`,
     )
   }
 }

@@ -39,6 +39,8 @@ export interface StageRuntimeContext {
 export interface StageRuntime {
   installDesktopPackages(surface?: string): void
   stagePnpmIntoNodeRuntime(options: { pnpmSource: string }): void
+  stageNpmForwardingShims(): void
+  translateNpmInvocation(args: readonly string[], mode?: 'npm' | 'npx'): string[]
   restoreExecutableHelpers(): void
   installCompiledPackageDependencies(sourceManifestPath: string, packageDir: string): void
   installCompiledPackageHostDependencies(sourceManifestPath: string, packageDir: string): void

@@ -365,11 +365,16 @@ pkgs.stdenv.mkDerivation {
     # Stage pnpm beside the node runtime through the shared assembler:
     # bundledRuntimePaths resolves pnpmEntry at
     # node-runtime/lib/node_modules/pnpm/bin/pnpm.mjs for isolated
-    # Marketplace installs.
+    # Marketplace installs. The npm/npx forwarding launchers follow so
+    # third-party lifecycle scripts that assume npm resolve onto pnpm.
     ${pkgs.nodejs_24}/bin/node $src/scripts/stage-runtime-lib.mjs stage-pnpm \
       --source ${ohDshBundle}/lib/oh-dsh/pnpm --target $out/node-runtime
     test -f "$out/node-runtime/lib/node_modules/pnpm/bin/pnpm.mjs"
     test -f "$out/node-runtime/bin/pnpm"
+    ${pkgs.nodejs_24}/bin/node $src/scripts/stage-runtime-lib.mjs stage-npm-shims \
+      --target $out/node-runtime
+    test -f "$out/node-runtime/lib/node_modules/npm-forward.mjs"
+    test -x "$out/node-runtime/bin/npm"
 
     # Guardrail: the assembled runtime must carry exactly the official
     # surface package set; a drift in SURFACE_PACKAGE_NAMES or a missing

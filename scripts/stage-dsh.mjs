@@ -179,11 +179,25 @@ function pruneNodeRuntime() {
     join(nodeRuntime, 'share'),
     join(nodeRuntime, 'lib', 'node_modules', 'npm'),
     join(nodeRuntime, 'node_modules', 'npm'),
+    join(nodeRuntime, 'lib', 'node_modules', 'corepack'),
+    join(nodeRuntime, 'node_modules', 'corepack'),
   ]
   for (const path of removable) rmSync(path, { recursive: true, force: true })
   for (const name of ['corepack', 'npm', 'npx']) {
     rmSync(join(nodeRuntime, 'bin', name), { recursive: true, force: true })
   }
+  if (isWindowsNode) {
+    // Windows distributions place the npm/npx/corepack launchers at the
+    // runtime root beside node.exe rather than in bin/; prune them too or
+    // they dangle onto the removed node_modules/npm package.
+    for (const name of ['npm', 'npx', 'corepack']) {
+      for (const extension of ['', '.cmd', '.ps1']) {
+        rmSync(join(nodeRuntime, name + extension), { force: true })
+      }
+    }
+    rmSync(join(nodeRuntime, 'install_tools.bat'), { force: true })
+  }
+  staging.stageNpmForwardingShims()
   console.log('Pruned Node runtime development files and npm')
 }
 
