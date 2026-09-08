@@ -52,9 +52,9 @@ symlink 规则,而包管理器本身就有现成的规避方式。
 
 ## 后果
 
-带脚本的 bundle 安装在磁盘上略大(真实目录而非 store 链接),
-也失去了 checkout 内部 pnpm 跨项目 store 硬链接的节省;不过事务局部的
-`.pnpm-store` 反正把下载缓存留在事务目录里。如果插件自己的构建脚本
+带脚本的 bundle 安装与默认 isolated 布局的磁盘占用相当:两种 linker 都
+以硬链接从 store 引用包文件,hoisted 的顶层条目是硬链接目录项而非拷贝。
+事务局部的 `.pnpm-store` 反正把下载缓存留在事务目录里。如果插件自己的构建脚本
 不带旗标地运行 `pnpm install`(或 `npm ci`),仍可能把 `node_modules`
 重建成 rename 后悬空的布局;这如今属于插件侧的问题而非市场默认行为,
 回归测试守住的是市场侧的契约。`tests/plugin-marketplace.test.ts`

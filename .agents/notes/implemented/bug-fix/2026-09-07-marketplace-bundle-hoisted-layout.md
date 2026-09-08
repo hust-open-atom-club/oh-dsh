@@ -61,10 +61,11 @@ failure was ours — the rename is Oh-DSH's own transaction step.
 
 ## Consequences
 
-Scripted bundle installs are slightly larger on disk (real directories
-instead of store links) and lose pnpm's cross-project store hard-linking
-inside the checkout; the preview-scoped `.pnpm-store` keeps the download
-cache local to the transaction either way. Plugins whose build scripts
+Scripted bundle installs keep the same disk footprint as the default
+isolated layout: pnpm hard-links package files from the store under both
+linkers, so hoisted's top-level entries are hard links rather than copies.
+The preview-scoped `.pnpm-store` keeps the download cache local to the
+transaction either way. Plugins whose build scripts
 themselves run `pnpm install` without the flag (or `npm ci`) can still
 rebuild their `node_modules` into a layout that dangles after the rename;
 that is now a plugin bug rather than a marketplace default, and the
