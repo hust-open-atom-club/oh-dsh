@@ -8,9 +8,9 @@ import { OH_DSH_HOME_ENV } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import {
   detectDistributionSurface,
-  installerOwnsRoot,
-  runSelfUpdate,
+  runSelfUpdates,
   surfaceIsInstalled,
+  type SelfUpdateSurface,
 } from './self-update.ts'
 import { main as runTui, resolveTuiRoot } from './tui.ts'
 import { main as runWeb } from './web.ts'
@@ -48,9 +48,10 @@ ${surfaces.map(surface => `  ${surface.padEnd(9)} ${descriptions[surface]}`).joi
 ${aliases.length === 0 ? '' : `\nAliases:\n${aliases.map(([alias, surface]) => `  ${alias.padEnd(9)} ${descriptions[surface]}`).join('\n')}`}
 
 Commands:
-  update    Upgrade this installation with the latest stable release
-            installer (web/tui on every platform; the desktop application
-            updates itself through its update window)
+  update    Upgrade through the latest stable release installer. With no
+            surface argument every installed surface (desktop, web, tui)
+            on this machine is detected and upgraded; pass one surface to
+            upgrade it alone.
 
 Run "ohdsh <surface> --help" for surface options.
 `
@@ -181,46 +182,75 @@ export async function launchDesktop(
   })
 }
 
-/** Run "ohdsh update": upgrade the running distribution via the installer. */
+/** Upgrades a list of installed surfaces through the platform installer. */
+export type UpdateSurfaces = (
+  surfaces: readonly SelfUpdateSurface[],
+  env: NodeJS.ProcessEnv,
+  announce: (surface: SelfUpdateSurface) => void,
+) => Promise<number>
+
+async function defaultUpdateSurfaces(
+  surfaces: readonly SelfUpdateSurface[],
+  env: NodeJS.ProcessEnv,
+  announce: (surface: SelfUpdateSurface) => void,
+): Promise<number> {
+  return await runSelfUpdates(
+    surfaces,
+    env,
+    process.platform,
+    undefined,
+    resolveTuiRoot(env),
+    announce,
+  )
+}
+
+/** Run "ohdsh update": upgrade installed distributions via the installer. */
 export async function runUpdateCommand(
   args: readonly string[],
   env: NodeJS.ProcessEnv,
   stdout: NodeJS.WriteStream,
   stderr: NodeJS.WriteStream,
+  updater: UpdateSurfaces = defaultUpdateSurfaces,
 ): Promise<number> {
-  const [requested] = args
-  if (requested !== undefined && !SURFACE_NAMES.includes(requested as SurfaceName)) {
+  const [requested] = args as readonly SelfUpdateSurface[]
+  if (requested !== undefined && !SURFACE_NAMES.includes(requested)) {
     stderr.write(`Unknown surface: ${requested}\n\n${cliHelp(env)}`)
     return 2
   }
   const root = resolveTuiRoot(env)
-  const distribution = detectDistributionSurface(root, env)
-  if (distribution === 'source') {
+  if (detectDistributionSurface(root, env) === 'source') {
     stderr.write('ohdsh update needs a packaged installation; update a source checkout with git instead.\n')
     return 2
   }
-  if (distribution === 'desktop' || requested === 'desktop') {
-    stdout.write('The desktop application updates itself: open Oh-DSH Desktop -> Check for Updates...\n')
-    return 0
-  }
-  const explicit = requested === 'web' || requested === 'tui'
-  const surface = explicit ? requested : distribution
   // Ownership is inferred from install records and paths, never from a build
-  // flag: the detected payload's own root, or — for an explicitly requested
-  // surface — any installer-owned installation of that surface.
-  const owned = explicit
-    ? surfaceIsInstalled(surface, env)
-    : installerOwnsRoot(root, surface, env)
-  if (!owned) {
-    stderr.write(
-      `ohdsh update: no installer-owned ${surface} installation was found` +
-      (explicit ? '' : ` at ${root}`) +
-      '. Re-run install.sh (or install.ps1) with --dest matching the location, or reinstall to the default location.\n',
-    )
-    return 2
+  // flag: one explicitly requested surface, or — with no argument — every
+  // installer-owned installation found on this machine.
+  let targets: readonly SelfUpdateSurface[]
+  if (requested !== undefined) {
+    if (!surfaceIsInstalled(requested, env)) {
+      stderr.write(
+        `ohdsh update: no installer-owned ${requested} installation was found` +
+        '. Re-run install.sh (or install.ps1) with --dest matching the location, or reinstall to the default location.\n',
+      )
+      return 2
+    }
+    targets = [requested]
+  } else {
+    targets = SURFACE_NAMES.filter(surface => surfaceIsInstalled(surface, env))
+    if (targets.length === 0) {
+      stderr.write(
+        'ohdsh update: no installer-owned installation was found' +
+        '. Install first with install.sh (or install.ps1), or pass a surface explicitly.\n',
+      )
+      return 2
+    }
   }
-  stdout.write(`Upgrading Oh-DSH ${surface} with the latest stable release installer...\n`)
-  return await runSelfUpdate(surface, env, process.platform, undefined, root)
+  stdout.write(`Upgrading Oh-DSH ${targets.join(', ')} with the latest stable release installer...\n`)
+  return await updater(
+    targets,
+    env,
+    surface => stdout.write(`\n=== Upgrading Oh-DSH ${surface} ===\n`),
+  )
 }
 
 /** Dispatch one surface command. */
