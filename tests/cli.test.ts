@@ -24,6 +24,12 @@ function output(): { stream: NodeJS.WriteStream; text: () => string } {
   }
 }
 
+/** Write the payload launcher files surfaceIsInstalled probes per platform. */
+async function writePayloadLauncher(payload: string): Promise<void> {
+  await writeFile(join(payload, 'bin', 'ohdsh'), '')
+  await writeFile(join(payload, 'bin', 'ohdsh.cmd'), '')
+}
+
 test('ohdsh dispatches desktop aliases, web, and TUI through one surface command', async () => {
   const stdout = output()
   const stderr = output()
@@ -177,10 +183,10 @@ test('ohdsh update without a surface upgrades every installed surface', async ()
   await mkdir(join(tuiPayload, 'bin'), { recursive: true })
   // The launcher's own payload marker keeps this a packaged distribution.
   await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
-  await writeFile(join(tuiPayload, 'bin', 'ohdsh'), '')
+  await writePayloadLauncher(tuiPayload)
   const webPayload = join(home, 'web-root')
   await mkdir(join(webPayload, 'bin'), { recursive: true })
-  await writeFile(join(webPayload, 'bin', 'ohdsh'), '')
+  await writePayloadLauncher(webPayload)
   const desktopExe = join(home, 'apps', 'Oh-DSH Desktop.app', 'Contents', 'MacOS', 'Oh-DSH Desktop')
   await mkdir(dirname(desktopExe), { recursive: true })
   await writeFile(desktopExe, '')
@@ -219,7 +225,7 @@ test('ohdsh update upgrades only the surfaces that are installed', async () => {
   const tuiPayload = join(payloadHome, 'tui')
   await mkdir(join(tuiPayload, 'bin'), { recursive: true })
   await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
-  await writeFile(join(tuiPayload, 'bin', 'ohdsh'), '')
+  await writePayloadLauncher(tuiPayload)
   const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
 
   const upgraded: string[][] = []
@@ -242,7 +248,7 @@ test('ohdsh update <surface> requires that surface to be installed', async () =>
   const tuiPayload = join(payloadHome, 'tui')
   await mkdir(join(tuiPayload, 'bin'), { recursive: true })
   await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
-  await writeFile(join(tuiPayload, 'bin', 'ohdsh'), '')
+  await writePayloadLauncher(tuiPayload)
   const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
 
   const stderr = output()
