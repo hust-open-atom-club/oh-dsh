@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict'
-import { posix } from 'node:path'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join, posix } from 'node:path'
 import { test } from 'node:test'
 import {
   desktopLaunchSpec,
   main,
+  runUpdateCommand,
 } from '../src/cli.ts'
+import type { SelfUpdateSurface } from '../src/self-update.ts'
 
 function output(): { stream: NodeJS.WriteStream; text: () => string } {
   let value = ''
@@ -163,4 +167,150 @@ test('desktop launch resolves paths with target platform semantics', () => {
     args: ['--inspect'],
     command: 'C:\\Tools\\Oh-DSH Desktop.exe',
   })
+})
+
+test('ohdsh update without a surface upgrades every installed surface', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'ohdsh-update-all-'))
+  const recordHome = join(home, '.ohdsh', 'installer')
+  const tuiPayload = join(home, 'tui-root')
+  await mkdir(join(recordHome), { recursive: true })
+  await mkdir(join(tuiPayload, 'bin'), { recursive: true })
+  // The launcher's own payload marker keeps this a packaged distribution.
+  await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
+  await writeFile(join(tuiPayload, 'bin', 'ohdsh'), '')
+  const webPayload = join(home, 'web-root')
+  await mkdir(join(webPayload, 'bin'), { recursive: true })
+  await writeFile(join(webPayload, 'bin', 'ohdsh'), '')
+  const desktopExe = join(home, 'apps', 'Oh-DSH Desktop.app', 'Contents', 'MacOS', 'Oh-DSH Desktop')
+  await mkdir(dirname(desktopExe), { recursive: true })
+  await writeFile(desktopExe, '')
+  await writeFile(
+    join(recordHome, 'launcher.env'),
+    [
+      `WEB_DEST=${webPayload}`,
+      `TUI_DEST=${tuiPayload}`,
+      `DESKTOP_EXE=${desktopExe}`,
+      `BIN_DIR=${join(home, 'bin')}`,
+    ].join('\n') + '\n',
+  )
+  const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
+
+  const upgraded: string[][] = []
+  const stdout = output()
+  assert.equal(await runUpdateCommand(
+    [],
+    env,
+    stdout.stream,
+    output().stream,
+    async (surfaces, _env, announce) => {
+      upgraded.push([...surfaces])
+      for (const surface of surfaces) announce(surface)
+      return 0
+    },
+  ), 0)
+  assert.deepEqual(upgraded, [['desktop', 'web', 'tui']])
+  assert.match(stdout.text(), /Upgrading Oh-DSH desktop, web, tui/)
+  assert.match(stdout.text(), /=== Upgrading Oh-DSH desktop ===/)
+})
+
+test('ohdsh update upgrades only the surfaces that are installed', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'ohdsh-update-tui-only-'))
+  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
+  const tuiPayload = join(payloadHome, 'tui')
+  await mkdir(join(tuiPayload, 'bin'), { recursive: true })
+  await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
+  await writeFile(join(tuiPayload, 'bin', 'ohdsh'), '')
+  const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
+
+  const upgraded: string[][] = []
+  assert.equal(await runUpdateCommand(
+    [],
+    env,
+    output().stream,
+    output().stream,
+    async surfaces => {
+      upgraded.push([...surfaces])
+      return 0
+    },
+  ), 0)
+  assert.deepEqual(upgraded, [['tui']])
+})
+
+test('ohdsh update <surface> requires that surface to be installed', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'ohdsh-update-explicit-'))
+  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
+  const tuiPayload = join(payloadHome, 'tui')
+  await mkdir(join(tuiPayload, 'bin'), { recursive: true })
+  await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
+  await writeFile(join(tuiPayload, 'bin', 'ohdsh'), '')
+  const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
+
+  const stderr = output()
+  assert.equal(await runUpdateCommand(
+    ['desktop'],
+    env,
+    output().stream,
+    stderr.stream,
+    async () => 0,
+  ), 2)
+  assert.match(stderr.text(), /no installer-owned desktop installation was found/)
+
+  const upgraded: string[][] = []
+  const recorder = async (surfaces: readonly SelfUpdateSurface[]): Promise<number> => {
+    upgraded.push([...surfaces])
+    return 0
+  }
+  assert.equal(await runUpdateCommand(
+    ['web'],
+    env,
+    output().stream,
+    output().stream,
+    recorder,
+  ), 2)
+  assert.deepEqual(upgraded, [])
+
+  assert.equal(await runUpdateCommand(
+    ['tui'],
+    env,
+    output().stream,
+    output().stream,
+    recorder,
+  ), 0)
+  assert.deepEqual(upgraded, [['tui']])
+})
+
+test('ohdsh update rejects unknown surfaces, empty machines, and source roots', async () => {
+  const stderr = output()
+  assert.equal(await runUpdateCommand(
+    ['wireless'],
+    { DSH_OH_TUI_ROOT: '/nonexistent-oh-dsh-payload' },
+    output().stream,
+    stderr.stream,
+    async () => 0,
+  ), 2)
+  assert.match(stderr.text(), /Unknown surface: wireless/)
+
+  const home = await mkdtemp(join(tmpdir(), 'ohdsh-update-empty-'))
+  const payloadRoot = join(home, 'tui-root')
+  await mkdir(payloadRoot, { recursive: true })
+  await writeFile(join(payloadRoot, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
+  const source = output()
+  assert.equal(await runUpdateCommand(
+    [],
+    { HOME: home, DSH_OH_TUI_ROOT: payloadRoot },
+    output().stream,
+    source.stream,
+    async () => 0,
+  ), 2)
+  assert.match(source.text(), /no installer-owned installation was found/)
+
+  const checkout = output()
+  assert.equal(await runUpdateCommand(
+    [],
+    { HOME: home, OH_DSH_SOURCE_ROOT: home },
+    output().stream,
+    checkout.stream,
+    async () => 0,
+  ), 2)
+  assert.match(checkout.text(), /needs a packaged installation/)
 })

@@ -104,15 +104,18 @@ pnpm run dist:mac && sh install.sh --local --surface desktop --force
   `Oh-DSH 0.1.8 -> 0.2.0 is available. Run "ohdsh update" to upgrade.`
 - **Web** 在监听地址之后打印同样的提示。
 - **Desktop** 通过更新窗口检查，发现新版本时弹出系统通知，点击即可打开
-  更新窗口。desktop 仍通过自带的校验更新器安装更新，而不是 shell 安装器。
+  更新窗口。
 
-`ohdsh update`（或 `ohdsh update web` / `ohdsh update tui`）在 macOS、
-Linux 与 Windows 上升级已打包的 web/tui 发行版：它重新运行对应平台的
-安装脚本，走与全新安装相同的校验与原子替换流程。安装来源采用 Codex
-式的推断——依据运行路径、载荷内的安装标记以及 `launcher.env` 记录的
-目标位置——绝不依赖构建时注入的标记，并会还原安装时的
-`--dest`/`--bin-dir`，让更新落在当初安装的位置。位于安装器不认识的
-路径上的安装会被拒绝并给出指引。在源码检出中执行时会提示改用 git。
+`ohdsh update` 在 macOS、Linux 与 Windows 上升级本机检测到的所有已安装
+surface（desktop、web、tui）：它依次为每个 surface 重新运行对应平台的
+安装脚本，走与全新安装相同的校验与原子替换流程；传 `ohdsh update web`
+（或 `desktop` / `tui`）则只升级一个 surface。通过安装器升级 desktop 会
+退出并替换应用包，因此桌面会话内的引导路径仍是应用自带的更新窗口。
+检测采用 Codex 式的推断——依据运行路径、载荷内的安装标记以及
+`launcher.env` 记录的目标位置——绝不依赖构建时注入的标记，并会还原安装
+时的 `--dest`/`--bin-dir`，让更新落在当初安装的位置。请求了一个安装器
+不认识的 surface 时会被拒绝并给出指引。在源码检出中执行时会提示改用
+git。
 
 更新只基于 Release：所有 surface 都用 semver 与已发布的稳定 GitHub
 Release 比较；不存在 commit 级或滚动更新通道。
@@ -123,7 +126,8 @@ Release 比较；不存在 commit 级或滚动更新通道。
 脚本，仅当包内没有时才通过 TLS 从仓库 `main` 分支下载；
 `OH_DSH_INSTALL_SCRIPT_URL` 可将下载指向镜像或本地副本以便测试。在
 Windows 上，更新会在当前进程退出后以分离方式执行，因为运行中的载荷
-无法在执行时被替换。
+无法在执行时被替换；多个 surface 会在同一个分离助手中按顺序执行，
+避免并发安装器互相踩踏记录与启动器。
 
 ## 安装完整版
 

@@ -186,6 +186,9 @@ export interface LauncherRecord {
   /** Per-surface fork provenance: repositories each payload came from. */
   webRepo?: string
   tuiRepo?: string
+  desktopDest?: string
+  desktopRepo?: string
+  desktopExe?: string
 }
 
 function readTextAt(path: string): string | undefined {
@@ -219,6 +222,9 @@ export function readLauncherRecord(
     else if (line.startsWith('BIN_DIR=')) record.binDir = line.slice('BIN_DIR='.length)
     else if (line.startsWith('WEB_REPO=')) record.webRepo = line.slice('WEB_REPO='.length)
     else if (line.startsWith('TUI_REPO=')) record.tuiRepo = line.slice('TUI_REPO='.length)
+    else if (line.startsWith('DESKTOP_DEST=')) record.desktopDest = line.slice('DESKTOP_DEST='.length)
+    else if (line.startsWith('DESKTOP_REPO=')) record.desktopRepo = line.slice('DESKTOP_REPO='.length)
+    else if (line.startsWith('DESKTOP_EXE=')) record.desktopExe = line.slice('DESKTOP_EXE='.length)
   }
   return record
 }
@@ -283,6 +289,9 @@ export function detectDistributionSurface(
   return 'source'
 }
 
+/** Every distribution the launcher can upgrade through the installers. */
+export type SelfUpdateSurface = 'desktop' | 'web' | 'tui'
+
 /** The command line that upgrades one surface with the platform installer. */
 export interface SelfUpdatePlan {
   scriptUrl: string
@@ -294,7 +303,7 @@ export interface SelfUpdatePlan {
 }
 
 export function selfUpdatePlan(
-  surface: 'web' | 'tui',
+  surface: SelfUpdateSurface,
   platform: NodeJS.Platform = process.platform,
   repository: string = OFFICIAL_REPOSITORY,
   env: NodeJS.ProcessEnv = {},
@@ -303,12 +312,16 @@ export function selfUpdatePlan(
   // Fork installs keep their provenance per surface: the record decides
   // which repository both the script download and the release resolution
   // target, so side-by-side installs from different forks stay separate.
-  const recordRepo = surface === 'web' ? record.webRepo : record.tuiRepo
+  const recordRepo = surface === 'web'
+    ? record.webRepo
+    : surface === 'tui' ? record.tuiRepo : record.desktopRepo
   const effectiveRepo = recordRepo !== undefined && recordRepo !== ''
     ? recordRepo
     : repository
   const scriptUrl = installScriptUrl(platform, effectiveRepo, env)
-  const dest = surface === 'web' ? record.webDest : record.tuiDest
+  const dest = surface === 'web'
+    ? record.webDest
+    : surface === 'tui' ? record.tuiDest : record.desktopDest
   const repoArgs = recordRepo !== undefined && recordRepo !== '' && recordRepo !== repository
     ? platform === 'win32' ? ['-Repo', recordRepo] : ['--repo', recordRepo]
     : []
@@ -333,34 +346,61 @@ export function selfUpdatePlan(
   return { scriptUrl, command: 'sh', args }
 }
 
-/**
- * Verify the running root is a location the installer owns (its recorded or
- * default destination), so an update never silently installs somewhere else.
- */
-export function installerOwnsRoot(
-  root: string,
-  surface: 'web' | 'tui',
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
+/** The desktop app image names the installers place under a destination. */
+function desktopImagePaths(dest: string, platform: NodeJS.Platform): string[] {
+  if (platform === 'darwin') return [join(dest, 'Oh-DSH Desktop.app')]
+  if (platform === 'win32') {
+    // install.ps1 probes both published executable names.
+    return [join(dest, 'Oh-DSH Desktop.exe'), join(dest, 'oh-dsh-desktop.exe')]
+  }
+  return [join(dest, 'oh-dsh-desktop')]
+}
+
+/** The destination the desktop installer marker last recorded, if any. */
+function desktopRecordDest(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+): string | undefined {
+  const raw = readTextAt(join(installerRecordHome(platform, env), 'desktop.env'))
+  if (raw === undefined) return undefined
+  const content = raw.startsWith('\uFEFF') ? raw.slice(1) : raw
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+    if (!line.startsWith('OH_DSH_INSTALL_DEST=')) continue
+    const value = line.slice('OH_DSH_INSTALL_DEST='.length)
+    return value === '' ? undefined : value
+  }
+  return undefined
+}
+
+function desktopIsInstalled(
+  record: LauncherRecord,
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+  pathExists: (path: string) => boolean,
 ): boolean {
-  const target = resolve(root)
-  if (markerSurface(target) === surface) return true
-  const payloadHome = installerPayloadHome(platform, env)
-  if (target === resolve(join(payloadHome, surface))) return true
-  const record = readLauncherRecord(env, platform)
-  const recorded = surface === 'web' ? record.webDest : record.tuiDest
-  return recorded !== undefined && recorded !== '' && target === resolve(recorded)
+  if (record.desktopExe !== undefined && record.desktopExe !== '') {
+    return pathExists(record.desktopExe)
+  }
+  const dest = record.desktopDest !== undefined && record.desktopDest !== ''
+    ? record.desktopDest
+    : desktopRecordDest(env, platform)
+  if (dest === undefined) return false
+  return desktopImagePaths(dest, platform).some(pathExists)
 }
 
 /** Whether an installer-owned installation of one surface exists anywhere. */
 export function surfaceIsInstalled(
-  surface: 'web' | 'tui',
+  surface: SelfUpdateSurface,
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
   pathExists: (path: string) => boolean = existsSync,
 ): boolean {
-  const launcher = join('bin', platform === 'win32' ? 'ohdsh.cmd' : 'ohdsh')
   const record = readLauncherRecord(env, platform)
+  if (surface === 'desktop') {
+    return desktopIsInstalled(record, env, platform, pathExists)
+  }
+  const launcher = join('bin', platform === 'win32' ? 'ohdsh.cmd' : 'ohdsh')
   const recorded = surface === 'web' ? record.webDest : record.tuiDest
   if (recorded !== undefined && recorded !== '') {
     return pathExists(join(recorded, launcher))
@@ -391,32 +431,62 @@ function windowsQuoted(value: string): string {
   return `'${value.replaceAll("'", "''")}'`
 }
 
+/** One Windows installer invocation: which script upgrades which surface. */
+interface WindowsUpdateEntry {
+  surface: SelfUpdateSurface
+  scriptPath: string
+  plan: SelfUpdatePlan
+}
+
+async function downloadInstallerScript(
+  url: string,
+  fetchImpl: UpdateFetcher,
+): Promise<string> {
+  try {
+    const response = await fetchImpl(url)
+    if (!response.ok) {
+      throw new Error(`unexpected status ${String(response.status)}`)
+    }
+    return await response.text()
+  } catch (error) {
+    throw new Error(
+      `failed to download the installer from ${url}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}
+
 /**
  * On Windows the packaged CLI runs from the payload being replaced, and a
  * mapped node.exe cannot be moved while this process lives. Hand the work to
- * a detached helper that waits for this process to exit, then runs the
- * installer on its own.
+ * a detached helper that waits for this process to exit, then runs every
+ * surface's installer sequentially in one helper — concurrent installers
+ * would race each other's launcher and record writes.
  */
 function spawnDetachedWindowsUpdate(
-  scriptPath: string,
-  plan: SelfUpdatePlan,
+  entries: readonly WindowsUpdateEntry[],
   env: NodeJS.ProcessEnv,
 ): number {
-  const flags = plan.args
-    .filter(arg => arg !== '-NoProfile' && arg !== '-ExecutionPolicy'
-      && arg !== 'Bypass' && arg !== '-File' && arg !== '<script>')
-    .map(arg => (arg.startsWith('-') ? arg : windowsQuoted(arg)))
-    .join(' ')
-  const escapedScript = windowsQuoted(scriptPath)
   // The helper is detached with silent stdio, so its diagnostics and exit
   // status are persisted for the user instead of vanishing with the console.
   const logPath = join(installerRecordHome('win32', env), 'update.log')
   const escapedLog = windowsQuoted(logPath)
+  const steps = entries.flatMap(entry => {
+    const flags = entry.plan.args
+      .filter(arg => arg !== '-NoProfile' && arg !== '-ExecutionPolicy'
+        && arg !== 'Bypass' && arg !== '-File' && arg !== '<script>')
+      .map(arg => (arg.startsWith('-') ? arg : windowsQuoted(arg)))
+      .join(' ')
+    return [
+      `Add-Content -LiteralPath ${escapedLog} -Value ([string](Get-Date) + ': updating ${entry.surface}')`,
+      `& ${windowsQuoted(entry.scriptPath)} ${flags} *>> ${escapedLog}`,
+      `Add-Content -LiteralPath ${escapedLog} -Value ([string](Get-Date) + ': ${entry.surface} update exited with ' + $LASTEXITCODE)`,
+    ]
+  }).join('; ')
   const waitAndRun = [
     `while (Get-Process -Id ${String(process.pid)} -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 250 }`,
-    `Add-Content -LiteralPath ${escapedLog} -Value ([string](Get-Date) + ': update starting')`,
-    `& ${escapedScript} ${flags} *>> ${escapedLog}`,
-    `Add-Content -LiteralPath ${escapedLog} -Value ([string](Get-Date) + ': update exited with ' + $LASTEXITCODE)`,
+    steps,
   ].join('; ')
   const child = spawn(
     'powershell',
@@ -437,73 +507,82 @@ function spawnDetachedWindowsUpdate(
  * installer runs detached after this process exits (see above).
  */
 export async function runSelfUpdate(
-  surface: 'web' | 'tui',
+  surface: SelfUpdateSurface,
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform = process.platform,
   fetchImpl: UpdateFetcher = fetch,
   root: string = '',
 ): Promise<number> {
-  const plan = selfUpdatePlan(surface, platform, OFFICIAL_REPOSITORY, env)
-  const bundled = root !== '' ? bundledInstallScript(root, platform) : undefined
+  return await runSelfUpdates([surface], env, platform, fetchImpl, root)
+}
+
+/**
+ * Run the installer for every requested surface, in order, announcing each
+ * one before its upgrade starts. A failing surface does not stop the rest:
+ * each is an independent payload, and a partial upgrade is still progress.
+ * The return code is the first nonzero installer exit, or 0 when all pass.
+ */
+export async function runSelfUpdates(
+  surfaces: readonly SelfUpdateSurface[],
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+  fetchImpl: UpdateFetcher = fetch,
+  root: string = '',
+  announce: (surface: SelfUpdateSurface) => void = () => {},
+): Promise<number> {
+  if (surfaces.length === 0) return 2
   if (platform === 'win32') {
-    const scriptPath = bundled ?? join(
-      installerRecordHome(platform, env),
-      'update-install.ps1',
-    )
-    if (bundled === undefined) {
-      let script: string
-      try {
-        const response = await fetchImpl(plan.scriptUrl)
-        if (!response.ok) {
-          throw new Error(`unexpected status ${String(response.status)}`)
+    const bundled = root !== '' ? bundledInstallScript(root, platform) : undefined
+    const entries: WindowsUpdateEntry[] = []
+    const persisted = new Map<string, string>()
+    for (const surface of surfaces) {
+      const plan = selfUpdatePlan(surface, platform, OFFICIAL_REPOSITORY, env)
+      let scriptPath = bundled
+      if (scriptPath === undefined) {
+        const cached = persisted.get(plan.scriptUrl)
+        if (cached === undefined) {
+          const script = await downloadInstallerScript(plan.scriptUrl, fetchImpl)
+          mkdirSync(installerRecordHome(platform, env), { recursive: true })
+          scriptPath = join(installerRecordHome(platform, env), `update-install-${surface}.ps1`)
+          writeFileSync(scriptPath, script, { mode: 0o755 })
+          persisted.set(plan.scriptUrl, scriptPath)
+        } else {
+          scriptPath = cached
         }
-        script = await response.text()
-      } catch (error) {
-        throw new Error(
-          `failed to download the installer from ${plan.scriptUrl}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        )
       }
-      mkdirSync(installerRecordHome(platform, env), { recursive: true })
+      entries.push({ surface, scriptPath, plan })
+    }
+    return spawnDetachedWindowsUpdate(entries, env)
+  }
+  let failure: number | undefined
+  for (const surface of surfaces) {
+    announce(surface)
+    const plan = selfUpdatePlan(surface, platform, OFFICIAL_REPOSITORY, env)
+    const bundled = root !== '' ? bundledInstallScript(root, platform) : undefined
+    let scriptPath = bundled
+    let workdir = ''
+    if (scriptPath === undefined) {
+      const script = await downloadInstallerScript(plan.scriptUrl, fetchImpl)
+      workdir = mkdtempSync(join(tmpdir(), 'oh-dsh-self-update-'))
+      scriptPath = join(workdir, 'install.sh')
       writeFileSync(scriptPath, script, { mode: 0o755 })
     }
-    return spawnDetachedWindowsUpdate(scriptPath, plan, env)
-  }
-  let scriptPath = bundled
-  let workdir = ''
-  if (scriptPath === undefined) {
-    let script: string
     try {
-      const response = await fetchImpl(plan.scriptUrl)
-      if (!response.ok) {
-        throw new Error(`unexpected status ${String(response.status)}`)
-      }
-      script = await response.text()
-    } catch (error) {
-      throw new Error(
-        `failed to download the installer from ${plan.scriptUrl}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      )
+      const args = plan.args.map(arg => (arg === '<script>' ? scriptPath : arg))
+      const code = await new Promise<number>((resolve, reject) => {
+        const child = spawn(plan.command, args, {
+          env,
+          stdio: 'inherit',
+        })
+        child.once('error', reject)
+        child.once('exit', code => {
+          resolve(code ?? 1)
+        })
+      })
+      if (code !== 0 && failure === undefined) failure = code
+    } finally {
+      if (workdir !== '') rmSync(workdir, { force: true, recursive: true })
     }
-    workdir = mkdtempSync(join(tmpdir(), 'oh-dsh-self-update-'))
-    scriptPath = join(workdir, 'install.sh')
-    writeFileSync(scriptPath, script, { mode: 0o755 })
   }
-  try {
-    const args = plan.args.map(arg => (arg === '<script>' ? scriptPath : arg))
-    return await new Promise<number>((resolve, reject) => {
-      const child = spawn(plan.command, args, {
-        env,
-        stdio: 'inherit',
-      })
-      child.once('error', reject)
-      child.once('exit', code => {
-        resolve(code ?? 1)
-      })
-    })
-  } finally {
-    if (workdir !== '') rmSync(workdir, { force: true, recursive: true })
-  }
+  return failure ?? 0
 }

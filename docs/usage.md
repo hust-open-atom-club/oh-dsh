@@ -120,19 +120,22 @@ Every surface checks for a newer stable Release once per launch:
 - **Web** prints the same notice after the listening URL.
 - **Desktop** checks through its update window and shows a system
   notification when a new version is found; clicking it opens the update
-  window. The desktop still installs updates through its own verified
-  updater, not the shell installer.
+  window.
 
-`ohdsh update` (or `ohdsh update web` / `ohdsh update tui`) upgrades a
-packaged web/tui distribution on macOS, Linux, and Windows by re-running
-the matching installer script with the same verification and atomic
-replacement as a fresh install. The installation source is inferred the
-way Codex does it — from the running path, the payload's install marker,
-and the destinations recorded in `launcher.env` — never from a flag baked
-into the build, and the recorded `--dest`/`--bin-dir` are reconstructed so
-an update lands exactly where the install did. An installation at a
-location the installers do not own is refused with guidance. From a source
-checkout it asks you to use git instead.
+`ohdsh update` upgrades every installed surface it detects on the machine —
+desktop, web, and tui — on macOS, Linux, and Windows by re-running the
+matching installer script for each surface with the same verification and
+atomic replacement as a fresh install; pass `ohdsh update web` (or
+`desktop` / `tui`) to upgrade one surface alone. Upgrading the desktop
+through the installer quits and replaces the app bundle, so the running
+application's update window remains the guided path inside a desktop
+session. Detection is inferred the way Codex does it — from the running
+path, the payloads' install markers, and the destinations recorded in
+`launcher.env` — never from a flag baked into the build, and the recorded
+`--dest`/`--bin-dir` are reconstructed so an update lands exactly where
+the install did. A requested surface without an installer-owned
+installation is refused with guidance. From a source checkout it asks you
+to use git instead.
 
 Updates are release-based only: every surface compares against published
 stable GitHub Releases with semver; there is no commit-level or rolling
@@ -147,7 +150,8 @@ repository's `main` branch over TLS when the bundle is absent;
 `OH_DSH_INSTALL_SCRIPT_URL` can point the download at a mirror or a local
 copy for testing. On Windows the update runs detached after the current
 process exits, because the running payload cannot be replaced while it
-executes.
+executes; multiple surfaces run sequentially inside one detached helper so
+concurrent installers never race their record and launcher writes.
 
 ## Install the full distribution
 

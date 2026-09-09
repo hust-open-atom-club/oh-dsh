@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import {
   bundledInstallScript,
@@ -10,16 +10,17 @@ import {
   fetchLatestVersion,
   formatUpdateNotice,
   installScriptUrl,
-  installerOwnsRoot,
   installerPayloadHome,
   installerRecordHome,
   latestReleaseApiUrl,
   readLauncherRecord,
   runSelfUpdate,
+  runSelfUpdates,
   selfUpdatePlan,
   surfaceIsInstalled,
   startupUpdateNotice,
   updateCheckEnabled,
+  type SelfUpdateSurface,
   type UpdateFetcher,
 } from '../src/self-update.ts'
 
@@ -128,6 +129,9 @@ test('installer plans target the platform script and surface', () => {
 
   const windowsPlan = selfUpdatePlan('tui', 'win32', 'hust-open-atom-club/oh-dsh', {
     LOCALAPPDATA: 'Z:\\no-such-place',
+    // Without USERPROFILE the record home falls back to the real profile
+    // and would read this machine's launcher records.
+    USERPROFILE: 'Z:\\no-such-profile',
   })
   assert.equal(windowsPlan.command, 'powershell')
   assert.deepEqual(
@@ -172,7 +176,8 @@ test('runSelfUpdate downloads and executes the installer for the surface', { ski
   const body = Buffer.from(script, 'utf8')
 
   const fetchImpl: UpdateFetcher = async () => new Response(body, { status: 200 })
-  const code = await runSelfUpdate('web', { ...process.env }, 'linux', fetchImpl)
+  // An isolated HOME keeps the plan free of this machine's real records.
+  const code = await runSelfUpdate('web', { ...process.env, HOME: home }, 'linux', fetchImpl)
   assert.equal(code, 0)
   assert.equal(await readFile(ranPath, 'utf8'), '--surface web\n')
 })
@@ -222,26 +227,91 @@ test('selfUpdatePlan reconstructs recorded destinations per platform', async () 
   assert.deepEqual(winPlan.args.slice(-4), ['-Dest', 'C:\\custom web', '-BinDir', 'C:\\custom bin'])
 })
 
-test('installer ownership follows markers, defaults, and records', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-owns-'))
+test('desktop plans reconstruct the recorded destination and fork', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-plan-desktop-'))
   const recordHome = join(home, '.ohdsh', 'installer')
-  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(
+    join(recordHome, 'launcher.env'),
+    'DESKTOP_DEST=/Applications\nDESKTOP_REPO=some-fork/oh-dsh\nBIN_DIR=/custom/bin\n',
+  )
+  const plan = selfUpdatePlan('desktop', 'linux', 'hust-open-atom-club/oh-dsh', { HOME: home })
+  assert.equal(plan.scriptUrl, 'https://raw.githubusercontent.com/some-fork/oh-dsh/main/install.sh')
+  assert.deepEqual(plan.args, [
+    '<script>', '--surface', 'desktop',
+    '--dest', '/Applications',
+    '--bin-dir', '/custom/bin',
+    '--repo', 'some-fork/oh-dsh',
+  ])
+
+  const plainHome = await mkdtemp(join(tmpdir(), 'oh-dsh-plan-desktop-empty-'))
+  const plain = selfUpdatePlan('desktop', 'darwin', 'hust-open-atom-club/oh-dsh', { HOME: plainHome })
+  assert.deepEqual(plain.args, ['<script>', '--surface', 'desktop'])
+})
+
+test('desktop detection follows DESKTOP_EXE, records, and the marker', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-desktop-installed-'))
+  const recordHome = join(home, '.ohdsh', 'installer')
   const env = { HOME: home }
 
-  const defaultPayload = join(payloadHome, 'web')
-  await mkdir(defaultPayload, { recursive: true })
-  await writeFile(join(defaultPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=web\n')
-  assert.equal(installerOwnsRoot(defaultPayload, 'web', env, 'linux'), true)
-  assert.equal(installerOwnsRoot(defaultPayload, 'tui', env, 'linux'), false)
+  assert.equal(surfaceIsInstalled('desktop', env, 'darwin'), false)
 
-  const foreign = join(home, 'elsewhere')
-  await mkdir(join(foreign, 'lib'), { recursive: true })
-  assert.equal(installerOwnsRoot(foreign, 'web', env, 'linux'), false)
-
-  const custom = join(home, 'custom tui')
+  // The recorded executable path is the primary probe on every platform.
   await mkdir(recordHome, { recursive: true })
-  await writeFile(join(recordHome, 'launcher.env'), `TUI_DEST=${custom}\nBIN_DIR=${join(home, 'bin')}\n`)
-  assert.equal(installerOwnsRoot(custom, 'tui', env, 'linux'), true)
+  const appExe = join(home, 'Applications', 'Oh-DSH Desktop.app', 'Contents', 'MacOS', 'Oh-DSH Desktop')
+  await writeFile(join(recordHome, 'launcher.env'), `DESKTOP_EXE=${appExe}\n`)
+  assert.equal(surfaceIsInstalled('desktop', env, 'darwin'), false)
+  await mkdir(dirname(appExe), { recursive: true })
+  await writeFile(appExe, '')
+  assert.equal(surfaceIsInstalled('desktop', env, 'darwin'), true)
+
+  // Without DESKTOP_EXE, the launcher record's destination and its app
+  // image decide; the desktop.env marker covers records that predate it.
+  const markerHome = await mkdtemp(join(tmpdir(), 'oh-dsh-desktop-marker-'))
+  const markerRecords = join(markerHome, '.ohdsh', 'installer')
+  const markerApps = join(markerHome, 'apps')
+  await mkdir(markerRecords, { recursive: true })
+  await writeFile(
+    join(markerRecords, 'desktop.env'),
+    `OH_DSH_INSTALL_SURFACE=desktop\nOH_DSH_INSTALL_DEST=${markerApps}\n`,
+  )
+  const markerEnv = { HOME: markerHome }
+  assert.equal(surfaceIsInstalled('desktop', markerEnv, 'linux'), false)
+  await mkdir(markerApps, { recursive: true })
+  await writeFile(join(markerApps, 'oh-dsh-desktop'), '')
+  assert.equal(surfaceIsInstalled('desktop', markerEnv, 'linux'), true)
+  assert.equal(surfaceIsInstalled('desktop', markerEnv, 'darwin'), false)
+})
+
+test('runSelfUpdates upgrades every surface and keeps going past a failure', { skip: !isUnix }, async () => {
+  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-selfupdates-'))
+  const ranDir = join(home, 'runs')
+  await mkdir(ranDir, { recursive: true })
+  // The downloaded script records its arguments per invocation and fails
+  // only for the desktop surface, so the run proves both ordering and the
+  // continue-past-failure contract.
+  const script = [
+    '#!/bin/sh',
+    `printf '%s\\n' "$*" >> ${JSON.stringify(join(ranDir, 'log.txt'))}`,
+    `[ "$2" = desktop ] && exit 3`,
+    'exit 0',
+  ].join('\n')
+  const body = Buffer.from(script, 'utf8')
+  const fetchImpl: UpdateFetcher = async () => new Response(body, { status: 200 })
+
+  const announced: SelfUpdateSurface[] = []
+  const code = await runSelfUpdates(
+    ['desktop', 'web', 'tui'],
+    { ...process.env, HOME: home },
+    'linux',
+    fetchImpl,
+    '',
+    surface => { announced.push(surface) },
+  )
+  assert.equal(code, 3)
+  assert.deepEqual(announced, ['desktop', 'web', 'tui'])
+  const log = (await readFile(join(ranDir, 'log.txt'), 'utf8')).split('\n').filter(line => line !== '')
+  assert.deepEqual(log.map(line => line.split(' ')[1]), ['desktop', 'web', 'tui'])
 })
 
 test('detection prefers the payload marker and app path over layout probes', async () => {
@@ -305,7 +375,14 @@ test('the bundled installer script is preferred over a download', { skip: !isUni
     fetched = true
     return new Response('# downloaded', { status: 200 })
   }
-  const code = await runSelfUpdate('tui', { ...process.env }, 'linux', fetchImpl, packageRoot)
+  // An isolated HOME keeps the plan free of this machine's real records.
+  const code = await runSelfUpdate(
+    'tui',
+    { ...process.env, HOME: home },
+    'linux',
+    fetchImpl,
+    packageRoot,
+  )
   assert.equal(code, 0)
   assert.equal(fetched, false, 'no download when the package bundles the script')
   assert.equal(await readFile(ranPath, 'utf8'), '--surface tui\n')
