@@ -222,11 +222,15 @@ test('ohdsh update without a surface upgrades every installed surface', async ()
 
 test('ohdsh update upgrades only the surfaces that are installed', async () => {
   const home = await mkdtemp(join(tmpdir(), 'ohdsh-update-tui-only-'))
-  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
-  const tuiPayload = join(payloadHome, 'tui')
+  const tuiPayload = join(home, 'tui-root')
   await mkdir(join(tuiPayload, 'bin'), { recursive: true })
   await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
   await writePayloadLauncher(tuiPayload)
+  // A recorded destination keeps detection off the platform-specific
+  // default payload path (XDG data home vs AppData\Local).
+  const recordHome = join(home, '.ohdsh', 'installer')
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(join(recordHome, 'launcher.env'), `TUI_DEST=${tuiPayload}\n`)
   // Windows derives the installer record root from USERPROFILE, not HOME.
   const env = { HOME: home, USERPROFILE: home, DSH_OH_TUI_ROOT: tuiPayload }
 
@@ -246,11 +250,15 @@ test('ohdsh update upgrades only the surfaces that are installed', async () => {
 
 test('ohdsh update <surface> requires that surface to be installed', async () => {
   const home = await mkdtemp(join(tmpdir(), 'ohdsh-update-explicit-'))
-  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
-  const tuiPayload = join(payloadHome, 'tui')
+  const tuiPayload = join(home, 'tui-root')
   await mkdir(join(tuiPayload, 'bin'), { recursive: true })
   await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
   await writePayloadLauncher(tuiPayload)
+  // A recorded destination keeps detection off the platform-specific
+  // default payload path (XDG data home vs AppData\Local).
+  const recordHome = join(home, '.ohdsh', 'installer')
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(join(recordHome, 'launcher.env'), `TUI_DEST=${tuiPayload}\n`)
   // Windows derives the installer record root from USERPROFILE, not HOME.
   const env = { HOME: home, USERPROFILE: home, DSH_OH_TUI_ROOT: tuiPayload }
 
