@@ -199,7 +199,8 @@ test('ohdsh update without a surface upgrades every installed surface', async ()
       `BIN_DIR=${join(home, 'bin')}`,
     ].join('\n') + '\n',
   )
-  const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
+  // Windows derives the installer record root from USERPROFILE, not HOME.
+  const env = { HOME: home, USERPROFILE: home, DSH_OH_TUI_ROOT: tuiPayload }
 
   const upgraded: string[][] = []
   const stdout = output()
@@ -226,7 +227,8 @@ test('ohdsh update upgrades only the surfaces that are installed', async () => {
   await mkdir(join(tuiPayload, 'bin'), { recursive: true })
   await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
   await writePayloadLauncher(tuiPayload)
-  const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
+  // Windows derives the installer record root from USERPROFILE, not HOME.
+  const env = { HOME: home, USERPROFILE: home, DSH_OH_TUI_ROOT: tuiPayload }
 
   const upgraded: string[][] = []
   assert.equal(await runUpdateCommand(
@@ -249,7 +251,8 @@ test('ohdsh update <surface> requires that surface to be installed', async () =>
   await mkdir(join(tuiPayload, 'bin'), { recursive: true })
   await writeFile(join(tuiPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=tui\n')
   await writePayloadLauncher(tuiPayload)
-  const env = { HOME: home, DSH_OH_TUI_ROOT: tuiPayload }
+  // Windows derives the installer record root from USERPROFILE, not HOME.
+  const env = { HOME: home, USERPROFILE: home, DSH_OH_TUI_ROOT: tuiPayload }
 
   const stderr = output()
   assert.equal(await runUpdateCommand(
@@ -303,7 +306,7 @@ test('ohdsh update rejects unknown surfaces, empty machines, and source roots', 
   const source = output()
   assert.equal(await runUpdateCommand(
     [],
-    { HOME: home, DSH_OH_TUI_ROOT: payloadRoot },
+    { HOME: home, USERPROFILE: home, DSH_OH_TUI_ROOT: payloadRoot },
     output().stream,
     source.stream,
     async () => 0,
