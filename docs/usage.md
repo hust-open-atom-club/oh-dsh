@@ -293,7 +293,10 @@ cd oh-dsh-tui-*/
 
 Use `bin\ohdsh.cmd tui` on Windows. TUI requires a real interactive terminal.
 It keeps the current terminal position by default, matching the Codex-style
-inline startup; pass `--fullscreen` to use the alternate screen.
+inline startup; pass `--fullscreen` to use the alternate screen. Inside a
+terminal multiplexer (tmux, zellij, screen) the default flips to the
+alternate screen, because inline frame anchoring misplaces the composer in
+multiplexed panes; `--inline` still forces scrollback.
 
 ## Unified commands
 
@@ -320,7 +323,7 @@ Common TUI options:
 | `--resume` | New session | Resume a Session id |
 | `--lang` | Upstream preference | `zh` or `en` |
 | `--preset` | `standard` | Initial Agent preset |
-| `--inline` | On | Preserve terminal scrollback instead of alternate screen |
+| `--inline` | On in a plain terminal | Preserve terminal scrollback instead of alternate screen (multiplexers default to fullscreen) |
 
 ### Agent presets
 

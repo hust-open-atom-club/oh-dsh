@@ -51,8 +51,10 @@ Options:
   --resume <session>     resume an existing session id
   --lang <zh|en>         initial interface language
   --preset <name>        initial agent preset
-  --fullscreen           use the alternate screen
-  --inline               keep terminal scrollback instead (default)
+  --fullscreen           use the alternate screen (default under tmux,
+                         zellij, and screen)
+  --inline               keep terminal scrollback instead (default in a
+                         plain terminal)
   --help                 show this help
 
 Environment:
@@ -69,6 +71,24 @@ function parseBoolean(value: string, name: string): boolean {
 function optionalEnv(env: NodeJS.ProcessEnv, name: string): string | undefined {
   const value = env[name]
   return value === undefined || value === '' ? undefined : value
+}
+
+/**
+ * Default to the alternate screen inside terminal multiplexers: the inline
+ * renderer anchors its frames above the prompt cursor, and multiplexed panes
+ * answer the renderer's cursor/size probes differently than a plain terminal,
+ * which pins the composer to the top of the pane and makes each streamed
+ * frame crawl upward (observed under zellij). An explicit `--inline`,
+ * `--fullscreen`, or DSH_OH_TUI_FULLSCREEN always wins over this default.
+ */
+function multiplexerDefaultFullscreen(env: NodeJS.ProcessEnv): boolean {
+  if (optionalEnv(env, 'ZELLIJ') !== undefined
+    || optionalEnv(env, 'ZELLIJ_SESSION_NAME') !== undefined
+    || optionalEnv(env, 'TMUX') !== undefined) {
+    return true
+  }
+  const term = env.TERM ?? ''
+  return term.startsWith('screen') || term.startsWith('tmux') || term.startsWith('zellij')
 }
 
 function language(value: string): 'en' | 'zh' {
@@ -93,7 +113,7 @@ export function parseTuiArgs(
       ?? optionalEnv(env, 'OH_DSH_HOME')
       ?? defaultDataRoot,
     fullscreen: envFullscreen === undefined
-      ? false
+      ? multiplexerDefaultFullscreen(env)
       : parseBoolean(envFullscreen, 'DSH_OH_TUI_FULLSCREEN'),
     help: false,
     ...(envLang === undefined ? {} : { lang: language(envLang) }),

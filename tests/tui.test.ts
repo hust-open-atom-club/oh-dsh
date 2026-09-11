@@ -61,6 +61,34 @@ test('TUI arguments keep environment defaults behind explicit flags', () => {
 
   assert.equal(parseTuiArgs([], {}, '/default/workspace', '/default/home').fullscreen, false)
 
+  // Multiplexed panes answer the inline renderer's cursor/size probes
+  // differently, so an unchosen default flips to the alternate screen;
+  // explicit flags and env still win.
+  assert.equal(
+    parseTuiArgs([], { ZELLIJ: '1' }, '/default/workspace', '/default/home').fullscreen,
+    true,
+  )
+  assert.equal(
+    parseTuiArgs([], { TMUX: '/tmp/tmux-0/default,1,0' }, '/default/workspace', '/default/home').fullscreen,
+    true,
+  )
+  assert.equal(
+    parseTuiArgs([], { TERM: 'screen-256color' }, '/default/workspace', '/default/home').fullscreen,
+    true,
+  )
+  assert.equal(
+    parseTuiArgs(['--inline'], { ZELLIJ: '1' }, '/default/workspace', '/default/home').fullscreen,
+    false,
+  )
+  assert.equal(
+    parseTuiArgs([], { ZELLIJ: '1', DSH_OH_TUI_FULLSCREEN: '0' }, '/default/workspace', '/default/home').fullscreen,
+    false,
+  )
+  assert.equal(
+    parseTuiArgs([], { TERM: 'xterm-256color' }, '/default/workspace', '/default/home').fullscreen,
+    false,
+  )
+
   assert.equal(
     parseTuiArgs([], { OH_DSH_HOME: '/shared/home' }).dataRoot,
     '/shared/home',

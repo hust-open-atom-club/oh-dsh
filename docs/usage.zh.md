@@ -255,7 +255,9 @@ cd oh-dsh-tui-*/
 
 Windows 使用 `bin\ohdsh.cmd tui`。TUI 需要真实交互终端；默认从当前终端位置
 inline 启动，与 Codex 风格一致；需要 alternate screen 时显式传入
-`--fullscreen`。
+`--fullscreen`。在终端多路复用器（tmux、zellij、screen）内默认改用
+alternate screen——inline 帧锚定在复用窗格中会错位；`--inline` 仍可强制
+保留回滚区。
 
 ## 统一启动命令
 
@@ -280,7 +282,7 @@ TUI 常用选项：
 | `--resume` | 新会话 | 恢复指定 Session id |
 | `--lang` | 上游设置 | `zh` 或 `en` |
 | `--preset` | `standard` | 初始 Agent preset |
-| `--inline` | 开启 | 保留终端 scrollback，不使用 alternate screen |
+| `--inline` | 普通终端开启 | 保留终端 scrollback，不使用 alternate screen（多路复用器默认全屏） |
 
 ### Agent preset
 
