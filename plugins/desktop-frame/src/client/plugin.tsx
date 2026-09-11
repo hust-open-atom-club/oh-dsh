@@ -66,14 +66,16 @@ interface ClientContext {
   }
 }
 
-const SIDEBAR_MIN = 264
+// Codex-like proportions: a compact sidebar (~1/6 of a 1440 canvas) and a
+// review-weight right column; the center keeps its generous floor.
+const SIDEBAR_MIN = 232
 const SIDEBAR_MAX = 420
-const SIDEBAR_DEFAULT = 280
+const SIDEBAR_DEFAULT = 260
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_AUTO_COLLAPSE = 1024
 const RIGHTBAR_MIN = 300
 const RIGHTBAR_MAX = 560
-const RIGHTBAR_DEFAULT = 360
+const RIGHTBAR_DEFAULT = 420
 const RIGHTBAR_FULLSCREEN = RIGHTBAR_MAX
 const CENTER_MIN = 640
 

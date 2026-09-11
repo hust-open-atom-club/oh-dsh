@@ -76,7 +76,11 @@ import { DesktopUpdateManager, detectPackageType } from './update-manager.ts'
 import { scheduleImmediateUpdateInstall, singleFlight } from './update-lifecycle.ts'
 
 const PRODUCT_NAME = 'Oh-DSH Desktop'
-const DEFAULT_UI_ZOOM_FACTOR = 1.12
+// Zoom 1.0 keeps every device pixel integral on standard 1x/2x displays:
+// the Codex-finish hairlines (1px elevation rings) render as continuous
+// lines, exactly like the ChatGPT desktop they are modeled on. A fractional
+// factor (the previous 1.12) shimmers them into dashed fragments.
+const DEFAULT_UI_ZOOM_FACTOR = 1
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const PRODUCT_VERSION = resolveProductVersion(join(currentDir, '..'))
 const splashPath = join(currentDir, 'splash.html')
@@ -356,7 +360,15 @@ function createWindow(options: { preview?: boolean; title?: string } = {}): Brow
     show: false,
     title: options.title ?? PRODUCT_NAME,
     ...(process.platform === 'darwin'
-      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 16 } }
+      // ChatGPT desktop's own primary-window recipe: hiddenInset traffic
+      // lights over a 'menu' vibrancy material, so the web content shows
+      // through the titlebar region and the sidebar reaches the top edge.
+      ? {
+        titleBarStyle: 'hiddenInset' as const,
+        trafficLightPosition: { x: 16, y: 16 },
+        vibrancy: 'menu' as const,
+        acceptFirstMouse: true,
+      }
       : process.platform === 'win32'
         ? { autoHideMenuBar: true, frame: false }
         : {}),
