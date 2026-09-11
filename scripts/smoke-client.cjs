@@ -39,6 +39,11 @@ void app.whenReady().then(async () => {
     // visible (rc.5 behavior).
     show: true,
     webPreferences: {
+      // Throwaway partition: the runtime plants a dsh-auth-* cookie per boot
+      // and cookies are shared across loopback ports, so a persistent jar
+      // accumulates dead tokens run over run until bundle URLs trip the
+      // server's header limit (431). Each smoke run starts with a clean jar.
+      partition: 'oh-dsh-smoke',
       backgroundThrottling: false,
       contextIsolation: true,
       nodeIntegration: false,

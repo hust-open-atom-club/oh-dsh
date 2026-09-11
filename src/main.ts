@@ -729,6 +729,22 @@ function handleRuntimeExit(exit: RuntimeExit): void {
   })
 }
 
+/**
+ * The runtime plants one `dsh-auth-*` session cookie per boot on its loopback
+ * origin, and cookie storage is shared across ports. Dead tokens accumulate
+ * across launches until requests carrying the combined client-bundle URL
+ * exceed the runtime server's header limit (HTTP 431, blank shell). Drop
+ * them before a surface loads; the boot flow replants a live one.
+ */
+async function pruneRuntimeAuthCookies(origin: string): Promise<void> {
+  const { host, protocol } = new URL(origin)
+  const jar = session.defaultSession.cookies
+  const cookies = await jar.get({ url: `${protocol}//${host}` }).catch(() => [])
+  await Promise.all(cookies
+    .filter(cookie => cookie.name.startsWith('dsh-auth-'))
+    .map(cookie => jar.remove(`${protocol}//${host}`, cookie.name).catch(() => {})))
+}
+
 async function startRuntime(): Promise<void> {
   const info = desktopInfo()
   if (desktopReadOnly === false || !existsSync(join(info.dshHome, 'profiles', DESKTOP_PROFILE))) {
@@ -744,6 +760,7 @@ async function startRuntime(): Promise<void> {
   runtimeUrl = url
   runtimeOrigin = url.origin
   if (mainWindow === undefined || mainWindow.isDestroyed()) mainWindow = createWindow()
+  await pruneRuntimeAuthCookies(url.origin)
   await mainWindow.loadURL(url.href)
   flushQueuedPaths()
 }
@@ -793,6 +810,7 @@ async function startPreviewSurface(input: {
       title: `Preview ${input.pluginId} — ${PRODUCT_NAME}`,
     })
     previewWindow = window
+    await pruneRuntimeAuthCookies(url.origin)
     await window.loadURL(url.href)
     return {}
   } catch (error) {
