@@ -72,7 +72,9 @@ stdenv.mkDerivation rec {
     # level. A plain isolated install only links the assembly root's direct
     # dependencies, so transitive native packages (node-pty) never appeared
     # at the top level and the desktop/web staging's PTY alignment failed.
-    pnpm --filter @deepseek-ai/dsh deploy --prod --legacy $PWD/.deploy
+    # --offline: the sandbox has no network and deploy otherwise re-resolves
+    # registry metadata; the frozen install already populated the store.
+    pnpm --filter @deepseek-ai/dsh deploy --prod --legacy --offline --ignore-scripts $PWD/.deploy
     runHook postBuild
   '';
 
