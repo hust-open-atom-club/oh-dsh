@@ -313,7 +313,7 @@ HTTP(S) URL，即可使用同样的原生图片输入。
 
 Desktop 和 Web 内置
 [dsh-context](https://github.com/bowenliang123/dsh-context)（固定版本
-`v0.41.0`）插件。它提供 Context 面板，展示上下文容量、余量、组成、历史、事件与
+`v0.47.0`）插件。它提供 Context 面板，展示上下文容量、余量、组成、历史、事件与
 消息统计，并提供 `/context` 命令在会话内快速查看当前上下文组成。该插件只做只读
 洞察：通过 DSH 自身驱动的 projection 观察会话，不会改动对话内容。
 

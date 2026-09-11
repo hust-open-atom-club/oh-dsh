@@ -55,15 +55,15 @@ test('every surface patch ships the same DeepSeek advisory model catalog', () =>
   }
 })
 
-test('the default catalog adds DeepSeek-V4.1-Flash beside the pinned runtime models', () => {
+test('the default catalog adds the official DeepSeek-V4.1-Flash id beside the pinned runtime models', () => {
   const models = surfaceCatalogModels(SURFACE_PATCHES[0])
   assert.deepEqual(
     models.map(model => model.id),
     [
+      'deepseek-flash',
       'deepseek-v4-flash',
       'deepseek-v4-pro',
       'deepseek-v4-flash-vision-exp',
-      'deepseek-v4.1-flash-expires-on-0910',
     ],
   )
 
@@ -78,10 +78,23 @@ test('the default catalog adds DeepSeek-V4.1-Flash beside the pinned runtime mod
     }
   }
 
-  const v41 = models.find(model => model.id === 'deepseek-v4.1-flash-expires-on-0910')
-  assert.equal(v41?.name, 'DeepSeek-V4.1-Flash-Expires-On-0910')
+  const v41 = models.find(model => model.id === 'deepseek-flash')
+  assert.equal(v41?.name, 'DeepSeek-V4.1-Flash')
   assert.equal(v41?.contextWindow, 1000000)
   assert.deepEqual(v41?.inputModalities, ['text', 'image'])
   assert.equal(v41?.imagePixelBudget, 640000)
   assert.equal(v41?.imageMaxBytes, 1048576)
+})
+
+test('the TUI layer restates the upstream TUI keys its llm-deepseek row replaces', () => {
+  const rows = parse(readFileSync(join(root, 'plugins', 'tui', 'cordis.patch.yml'), 'utf8'), {
+    customTags: [jsExpressionTag],
+  }) as Array<{ id?: string, config?: { thinking?: string, reasoningEffort?: string, apiKeyEnv?: string } }>
+  const row = rows.find(entry => entry.id === 'llm-deepseek')
+  // A patch row replaces the whole config of the TUI bundle's own row, which
+  // pins the deployment's thinking defaults; dropping the keys would silently
+  // fall back to schema-less values on the terminal surface.
+  assert.equal(row?.config?.apiKeyEnv, 'DEEPSEEK_API_KEY')
+  assert.equal(row?.config?.thinking, 'enabled')
+  assert.equal(row?.config?.reasoningEffort, 'max')
 })

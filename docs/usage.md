@@ -359,7 +359,7 @@ the prompt to use the same native image input.
 
 Desktop and Web bundle
 [dsh-context](https://github.com/bowenliang123/dsh-context) (pinned release
-`v0.41.0`) as a built-in plugin. It contributes a Context panel with capacity,
+`v0.47.0`) as a built-in plugin. It contributes a Context panel with capacity,
 remaining, composition, history, event, and message statistics, and a
 `/context` command that summarizes the current context composition inside the
 conversation. The plugin is read-only insight: it observes the session through

@@ -76,31 +76,35 @@ let
       && base != "dist";
   };
 
+  # The fetchFromGitHub nar hashes below (betterSidebarSrc, tuiSrc,
+  # dshAuthSrc) and the fetchPnpmDeps hashes still carry the 0.1.2-alpha.3 /
+  # beta.4-era values: they must be refreshed from a real `nix build` on a
+  # nix-capable host (a mismatch fails the fetch and prints the new hash).
   betterSidebarSrc = pkgs.fetchFromGitHub {
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
-    rev = "9494774c4867cdb661c8f9a805c40f7982518868";
+    rev = "146840bb4f1b67e9b9ab8c556355613b20bd20e3";
     hash = "sha256-dm2wsVyjnXX6D4uvXMd971gM3o7Oh6gT7tK5do074fw=";
   };
   contextRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.41.0.tgz";
-    hash = "sha512-yPa+brCs/CKlH7bxIvAV3Q6MJzEXgTxqK0yap3tslBs022UKQNR1nV6HR+haPTK4B75BH2ujLYd3foH3vMjxCQ==";
+    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.47.0.tgz";
+    hash = "sha512-wymzyVR3fWpQeECZjfMn/LGB7x7nvWi0rU1vMAEUKf6T8uBe1vhnTySMCJER1MnOzI7wnX6vdvNfyBMLfx/4ZA==";
   };
   tuiSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
-    rev = "f7db605713a861b28c004b2dc18813bb74d61154";
+    rev = "1626398e079be1b5d8e92737f87bd02f865f2a53";
     hash = "sha256-cS+CHJoko+KLCmMZk8WUt2vxFkd2Pg6sSieTfvVStMU=";
   };
   dshAuthSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-auth";
-    rev = "4e7cba3854e8874c8114bac2133aba3a7e1a65fe";
+    rev = "94fdf81e775e8d884af4dfb64a94b617c3751936";
     hash = "sha256-H2h/yyg56pDMMnx3YvC5xxXdX4T80V2tz8A32vua2LU=";
   };
   tuiRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.0-beta.4.tgz";
-    hash = "sha512-+DAyd7uWgSibjxiTtC/SFODt/TdNrrmS9dSAYP53VNAhA6sFcJATp1qPNhG/31coVM+mb5HmZD5rwX60MC/cCQ==";
+    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.0.tgz";
+    hash = "sha512-0alYtPbQedsdojpywbfoRtQghJKnwg0aazIYDRyp9sXcdMoG3fSt53M91ttOvSraJr7vOYfgA+ZBpqckMqWv8g==";
   };
   dshAuthRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-auth/-/dsh-auth-0.1.0.tgz";

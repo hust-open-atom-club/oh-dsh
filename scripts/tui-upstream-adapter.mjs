@@ -31,7 +31,10 @@ function replaceLogoModule(path) {
 
   for (const marker of [
     'function capitalize(text) {',
-    'export function LogoV2({ model, effort, cwd, skipIntro = false, tip, whale = true, drift, }) {',
+    // v0.10.0 grew the signature (intro/whaleIdle/working) with the whale
+    // welcome rework; the replacement overlay keeps accepting the same
+    // extra props through JavaScript's silent-drop destructuring.
+    'export function LogoV2({ model, effort, cwd, skipIntro = false, intro, tip, whale = true, whaleIdle = true, working = false, drift, }) {',
   ]) {
     if (!source.includes(marker)) {
       throw new Error(`TUI upstream adapter seam changed: ${path}`)
@@ -140,8 +143,8 @@ function adaptChatStartupLayout(path) {
   )
   replaceOnce(
     path,
-    'flexDirection: "row", flexGrow: 1, flexShrink: 1, width: "100%", children:',
-    'flexDirection: "row", flexGrow: inlineLayout ? 0 : 1, flexShrink: inlineLayout ? 0 : 1, width: "100%", children:',
+    'flexDirection: "row", flexGrow: 1, flexShrink: 1, marginRight: -pageInsetX, children:',
+    'flexDirection: "row", flexGrow: inlineLayout ? 0 : 1, flexShrink: inlineLayout ? 0 : 1, marginRight: -pageInsetX, children:',
   )
   replaceOnce(
     path,
@@ -223,11 +226,8 @@ export function adaptTuiRendererPackage(packageDir) {
     "export const DATA_DIR = join(homeDir(), '.dsh-tui');",
     "export const DATA_DIR = process.env.OH_DSH_TUI_CONFIG_HOME ?? join(homeDir(), '.ohdsh', 'tui');",
   )
-  replaceOnce(
-    paths,
-    "export const LEGACY_DATA_DIR = join(homeDir(), '.dsh-cc');",
-    'export const LEGACY_DATA_DIR = DATA_DIR;',
-  )
+  // v0.10.0 retired the ~/.dsh-cc legacy-data migration wholesale, so the
+  // LEGACY_DATA_DIR export is gone; nothing else reads it.
 
   const logo = join(lib, 'components', 'LogoV2.js')
   replaceLogoModule(logo)

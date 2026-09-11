@@ -71,10 +71,14 @@ catalogs and asserts the V4.1 entry's facts, so the deliberate 3× repetition
 
 ## Consequences
 
-- All three surfaces list DeepSeek-V4.1-Flash by default; the model id embeds
-  its retirement date, so after 2026-09-10 the entry should be dropped from
-  all three layers (and the contract test) in one change — the id will keep
-  passing through to the endpoint either way.
+- All three surfaces list the V4.1 Flash entry by default. The original
+  stopgap id embedded its retirement date; on 2026-09-11 (see
+  [2026-09-11-dsh-0.1.2-rc.1-upgrade](../process/2026-09-11-dsh-0.1.2-rc.1-upgrade.md))
+  the entry was replaced by the official id `deepseek-flash` rather than
+  dropped, because the pinned runtime line (0.1.2-rc.1) still compiles a
+  three-model `DEFAULT_MODELS` — the layers are deleted wholesale when the
+  runtime that ships `deepseek-flash` natively (0.1.5-rc.1) becomes
+  reachable.
 - The entry list shadows the pinned runtime's `DEFAULT_MODELS`: a future
   runtime release that adds or retunes its own defaults will not surface here
   until the three rows are updated. That is the cost of a distribution-owned
