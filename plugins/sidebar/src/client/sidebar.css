@@ -60,7 +60,13 @@ html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-sidebar-root {
   );
   display: flex;
   align-items: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
   gap: 3px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  width: max-content;
   padding: 2px;
   border: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
   border-radius: 10px;
