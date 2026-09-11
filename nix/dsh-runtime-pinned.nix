@@ -67,15 +67,21 @@ stdenv.mkDerivation rec {
   buildPhase = ''
     runHook preBuild
     pnpm install --frozen-lockfile --ignore-scripts
+    # Produce the same deploy layout scripts/stage-dsh.mjs stages locally:
+    # the runtime's whole production closure hoisted at node_modules top
+    # level. A plain isolated install only links the assembly root's direct
+    # dependencies, so transitive native packages (node-pty) never appeared
+    # at the top level and the desktop/web staging's PTY alignment failed.
+    pnpm --filter @deepseek-ai/dsh deploy --prod --legacy $PWD/.deploy
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
     mkdir -p $out/lib/dsh
+    cp -r .deploy/lib .deploy/package.json .deploy/node_modules $out/lib/dsh/
     # 0.1.2 npm assemblies ship lib/ without the config/ tree rc.2 carried.
-    cp -r lib package.json node_modules $out/lib/dsh/
-    if [ -d config ]; then cp -r config $out/lib/dsh/; fi
+    if [ -d .deploy/config ]; then cp -r .deploy/config $out/lib/dsh/; fi
     runHook postInstall
   '';
 
