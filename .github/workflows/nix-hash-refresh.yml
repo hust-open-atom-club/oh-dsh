@@ -12,7 +12,7 @@ on:
 
 jobs:
   hashes:
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v30

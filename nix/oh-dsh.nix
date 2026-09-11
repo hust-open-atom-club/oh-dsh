@@ -76,15 +76,11 @@ let
       && base != "dist";
   };
 
-  # The fetchFromGitHub nar hashes below (betterSidebarSrc, tuiSrc,
-  # dshAuthSrc) and the fetchPnpmDeps hashes still carry the 0.1.2-alpha.3 /
-  # beta.4-era values: they must be refreshed from a real `nix build` on a
-  # nix-capable host (a mismatch fails the fetch and prints the new hash).
   betterSidebarSrc = pkgs.fetchFromGitHub {
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
     rev = "146840bb4f1b67e9b9ab8c556355613b20bd20e3";
-    hash = "sha256-dm2wsVyjnXX6D4uvXMd971gM3o7Oh6gT7tK5do074fw=";
+    hash = "sha256-2jUJgv8GHYZ+mSGjzToeqj66PxothU8jWwjsehRfx0E=";
   };
   contextRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.47.0.tgz";
@@ -94,13 +90,13 @@ let
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
     rev = "1626398e079be1b5d8e92737f87bd02f865f2a53";
-    hash = "sha256-cS+CHJoko+KLCmMZk8WUt2vxFkd2Pg6sSieTfvVStMU=";
+    hash = "sha256-i49UdJ/uHCB1G7Jm7MPy/HDgbrCLUJjY9J1sl0xL6Mw=";
   };
   dshAuthSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-auth";
     rev = "94fdf81e775e8d884af4dfb64a94b617c3751936";
-    hash = "sha256-H2h/yyg56pDMMnx3YvC5xxXdX4T80V2tz8A32vua2LU=";
+    hash = "sha256-gSkDJnjm4N2qOqnEstDU12S4D9FvomrxB9UVwlFN2M4=";
   };
   tuiRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.0.tgz";
