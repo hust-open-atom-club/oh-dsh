@@ -284,6 +284,7 @@ try {
     env: {
       ...runtimeEnvironment,
       DSH_SMOKE_RUNTIME_URL: base.href,
+      OH_DSH_SMOKE_WORKSPACE: smokeRoot,
     },
     timeout: 30_000,
   })

@@ -20,7 +20,12 @@ const emptyMarketplaceSnapshot = Object.freeze({
 })
 
 contextBridge.exposeInMainWorld('dshDesktop', Object.freeze({
-  chooseWorkspace: async () => [],
+  // The 0.1.5 workspace picker needs a real directory from the native
+  // chooser; answer with the smoke's own workspace root.
+  chooseWorkspace: async () => {
+    const workspace = process.env.OH_DSH_SMOKE_WORKSPACE
+    return workspace === undefined || workspace === '' ? [] : [workspace]
+  },
   getInfo: async () => ({
     appDataPath: '',
     dshHome: '',
