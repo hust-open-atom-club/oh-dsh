@@ -72,6 +72,21 @@ function tuiColors(
     fastModeShimmer: value('--dsw-alias-button-primary-hover'),
     briefLabelYou: value('--dsw-alias-brand-text'),
     briefLabelClaude: value('--dsw-alias-brand-primary'),
+    // Markdown fenced-code syntax tokens (the renderer maps highlight.js
+    // classes onto these theme keys). Without them the palette inherits the
+    // terminal builtin's low-contrast grays — comments and punctuation sit
+    // near 3:1 on a dark background and plaintext blocks lose the skin —
+    // so every skin pins them to its shared label/state tokens instead.
+    syntaxKeyword: value('--dsw-alias-brand-primary'),
+    syntaxString: value('--dsw-alias-state-success-primary'),
+    syntaxComment: value('--dsw-alias-label-tertiary'),
+    syntaxNumber: value('--dsw-alias-state-warn-primary'),
+    syntaxFunction: value('--dsw-alias-button-primary-hover'),
+    syntaxType: merged,
+    syntaxVariable: value('--dsw-alias-label-primary'),
+    syntaxOperator: value('--dsw-alias-label-secondary'),
+    syntaxPunctuation: value('--dsw-alias-label-secondary'),
+    syntaxConstant: value('--dsw-alias-state-error-primary'),
   })
 }
 
