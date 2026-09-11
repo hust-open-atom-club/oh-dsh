@@ -257,7 +257,8 @@ Windows 使用 `bin\ohdsh.cmd tui`。TUI 需要真实交互终端；默认从当
 inline 启动，与 Codex 风格一致；需要 alternate screen 时显式传入
 `--fullscreen`。在终端多路复用器（tmux、zellij、screen）内默认改用
 alternate screen——inline 帧锚定在复用窗格中会错位；`--inline` 仍可强制
-保留回滚区。
+保留回滚区。切换多路复用器标签页再返回时可能残留堆叠旧帧；按
+`Ctrl+L` 清屏并重绘。
 
 ## 统一启动命令
 

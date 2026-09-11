@@ -32,6 +32,13 @@ over the new default. The `--help` text states both defaults.
 - tmux/zellij/screen users get a correctly laid-out TUI with no flags;
   scrolling happens inside the alternate screen instead of the host
   scrollback, which is the standard trade for multiplexer sessions.
+- A multiplexer tab switch can still leave stale stacked frames when the
+  pane returns: while hidden, the pane's queued writes replay and the
+  renderer's frame anchor can desync from the physical screen (observed
+  under zellij on v0.10.0; upstream family: dsh-TUI#490). The renderer's
+  built-in recovery is Ctrl+L (`redraw` action → `forceRedraw()`), which
+  clears the physical screen and repaints atomically; usage docs state it
+  beside the multiplexer default. Root-cause fix belongs upstream.
 - `--inline` remains available for users who want scrollback inside a
   multiplexer and accept the anchoring quirks.
 - The fix ships with the release carrying it; the installed 0.2.1 keeps

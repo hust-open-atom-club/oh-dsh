@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-11-tui-multiplexer-fullscreen.md
-2026-09-11-tui-multiplexer-fullscreen.md: 7769c447c70cdac16a054369bd87e7f16092b511
-2026-09-11-tui-multiplexer-fullscreen.zh.md: e68adce754d224e7caa6efaadade311dd8f8307c
+2026-09-11-tui-multiplexer-fullscreen.md: f790de2901bb57c116baf68c59a8a77edd745e19
+2026-09-11-tui-multiplexer-fullscreen.zh.md: 7ff8fd271bb31057d077b152ef94135571f0523b

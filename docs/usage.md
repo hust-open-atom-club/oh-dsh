@@ -296,7 +296,9 @@ It keeps the current terminal position by default, matching the Codex-style
 inline startup; pass `--fullscreen` to use the alternate screen. Inside a
 terminal multiplexer (tmux, zellij, screen) the default flips to the
 alternate screen, because inline frame anchoring misplaces the composer in
-multiplexed panes; `--inline` still forces scrollback.
+multiplexed panes; `--inline` still forces scrollback. Switching a
+multiplexer tab away and back can leave stale stacked frames; press
+`Ctrl+L` to clear and repaint the screen.
 
 ## Unified commands
 
