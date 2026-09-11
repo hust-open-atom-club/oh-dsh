@@ -66,24 +66,24 @@ stdenv.mkDerivation rec {
 
   buildPhase = ''
     runHook preBuild
-    pnpm install --frozen-lockfile --ignore-scripts
-    # Produce the same deploy layout scripts/stage-dsh.mjs stages locally:
-    # the runtime's whole production closure hoisted at node_modules top
-    # level. A plain isolated install only links the assembly root's direct
+    # Install with the hoisted linker so the derivation carries the layout
+    # scripts/stage-dsh.mjs stages locally (`pnpm deploy --prod --legacy`):
+    # the runtime's whole production closure sits at node_modules top level.
+    # The default isolated linker only links the assembly root's direct
     # dependencies, so transitive native packages (node-pty) never appeared
     # at the top level and the desktop/web staging's PTY alignment failed.
-    # --offline: the sandbox has no network and deploy otherwise re-resolves
-    # registry metadata; the frozen install already populated the store.
-    pnpm --filter @deepseek-ai/dsh deploy --prod --legacy --offline --ignore-scripts $PWD/.deploy
+    # Deploy itself cannot run here: its legacy implementation re-resolves
+    # registry metadata, which the offline sandbox cannot fetch.
+    pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
     mkdir -p $out/lib/dsh
-    cp -r .deploy/lib .deploy/package.json .deploy/node_modules $out/lib/dsh/
+    cp -r lib package.json node_modules $out/lib/dsh/
     # 0.1.2 npm assemblies ship lib/ without the config/ tree rc.2 carried.
-    if [ -d .deploy/config ]; then cp -r .deploy/config $out/lib/dsh/; fi
+    if [ -d config ]; then cp -r config $out/lib/dsh/; fi
     runHook postInstall
   '';
 
