@@ -1172,6 +1172,49 @@ function installDesktopPackages(surface = 'all') {
     ...installedVersions,
   }
   writeFileSync(cliManifestPath, JSON.stringify(cliManifest, undefined, 2) + '\n')
+  writeDesktopProfileLauncher()
+}
+
+/**
+ * The 0.1.5 dsh CLI reserves `--profile desktop` for the official DSH
+ * Desktop application and rejects the name in its argument parser, so the
+ * Oh-DSH Electron host drives the same programmatic entries the CLI wraps:
+ * `runProfile` for boot and `runPlugin` for profile plugin management. The
+ * entries live in build-hashed chunks, so the launcher resolves them by
+ * prefix at load time. Everything it imports resolves from the staged
+ * runtime's own tree.
+ */
+function writeDesktopProfileLauncher() {
+  const launcher = join(runtime, 'lib', 'ohdsh-desktop.mjs')
+  writeFileSync(launcher, `import { readdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
+
+const lib = dirname(fileURLToPath(import.meta.url))
+
+async function importExport(prefix, name) {
+  const candidates = readdirSync(lib).filter(file => file.startsWith(prefix)).sort()
+  for (const file of candidates) {
+    const module = await import(join(lib, file))
+    if (typeof module[name] === 'function') return module[name]
+  }
+  throw new Error(\`ohdsh desktop launcher: no \${prefix}* chunk exports \${name}\`)
+}
+
+const argv = process.argv.slice(2)
+if (argv[0] === 'plugin') {
+  const runPlugin = await importExport('plugin-', 'runPlugin')
+  process.exit(runPlugin('desktop', argv.slice(1)))
+}
+const runProfile = await importExport('profile-boot-', 'runProfile')
+await runProfile({
+  environment: loadLayeredEnv('dsh'),
+  profile: 'desktop',
+  patchFiles: [],
+  args: argv,
+})
+`)
 }
 
 

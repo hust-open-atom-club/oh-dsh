@@ -240,8 +240,10 @@ function runtimeOptions(): DshRuntimeOptions {
     throw new Error(`packaged DSH CLI is missing: ${paths.cliEntry}`)
   }
   return {
-    args: ['--profile', DESKTOP_PROFILE],
-    cliEntry: paths.cliEntry,
+    // The 0.1.5 CLI reserves `--profile desktop` for the official DSH
+    // Desktop; the staged launcher drives the same programmatic boot.
+    args: [],
+    cliEntry: paths.desktopBootEntry,
     cwd: workspaceRoot,
     env: runtimeEnvironment(paths),
     nodeBinary: paths.nodeBinary,
@@ -272,8 +274,9 @@ function previewRuntimeOptions(input: {
     })
     : undefined
   return {
-    args: ['--profile', DESKTOP_PROFILE],
-    cliEntry: paths.cliEntry,
+    // Same programmatic desktop-profile boot as the main runtime.
+    args: [],
+    cliEntry: paths.desktopBootEntry,
     cwd: workspaceRoot,
     env: {
       ...runtimeEnvironment(paths, {
@@ -884,7 +887,8 @@ async function installLocalPlugin(): Promise<void> {
     await runtime?.stop()
     runtime = undefined
     const options = runtimeOptions()
-    await runDshCommand(options, ['plugin', '--profile', DESKTOP_PROFILE, 'add', pluginPath])
+    // The staged launcher pins the desktop profile; only pnpm args follow.
+    await runDshCommand(options, ['plugin', 'add', pluginPath])
     await startRuntime()
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)

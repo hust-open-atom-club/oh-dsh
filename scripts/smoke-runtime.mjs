@@ -24,7 +24,7 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const resources = resolve(process.argv[2] ?? join(root, '.stage'))
 const paths = bundledRuntimePaths(resources)
-const { cliEntry, nodeBinary } = paths
+const { cliEntry, desktopBootEntry, nodeBinary } = paths
 const smokeRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-desktop-smoke-'))
 const dshHome = join(smokeRoot, 'dsh-home')
 const lines = []
@@ -68,7 +68,8 @@ writeFileSync(join(pluginRoot, 'package.json'), JSON.stringify({
 writeFileSync(join(pluginRoot, 'index.js'), 'export function apply() {}\n')
 writeFileSync(join(pluginRoot, 'cordis.patch.yml'), '[]\n')
 const install = spawnSync(nodeBinary, [
-  cliEntry, 'plugin', '--profile', 'desktop', 'add', pluginRoot,
+  // The staged launcher owns the reserved desktop profile on 0.1.5.
+  desktopBootEntry, 'plugin', 'add', pluginRoot,
 ], {
   cwd: smokeRoot,
   encoding: 'utf8',
@@ -103,7 +104,7 @@ git('add', 'review-smoke.txt')
 git('commit', '-m', 'review smoke baseline')
 writeFileSync(join(smokeRoot, 'review-smoke.txt'), 'after\n')
 
-const child = spawn(nodeBinary, [cliEntry, '--profile', 'desktop'], {
+const child = spawn(nodeBinary, [desktopBootEntry], {
   cwd: smokeRoot,
   env: runtimeEnvironment,
   stdio: ['ignore', 'pipe', 'pipe'],
