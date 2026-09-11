@@ -1186,6 +1186,9 @@ function installDesktopPackages(surface = 'all') {
  */
 function writeDesktopProfileLauncher() {
   const launcher = join(runtime, 'lib', 'ohdsh-desktop.mjs')
+  // The launcher is Oh-DSH's own artifact: guarantee its directory exists even
+  // when the staged runtime tree carries no lib/ chunk of its own.
+  mkdirSync(dirname(launcher), { recursive: true })
   writeFileSync(launcher, `import { readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
