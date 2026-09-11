@@ -120,7 +120,13 @@ test('desktop skins are namespaced and keep every app surface on one opaque base
     assert.match(skin.id, /^oh-dsh-skin-/)
     assert.ok(Object.keys(skin.tokens).length >= 30)
     assert.match(skin.tokens['--dsw-alias-bg-base'] ?? '', /^#[0-9a-f]{6}$/i)
-    assert.equal(skin.tokens['--dsw-alias-bg-base'], skin.tokens['--dsw-specific-sidebar-fill'])
+    // Luminance ladder: the sidebar fill is its own opaque step away from the
+    // canvas so region separation survives without borders (Codex-like), and
+    // every skin pins the hover/active rows explicitly.
+    assert.match(skin.tokens['--dsw-specific-sidebar-fill'] ?? '', /^#[0-9a-f]{6}$/i)
+    assert.notEqual(skin.tokens['--dsw-specific-sidebar-fill'], skin.tokens['--dsw-alias-bg-base'])
+    assert.ok(skin.tokens['--dsw-specific-sidebar-nav-item-hover'] !== undefined)
+    assert.ok(skin.tokens['--dsw-specific-sidebar-nav-item-active'] !== undefined)
     assert.equal(skin.css, undefined)
   }
 })

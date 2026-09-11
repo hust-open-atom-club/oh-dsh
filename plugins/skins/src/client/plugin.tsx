@@ -1,6 +1,7 @@
 import { defineStore } from '@deepseek-ai/dsh-client-store'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
 import desktopSkinsCss from './skins.css'
+import finishCss from './finish.css'
 import {
   DESKTOP_SKINS_MESSAGES,
   type DesktopSkinsMessage,
@@ -141,6 +142,16 @@ function installSettingsStyles(): () => void {
   return () => { style.remove() }
 }
 
+const FINISH_STYLE_ATTRIBUTE = 'data-oh-dsh-skins-finish'
+
+function installFinishStyles(): () => void {
+  const style = document.createElement('style')
+  style.setAttribute(FINISH_STYLE_ATTRIBUTE, 'true')
+  style.textContent = finishCss
+  document.head.append(style)
+  return () => { style.remove() }
+}
+
 function syncActions(
   actions: BoundSkinActions | undefined,
   snapshot: DesktopSkinsSnapshot,
@@ -161,6 +172,10 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(
     () => typeof document === 'undefined' ? undefined : installSettingsStyles(),
     'oh-dsh-skins: settings styles',
+  )
+  ctx.effect(
+    () => typeof document === 'undefined' ? undefined : installFinishStyles(),
+    'oh-dsh-skins: shared finish layer',
   )
 
   const storage = typeof fetch === 'undefined'
