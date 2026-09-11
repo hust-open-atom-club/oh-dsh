@@ -1,5 +1,12 @@
 declare module '@deepseek-ai/dsh-client-store' {
+  export interface EngineStoreInstance<State> {
+    getSnapshot(): State
+    subscribe(listener: () => void): () => void
+    actions: Record<string, (...args: any[]) => void>
+  }
+
   export interface EngineStoreHandle<State> {
+    create(scopeKey?: string): EngineStoreInstance<State>
     readonly __state?: State
   }
 

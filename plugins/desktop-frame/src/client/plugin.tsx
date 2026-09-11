@@ -25,21 +25,27 @@ interface SessionState {
 
 interface DesktopLayoutActions {
   setSidebar(width: number): void
-  setDetails(width: number): void
+  setRightbar(width: number): void
   toggleSidebar(): void
   setNarrow(narrow: boolean): void
-  openDetails(): void
-  closeDetails(): void
+  openRightbar(fullscreen?: boolean): void
+  closeRightbar(): void
+  selectPanel(panelId: string): void
+  beginNavigation(): void
+  retainMainPanels(panelIds: readonly string[]): void
+}
+
+/** The panel-info face the 0.1.5 shell and slot entries read through provideRoot. */
+interface PanelInfo {
+  activePanelId: string
 }
 
 interface DesktopFrameProps {
   useStore<T>(selector: (state: LayoutState) => T): T
   useSessions<T>(selector: (state: SessionState) => T): T
+  usePanelInfo<T>(selector: (info: PanelInfo) => T): T
   actions: DesktopLayoutActions
-  renderSlot(name: string, owner: Record<string, unknown>): ReactNode
-  // Standard share since the 0.1.2 slot system: strict session-scoped child
-  // slots (details) only render inside this current-session binding.
-  SessionProvider: (props: { children?: ReactNode }) => JSX.Element
+  renderSlot(name: string, owner: Record<string, unknown>, options?: { entryKey?: string }): ReactNode
 }
 
 interface ClientContext {
@@ -51,6 +57,9 @@ interface ClientContext {
   }
   slots: {
     register(options: Record<string, unknown>, component: unknown): () => void
+    provideRoot(options: Record<string, unknown>): () => void
+    entries(name: string): Array<{ options: { key?: string } }>
+    subscribe(name: string, listener: () => void): () => void
   }
   theme: {
     getTheme(): ThemeSnapshot
@@ -62,61 +71,66 @@ const SIDEBAR_MAX = 420
 const SIDEBAR_DEFAULT = 280
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_AUTO_COLLAPSE = 1024
-const DETAILS_MIN = 300
-const DETAILS_MAX = 520
-const DETAILS_DEFAULT = 360
+const RIGHTBAR_MIN = 300
+const RIGHTBAR_MAX = 560
+const RIGHTBAR_DEFAULT = 360
+const RIGHTBAR_FULLSCREEN = RIGHTBAR_MAX
 const CENTER_MIN = 640
 
 type LayoutState = {
   sidebar: number
-  details: number
+  rightbar: number
+  activePanelId: string | undefined
   narrow: boolean
   narrowExpanded: boolean
 }
 
 type LayoutActions = {
   setSidebar(draft: LayoutState, width: number): void
-  setDetails(draft: LayoutState, width: number): void
+  setRightbar(draft: LayoutState, width: number): void
   toggleSidebar(draft: LayoutState): void
   setNarrow(draft: LayoutState, narrow: boolean): void
-  openDetails(draft: LayoutState): void
-  closeDetails(draft: LayoutState): void
+  openRightbar(draft: LayoutState, fullscreen?: boolean): void
+  closeRightbar(draft: LayoutState): void
+  selectPanel(draft: LayoutState, panelId: string): void
+  beginNavigation(draft: LayoutState): void
+  retainMainPanels(draft: LayoutState, panelIds: readonly string[]): void
 }
 
 function clampWidth(width: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(width)))
 }
 
-function computeColumns(viewport: number, sidebar: number, details: number): {
+function computeColumns(viewport: number, sidebar: number, rightbar: number): {
   sidebar: number
   center: number
-  details: number
+  rightbar: number
 } {
   const resolvedSidebar = sidebar === 0
     ? SIDEBAR_COLLAPSED
     : clampWidth(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
-  const preferredDetails = details === 0 ? 0 : clampWidth(details, DETAILS_MIN, DETAILS_MAX)
-  if (resolvedSidebar + preferredDetails + CENTER_MIN <= viewport) {
+  const preferredRightbar = rightbar === 0 ? 0 : clampWidth(rightbar, RIGHTBAR_MIN, RIGHTBAR_MAX)
+  if (resolvedSidebar + preferredRightbar + CENTER_MIN <= viewport) {
     return {
       sidebar: resolvedSidebar,
-      center: viewport - resolvedSidebar - preferredDetails,
-      details: preferredDetails,
+      center: viewport - resolvedSidebar - preferredRightbar,
+      rightbar: preferredRightbar,
     }
   }
-  const resolvedDetails = preferredDetails === 0
+  const resolvedRightbar = preferredRightbar === 0
     ? 0
-    : Math.max(DETAILS_MIN, viewport - resolvedSidebar - CENTER_MIN)
-  if (resolvedSidebar + resolvedDetails + CENTER_MIN <= viewport) {
+    : Math.max(RIGHTBAR_MIN, viewport - resolvedSidebar - CENTER_MIN)
+  if (resolvedSidebar + resolvedRightbar + CENTER_MIN <= viewport) {
     return {
       sidebar: resolvedSidebar,
       center: CENTER_MIN,
-      details: resolvedDetails,
+      rightbar: resolvedRightbar,
     }
   }
   return {
     sidebar: resolvedSidebar,
     center: Math.max(0, viewport - resolvedSidebar),
-    details: 0,
+    rightbar: 0,
   }
 }
 
@@ -124,13 +138,14 @@ function createDesktopLayoutStore() {
   return defineStore<LayoutState>({
     init: () => ({
       sidebar: SIDEBAR_DEFAULT,
-      details: 0,
+      rightbar: 0,
+      activePanelId: undefined,
       narrow: false,
       narrowExpanded: false,
     }),
     actions: {
       setSidebar: (draft, width) => { draft.sidebar = clampWidth(width, SIDEBAR_MIN, SIDEBAR_MAX) },
-      setDetails: (draft, width) => { draft.details = clampWidth(width, DETAILS_MIN, DETAILS_MAX) },
+      setRightbar: (draft, width) => { draft.rightbar = clampWidth(width, RIGHTBAR_MIN, RIGHTBAR_MAX) },
       toggleSidebar: draft => {
         if (draft.narrow) draft.narrowExpanded = !draft.narrowExpanded
         else draft.sidebar = draft.sidebar === 0 ? SIDEBAR_DEFAULT : 0
@@ -140,28 +155,54 @@ function createDesktopLayoutStore() {
         draft.narrow = narrow
         draft.narrowExpanded = false
       },
-      openDetails: draft => { if (draft.details === 0) draft.details = DETAILS_DEFAULT },
-      closeDetails: draft => { draft.details = 0 },
+      openRightbar: (draft, fullscreen) => {
+        if (draft.rightbar === 0) draft.rightbar = fullscreen === true ? RIGHTBAR_FULLSCREEN : RIGHTBAR_DEFAULT
+      },
+      closeRightbar: draft => { draft.rightbar = 0 },
+      selectPanel: (draft, panelId) => { draft.activePanelId = panelId },
+      beginNavigation: _draft => {
+        // The 0.1.5 layout face reserves this seam for navigation-time
+        // panel handling; the Oh-DSH frame keeps a single selection.
+      },
+      retainMainPanels: (draft, panelIds) => {
+        if (draft.activePanelId !== undefined && !panelIds.includes(draft.activePanelId)) {
+          draft.activePanelId = undefined
+        }
+      },
     },
   })
 }
 
 interface LayoutService {
   toggleSidebar(): void
-  openDetails(): void
-  closeDetails(): void
+  openRightbar(track?: unknown, fullscreen?: boolean): void
+  closeRightbar(): void
+  selectPanel(panelId: string): void
+  beginNavigation(): void
 }
 
 class DesktopLayoutController implements LayoutService {
   private actions: DesktopLayoutActions | undefined
+  private readonly hasMainPanel: (panelId: string) => boolean
+
+  constructor(hasMainPanel: (panelId: string) => boolean) {
+    this.hasMainPanel = hasMainPanel
+  }
 
   attach(actions: DesktopLayoutActions): void {
     this.actions = actions
   }
 
   toggleSidebar(): void { this.require().toggleSidebar() }
-  openDetails(): void { this.require().openDetails() }
-  closeDetails(): void { this.require().closeDetails() }
+  openRightbar(_track?: unknown, fullscreen?: boolean): void { this.require().openRightbar(fullscreen) }
+  closeRightbar(): void { this.require().closeRightbar() }
+  beginNavigation(): void { this.require().beginNavigation() }
+
+  selectPanel(panelId: string): void {
+    if (panelId === 'conversation' || this.hasMainPanel(panelId)) {
+      this.require().selectPanel(panelId)
+    }
+  }
 
   private require(): DesktopLayoutActions {
     if (this.actions === undefined) throw new Error('desktop-frame: layout actions are not attached')
@@ -171,7 +212,7 @@ class DesktopLayoutController implements LayoutService {
 
 function DragHandle(props: {
   left: number
-  side: 'sidebar' | 'details'
+  side: 'sidebar' | 'rightbar'
   onStart(): void
   onDrag(delta: number): void
   onEnd(): void
@@ -228,35 +269,28 @@ function DragHandle(props: {
 
 function DesktopFrame(props: DesktopFrameProps): JSX.Element {
   const panels = props.useStore(state => state)
-  const detailsSession = props.useSessions(state => {
+  const activePanelId = props.usePanelInfo(info => info.activePanelId) ?? 'conversation'
+  const rightbarSession = props.useSessions(state => {
     const current = state.current
     return current !== undefined && state.byId[current]?.blank === false ? current : undefined
   })
   const frameRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState(() => window.innerWidth)
   const [dragging, setDragging] = useState(false)
-  const lastSession = useRef(detailsSession)
   const sidebarBase = useRef(0)
-  const detailsBase = useRef(0)
+  const rightbarBase = useRef(0)
   const cols = computeColumns(
     viewport,
     viewport < SIDEBAR_AUTO_COLLAPSE
       ? (!panels.narrowExpanded ? 0 : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar)
       : panels.sidebar,
-    detailsSession === undefined ? 0 : panels.details,
+    rightbarSession === undefined ? 0 : panels.rightbar,
   )
   const sidebarCollapsed = viewport < SIDEBAR_AUTO_COLLAPSE
     ? !panels.narrowExpanded
     : panels.sidebar === 0
   const colsRef = useRef(cols)
   colsRef.current = cols
-  useLayoutEffect(() => {
-    if (detailsSession === undefined) return
-    if (lastSession.current !== undefined && lastSession.current !== detailsSession) {
-      props.actions.closeDetails()
-    }
-    lastSession.current = detailsSession
-  }, [detailsSession, props.actions])
   useLayoutEffect(() => {
     const element = frameRef.current
     if (element === null) return
@@ -275,39 +309,45 @@ function DesktopFrame(props: DesktopFrameProps): JSX.Element {
     }
   }, [])
   useEffect(() => { props.actions.setNarrow(viewport < SIDEBAR_AUTO_COLLAPSE) }, [props.actions, viewport])
-  // Publish the details column width on the root element: floating chrome
+  // Publish the rightbar column width on the root element: floating chrome
   // lives outside the frame, so it can only inherit the value from there.
   useEffect(() => {
     const root = document.documentElement
-    root.style.setProperty('--oh-dsh-details-width', `${cols.details}px`)
+    root.style.setProperty('--oh-dsh-details-width', `${cols.rightbar}px`)
     return () => { root.style.removeProperty('--oh-dsh-details-width') }
-  }, [cols.details])
+  }, [cols.rightbar])
   // An active session puts the conversation top bar's own controls (Session
   // log) in the top-right corner; only then does floating chrome need to step
   // aside from it.
   useEffect(() => {
     const root = document.documentElement
-    if (detailsSession === undefined) delete root.dataset.ohDshSessionActive
+    if (rightbarSession === undefined) delete root.dataset.ohDshSessionActive
     else root.dataset.ohDshSessionActive = 'true'
     return () => { delete root.dataset.ohDshSessionActive }
-  }, [detailsSession])
+  }, [rightbarSession])
   return (
     <div
       ref={frameRef}
       className="oh-dsh-desktop-frame"
       data-sidebar-collapsed={sidebarCollapsed || undefined}
-      data-details-collapsed={cols.details === 0 || undefined}
+      data-details-collapsed={cols.rightbar === 0 || undefined}
       data-dragging={dragging || undefined}
-      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
+      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.rightbar}px` }}
     >
       <div className="oh-dsh-desktop-frame-sidebar">
         <div className="oh-dsh-desktop-frame-sidebar-content">
           {props.renderSlot('sidebar', { collapsed: sidebarCollapsed, width: cols.sidebar })}
         </div>
       </div>
-      <div className="oh-dsh-desktop-frame-center">{props.renderSlot('conversation', {})}</div>
+      <div className="oh-dsh-desktop-frame-center">
+        {props.renderSlot('main', {}, { entryKey: activePanelId })}
+      </div>
       <div className="oh-dsh-desktop-frame-details">
-        <props.SessionProvider>{props.renderSlot('details', {})}</props.SessionProvider>
+        {props.renderSlot('rightbar', {
+          width: cols.rightbar,
+          viewportWidth: viewport,
+          canShow: cols.rightbar > 0,
+        })}
       </div>
       <div className="oh-dsh-desktop-frame-overlay" data-shell-overlay>{props.renderSlot('shell.overlay', {})}</div>
       {!sidebarCollapsed && (
@@ -319,12 +359,12 @@ function DesktopFrame(props: DesktopFrameProps): JSX.Element {
           onEnd={() => { setDragging(false) }}
         />
       )}
-      {cols.details > 0 && (
+      {cols.rightbar > 0 && (
         <DragHandle
-          side="details"
-          left={viewport - cols.details}
-          onStart={() => { detailsBase.current = colsRef.current.details; setDragging(true) }}
-          onDrag={delta => { props.actions.setDetails(detailsBase.current - delta) }}
+          side="rightbar"
+          left={viewport - cols.rightbar}
+          onStart={() => { rightbarBase.current = colsRef.current.rightbar; setDragging(true) }}
+          onDrag={delta => { props.actions.setRightbar(rightbarBase.current - delta) }}
           onEnd={() => { setDragging(false) }}
         />
       )}
@@ -335,7 +375,6 @@ function DesktopFrame(props: DesktopFrameProps): JSX.Element {
 export const inject = ['slots', 'theme']
 
 export function apply(ctx: ClientContext): void {
-  const layout = new DesktopLayoutController()
   ctx.effect(() => {
     const style = document.createElement('style')
     style.dataset.ohDshDesktopFrame = 'true'
@@ -344,24 +383,46 @@ export function apply(ctx: ClientContext): void {
     const presenter = new DesktopFrameThemePresenter()
     presenter.apply(ctx.theme.getTheme())
     const offTheme = ctx.on('theme/change', (snapshot: ThemeSnapshot) => { presenter.apply(snapshot) })
+    // One root store instance for the whole frame; the slot system hands the
+    // same handle its scoped `create` calls would get.
+    const handle = createDesktopLayoutStore()
+    const instance = handle.create()
+    const store = { ...handle, create: () => instance }
+    // The 0.1.5 shell reads panel info through the root hooks; without this
+    // provider every slot entry calling usePanelInfo crashes.
+    const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: {
+      getSnapshot: (): PanelInfo => ({ activePanelId: instance.getSnapshot().activePanelId ?? 'conversation' }),
+      subscribe: (listener: () => void) => instance.subscribe(listener),
+    } } })
+    const layout = new DesktopLayoutController(panelId =>
+      ctx.slots.entries('main').some(entry => entry.options.key === panelId))
     const disposeLayout = ctx.reflect.provide('layout', layout)
     const disposeRoot = ctx.slots.register({
       name: 'root',
+      locale: 'common',
       children: {
         sidebar: { kind: 'single', scope: 'root' },
-        conversation: { kind: 'single', scope: 'session-maybe' },
-        details: { kind: 'single', scope: 'session' },
+        main: { kind: 'keyed', scope: 'root' },
+        rightbar: { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
       },
-      store: createDesktopLayoutStore,
+      store,
       inject: (actions: DesktopLayoutActions) => {
         layout.attach(actions)
         return {}
       },
     }, DesktopFrame)
+    const disposeRetain = ctx.slots.subscribe('main', () => {
+      void instance.actions.retainMainPanels?.(
+        ctx.slots.entries('main')
+          .flatMap(entry => entry.options.key === undefined ? [] : [entry.options.key]),
+      )
+    })
     return () => {
+      disposeRetain()
       disposeRoot()
       if (typeof disposeLayout === 'function') void disposeLayout()
+      disposePanelInfo()
       offTheme()
       presenter.dispose()
       style.remove()
