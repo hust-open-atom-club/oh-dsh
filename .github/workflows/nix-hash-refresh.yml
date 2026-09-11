@@ -1,8 +1,9 @@
 name: Nix hash refresh (temporary)
 
 # One-off helper for the 0.1.2-rc.1 upgrade PR: computes the fixed-output
-# hashes the nix assembly needs after the source pins moved. Prints each
-# hash as SRI; delete this workflow once the values land in nix/*.nix.
+# hashes the nix assembly needs after the source pins moved. Dumps raw
+# output (no filtering) so a single run yields every value; delete this
+# workflow once the values land in nix/*.nix.
 
 on:
   workflow_dispatch:
@@ -22,7 +23,7 @@ jobs:
           set -euo pipefail
           fetch() {
             echo "### $1"
-            nix store prefetch-file --unpack --hash-type sha256 "$2" 2>&1 | grep -oE 'hash: .*' || true
+            nix store prefetch-file --unpack --hash-type sha256 "$2" 2>&1 || true
           }
           fetch better-sidebar https://github.com/omdsh-dev/DSH-better-sidebar/archive/146840bb4f1b67e9b9ab8c556355613b20bd20e3.tar.gz
           fetch dsh-TUI https://github.com/ccch1mneyyy/dsh-TUI/archive/1626398e079be1b5d8e92737f87bd02f865f2a53.tar.gz
@@ -31,10 +32,9 @@ jobs:
           fetch dsh-std https://github.com/Yan-Zero/dsh-std/archive/614dfa1ac168db79fcf4577cf0ebb34e2e3b944b.tar.gz
       - name: Surface the pnpmDeps hashes from real builds
         run: |
-          set -euo pipefail
-          # Each fixed-output mismatch prints the actual hash; iterate until
-          # the build succeeds or only non-hash failures remain.
+          set -uo pipefail
           for pkg in oh-dsh-tui-pinned oh-dsh-web-pinned; do
             echo "### $pkg"
-            nix build .#$pkg 2>&1 | grep -E 'got:|specified:|sha256' | head -8 || echo "built OK"
+            nix build --no-link .#$pkg >build-$pkg.log 2>&1 && echo "BUILD OK" || echo "BUILD FAILED"
+            cat build-$pkg.log
           done
