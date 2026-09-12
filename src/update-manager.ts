@@ -164,7 +164,7 @@ function isVerificationFailure(error: unknown): boolean {
   return code.includes('signature') || code.includes('checksum') || message.includes('checksum') || message.includes('signature')
 }
 
-const PROXY_FAILURE_CODES = new Set(['ERR_PROXY_CONNECTION_FAILED', 'ERR_TUNNEL_CONNECTION_FAILED', 'ERR_PROXY_AUTH_UNSUPPORTED'])
+const PROXY_FAILURE_CODES = new Set(['ERR_PROXY_CONNECTION_FAILED', 'ERR_TUNNEL_CONNECTION_FAILED', 'ERR_PROXY_AUTH_UNSUPPORTED', 'ERR_NO_SUPPORTED_PROXIES'])
 
 function isProxyFailure(code: string): boolean {
   return PROXY_FAILURE_CODES.has(code)
