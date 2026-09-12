@@ -99,6 +99,15 @@
     0 4px 48px 6px rgba(0, 0, 0, 0.03) !important;
 }
 
+/* The native corner expand control is retired on Oh-DSH surfaces: the
+ * right sidebar is not part of the default Oh-DSH layout flow, so the
+ * stray icon in the conversation header corner reads as dead chrome.
+ * The dock itself stays fully functional when opened through the layout
+ * face (menu commands, open-paths routing). */
+[data-sidebar-right-expand] {
+  display: none;
+}
+
 /* Runtime popovers/menus ride above the shell; give them the panel
  * elevation and continuous corners. */
 [data-radix-popper-content-wrapper] > * {
