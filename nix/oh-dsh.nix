@@ -79,28 +79,28 @@ let
   betterSidebarSrc = pkgs.fetchFromGitHub {
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
-    rev = "146840bb4f1b67e9b9ab8c556355613b20bd20e3";
+    rev = "754974afeaf5c0aa310d6104dfd892ef56a6297d";
     hash = "sha256-2jUJgv8GHYZ+mSGjzToeqj66PxothU8jWwjsehRfx0E=";
   };
   contextRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.47.0.tgz";
-    hash = "sha512-wymzyVR3fWpQeECZjfMn/LGB7x7nvWi0rU1vMAEUKf6T8uBe1vhnTySMCJER1MnOzI7wnX6vdvNfyBMLfx/4ZA==";
+    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.49.2.tgz";
+    hash = "sha512-RDBZH0n9FwHyaxTCm8hHNDJltjexKCcA8gfzlKpT/xVjr9HdGlEQtgHdeYlr/POAphFvhVqhTG58FM7TtrYP0A==";
   };
   tuiSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
-    rev = "1626398e079be1b5d8e92737f87bd02f865f2a53";
+    rev = "78081cebde1ee1b47a561ef57c04f128c5623476";
     hash = "sha256-i49UdJ/uHCB1G7Jm7MPy/HDgbrCLUJjY9J1sl0xL6Mw=";
   };
   dshAuthSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-auth";
-    rev = "94fdf81e775e8d884af4dfb64a94b617c3751936";
+    rev = "cc6ec5224b62b6e6508c0109ef19e93b0a5c0a0e";
     hash = "sha256-gSkDJnjm4N2qOqnEstDU12S4D9FvomrxB9UVwlFN2M4=";
   };
   tuiRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.0.tgz";
-    hash = "sha512-0alYtPbQedsdojpywbfoRtQghJKnwg0aazIYDRyp9sXcdMoG3fSt53M91ttOvSraJr7vOYfgA+ZBpqckMqWv8g==";
+    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.1.tgz";
+    hash = "sha512-xnwLON+c28zt1Yg5nrI2fNHysUEF63TsIC7XndtIJIiDOBEomcSfydnc9DrT+Xzx7p2/qAi6d7+GFB0eSyJ2uw==";
   };
   dshAuthRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-auth/-/dsh-auth-0.1.0.tgz";

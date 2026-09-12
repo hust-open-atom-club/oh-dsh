@@ -1,0 +1,40 @@
+name: Nix hash refresh (temporary)
+
+# One-off helper for the 0.1.5-rc.1 upgrade branch: computes the fixed-output
+# hashes the nix assembly needs after the source pins moved. Dumps raw output
+# (no filtering) so a single run yields every value; delete this workflow
+# once the values land in nix/*.nix.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feature/dsh-0.1.5-rc.1-upgrade']
+
+jobs:
+  hashes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Prefetch GitHub source hashes
+        run: |
+          set -euo pipefail
+          fetch() {
+            echo "### $1"
+            nix store prefetch-file --unpack --hash-type sha256 "$2" 2>&1 || true
+          }
+          fetch better-sidebar https://github.com/omdsh-dev/DSH-better-sidebar/archive/754974afeaf5c0aa310d6104dfd892ef56a6297d.tar.gz
+          fetch dsh-TUI https://github.com/ccch1mneyyy/dsh-TUI/archive/78081cebde1ee1b47a561ef57c04f128c5623476.tar.gz
+          fetch dsh-auth https://github.com/ccch1mneyyy/dsh-auth/archive/cc6ec5224b62b6e6508c0109ef19e93b0a5c0a0e.tar.gz
+          fetch ecosystem-spec https://github.com/T-Auto/dsh-ecosystem-spec/archive/d28c267fe7fd775428ec2dccd65b0b7efd4dacee.tar.gz
+          fetch dsh-std https://github.com/Yan-Zero/dsh-std/archive/614dfa1ac168db79fcf4577cf0ebb34e2e3b944b.tar.gz
+      - name: Surface the pnpmDeps hashes from real builds
+        run: |
+          set -uo pipefail
+          for pkg in oh-dsh-tui-pinned oh-dsh-web-pinned; do
+            echo "### $pkg"
+            nix build --no-link .#$pkg >build-$pkg.log 2>&1 && echo "BUILD OK" || echo "BUILD FAILED"
+            cat build-$pkg.log
+          done
