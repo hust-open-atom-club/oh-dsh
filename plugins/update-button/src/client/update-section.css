@@ -1,0 +1,95 @@
+.oh-dsh-update-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.oh-dsh-update-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.oh-dsh-update-title {
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.oh-dsh-update-description {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.oh-dsh-update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.oh-dsh-update-status {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.oh-dsh-update-status[data-update-mode='available'],
+.oh-dsh-update-status[data-update-mode='downloaded'] {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.oh-dsh-update-status[data-update-mode='error'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.oh-dsh-update-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oh-dsh-update-secondary,
+.oh-dsh-update-primary {
+  border-radius: var(--ohdsh-radius-lg, 10px);
+  corner-shape: var(--ohdsh-corner-shape, round);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color var(--ohdsh-duration-fast, 120ms) var(--ohdsh-ease, ease);
+}
+
+.oh-dsh-update-secondary {
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+}
+
+.oh-dsh-update-secondary:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.oh-dsh-update-secondary:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.oh-dsh-update-primary {
+  border: none;
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-brand-primary-invert);
+}
+
+.oh-dsh-update-primary:hover {
+  background: var(--dsw-alias-button-primary-hover);
+}
+
+.oh-dsh-update-primary[data-update-actionable] {
+  box-shadow: 0 0 0 1px var(--dsw-alias-brand-primary);
+}

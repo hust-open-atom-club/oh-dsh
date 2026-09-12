@@ -22,13 +22,15 @@ export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
   '@oh-dsh/plugin-marketplace',
   '@oh-dsh/save-as-image',
   '@oh-dsh/update-button',
-  // Pinned upstream plugin (upstream/dsh-context) staged under its npm name.
+  // Pinned upstream plugins staged under their npm names: the context
+  // dashboard and the whole DSH-better-sidebar — its tabs render as native
+  // right-sidebar tab types and its host half serves the workspace API.
   'dsh-context',
+  'dsh-better-sidebar',
 ] as const
 
 /** Host-only capability providers shipped inside the desktop runtime. */
 export const BUNDLED_DESKTOP_HOST_PLUGINS = [
-  '@oh-dsh/better-sidebar-runtime',
   '@oh-dsh/liangshen',
   // Pinned upstream host plugin (upstream/dsh-TUI/dsh-auth): no browser
   // half; the /auth command interacts through the user-questions seam.

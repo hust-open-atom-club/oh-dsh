@@ -1,6 +1,7 @@
 packages:
   - .
   - plugins/*
+  - upstream/DSH-better-sidebar
   - upstream/dsh-TUI
   - upstream/dsh-TUI/dsh-auth
   - upstream/dsh-TUI/vendor/dsh-std/packages/command

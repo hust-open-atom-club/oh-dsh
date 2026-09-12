@@ -1,4 +1,5 @@
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
@@ -64,7 +65,6 @@ mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'about', id: '@oh-dsh/about' },
-  { directory: 'better-sidebar-runtime', hostOnly: true },
   { directory: 'liangshen', hostOnly: true },
   { directory: 'tui', hostOnly: true },
   { directory: 'tui-marketplace', hostOnly: true },
@@ -189,21 +189,18 @@ const builds = [
 for (const plugin of pluginPackages) {
   const source = join(root, 'plugins', plugin.directory, 'src')
   const output = join(dist, 'plugins', plugin.directory)
-  const hostEntry = plugin.directory === 'better-sidebar-runtime'
-    ? join(root, 'upstream', 'DSH-better-sidebar', 'src', 'index.ts')
-    : join(source, 'index.ts')
-  const hostBuild = {
-    ...shared,
-    entryPoints: [hostEntry],
-    outfile: join(output, 'index.js'),
-    platform: 'node',
-    format: 'esm',
-    external: plugin.external ?? (plugin.directory === 'better-sidebar-runtime'
-      ? ['@deepseek-ai/*', 'cordis', 'node-pty', 'schemastery', 'ws']
-      : []),
-  }
-  builds.push(build(hostBuild))
-  if (plugin.hostOnly !== true) {
+  const hostBuild = plugin.upstreamHostOnly === true
+    ? undefined
+    : {
+      ...shared,
+      entryPoints: [join(source, 'index.ts')],
+      outfile: join(output, 'index.js'),
+      platform: 'node',
+      format: 'esm',
+      external: plugin.external ?? [],
+    }
+  if (hostBuild !== undefined) builds.push(build(hostBuild))
+  if (plugin.hostOnly !== true && plugin.upstreamHostOnly !== true) {
     builds.push(build({
       bundle: true,
       define: versionDefine,
@@ -233,6 +230,20 @@ for (const plugin of pluginPackages) {
 }
 
 await Promise.all(builds)
+
+// The pinned DSH-better-sidebar builds itself with its own tsdown config
+// (host ESM + browser client + lazy chunk scripts). Staging copies its lib/
+// directly, so the build only has to run before staging does; every bundle
+// convention (module loader banner, CSS modules, chunk factory shape) stays
+// owned by the plugin's own build.
+const upstreamBuild = spawnSync(
+  process.execPath,
+  [join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs'),
+    '--silent', '--filter', 'dsh-better-sidebar', 'run', 'build'],
+  { cwd: root, stdio: 'inherit' },
+)
+if (upstreamBuild.error !== undefined) throw upstreamBuild.error
+if (upstreamBuild.status !== 0) process.exit(upstreamBuild.status ?? 1)
 
 const mainBundle = readFileSync(join(dist, 'main.js'), 'utf8')
 if (mainBundle.includes('Dynamic require of')

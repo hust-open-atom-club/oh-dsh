@@ -63,7 +63,7 @@ export const SURFACE_PACKAGE_NAMES = Object.freeze({
   desktop: new Set([
     '@oh-dsh/desktop',
     '@oh-dsh/liangshen',
-    '@oh-dsh/better-sidebar-runtime',
+    'dsh-better-sidebar',
     '@oh-dsh/desktop-frame',
     '@oh-dsh/about',
     '@oh-dsh/skins',
@@ -79,7 +79,7 @@ export const SURFACE_PACKAGE_NAMES = Object.freeze({
   web: new Set([
     '@oh-dsh/web',
     '@oh-dsh/liangshen',
-    '@oh-dsh/better-sidebar-runtime',
+    'dsh-better-sidebar',
     '@oh-dsh/about',
     '@oh-dsh/skins',
     '@oh-dsh/pinned-summary',
@@ -847,7 +847,7 @@ function installWindowsPackageDependencies(sourceManifestPath, packageDir) {
 }
 
 
-function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
+function installCompiledPackageDependencies(sourceManifestPath, packageDir, resolveBasePath) {
   if (isWindowsNode) {
     installWindowsPackageDependencies(sourceManifestPath, packageDir)
     return
@@ -915,14 +915,17 @@ function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
   }
 
   const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
-  const requireFromSource = createRequire(sourceManifestPath)
+  // A staging override manifest lists only the host closure; its
+  // dependencies still resolve from the real pinned source tree.
+  const resolveFrom = resolveBasePath ?? sourceManifestPath
+  const requireFromSource = createRequire(resolveFrom)
   for (const [dependency, optional] of dependencyNames(sourceManifest)) {
     try {
       const dependencyTarget = installManifest(
         resolveDependencyManifest(
           requireFromSource,
           dependency,
-          dirname(sourceManifestPath),
+          dirname(resolveFrom),
         ),
       )
       const link = join(installRoot, ...dependency.split('/'))
@@ -982,9 +985,19 @@ function runtimeDependencyTarget(dependency) {
 }
 
 
-function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) {
+function installCompiledPackageHostDependencies(
+  sourceManifestPath,
+  packageDir,
+  specHostDependencies,
+) {
   const manifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
-  for (const dependency of manifest.ohDsh?.hostDependencies ?? []) {
+  // A pinned upstream manifest cannot declare our staging's host closure;
+  // the staging spec may supply it (union with the manifest's own list).
+  const dependencies = [...new Set([
+    ...(specHostDependencies ?? []),
+    ...(manifest.ohDsh?.hostDependencies ?? []),
+  ])]
+  for (const dependency of dependencies) {
     if (npmRelease) {
       const target = runtimeDependencyTarget(dependency)
       if (isWindowsNode) {
@@ -1030,12 +1043,24 @@ function installDesktopPackages(surface = 'all') {
       ],
     },
     {
-      manifest: join(root, 'plugins', 'better-sidebar-runtime', 'package.json'),
+      // The pinned upstream sidebar ships whole, like dsh-context: the host
+      // half (lib/index.js), the browser client (lib/client.js), and the
+      // lazy chunk scripts all live in its own lib/ — the chunk route
+      // resolves them relative to the host module. scripts/build.mjs runs
+      // the plugin's own tsdown build first; the host's runtime
+      // dependencies carry over from our former host-only package.
+      manifest: join(root, 'upstream', 'DSH-better-sidebar', 'package.json'),
+      // The upstream manifest's dependencies are the browser bundle's
+      // build-time inputs (inlined by its own tsdown); only the host's Node
+      // closure stages. The pinned manifest cannot describe our staging, so
+      // the spec owns both lists (the deps carry over from our former
+      // host-only package).
+      runtimeDependencies: ['node-pty', 'schemastery', 'ws'],
+      hostDependencies: ['@deepseek-ai/dsh-settings', '@deepseek-ai/dsh-tools'],
       files: [
-        [
-          join(root, 'dist', 'plugins', 'better-sidebar-runtime', 'index.js'),
-          'dist/index.js',
-        ],
+        [join(root, 'upstream', 'DSH-better-sidebar', 'lib'), 'lib'],
+        [join(root, 'upstream', 'DSH-better-sidebar', 'cordis.patch.yml'), 'cordis.patch.yml'],
+        [join(root, 'upstream', 'DSH-better-sidebar', 'LICENSE'), 'LICENSE'],
       ],
     },
     {
@@ -1139,9 +1164,26 @@ function installDesktopPackages(surface = 'all') {
     const packageDir = runtimePackageDirectory(manifest.name)
     mkdirSync(packageDir, { recursive: true })
     writeFileSync(join(packageDir, 'package.json'), JSON.stringify(manifest, undefined, 2) + '\n')
-    installCompiledPackageDependencies(spec.manifest, packageDir)
-    installCompiledPackageHostDependencies(spec.manifest, packageDir)
-    if (manifest.name === '@oh-dsh/better-sidebar-runtime') {
+    if (spec.runtimeDependencies === undefined) {
+      installCompiledPackageDependencies(spec.manifest, packageDir)
+    } else {
+      const identity = JSON.parse(readFileSync(spec.manifest, 'utf8'))
+      const override = join(stage, 'host-deps', identity.name.replace(/[^A-Za-z0-9._-]/g, '_'), 'package.json')
+      mkdirSync(dirname(override), { recursive: true })
+      const versions = {}
+      for (const dependency of spec.runtimeDependencies) {
+        versions[dependency] = identity.dependencies?.[dependency] ?? '*'
+      }
+      writeFileSync(override, JSON.stringify({
+        name: `${identity.name}-host-deps`,
+        version: identity.version,
+        private: true,
+        dependencies: versions,
+      }, undefined, 2) + '\n')
+      installCompiledPackageDependencies(override, packageDir, spec.manifest)
+    }
+    installCompiledPackageHostDependencies(spec.manifest, packageDir, spec.hostDependencies)
+    if (manifest.name === 'dsh-better-sidebar') {
       alignBetterSidebarPtyDependency(packageDir)
     }
     for (const [source, target] of spec.files) {

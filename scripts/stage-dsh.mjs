@@ -199,7 +199,6 @@ for (const required of [
   'web/client.js',
   'web/client.js.map',
   'web/cordis.patch.yml',
-  'plugins/better-sidebar-runtime/index.js',
   'plugins/about/index.js',
   'plugins/about/client.js',
   'plugins/about/client.js.map',
@@ -227,6 +226,15 @@ for (const required of [
 ]) {
   if (!existsSync(join(root, 'dist', required))) {
     throw new Error(`desktop artifact missing: dist/${required}; run pnpm run build first`)
+  }
+}
+
+// The upstream sidebar's own build artifacts (invoked by scripts/build.mjs):
+// staging copies its lib/ wholesale, so the checklist only guards presence.
+for (const artifact of ['index.js', 'client.js', 'invariant.js',
+  'client-terminal.js', 'client-editor.js', 'client-mermaid.js', 'client-locale.js']) {
+  if (!existsSync(join(root, 'upstream', 'DSH-better-sidebar', 'lib', artifact))) {
+    throw new Error(`upstream sidebar artifact missing: lib/${artifact}; run pnpm run build first`)
   }
 }
 

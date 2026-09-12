@@ -20,7 +20,6 @@ interface ThemeSnapshot {
 
 interface SessionState {
   current?: string
-  byId: Record<string, { blank?: boolean }>
 }
 
 interface DesktopLayoutActions {
@@ -35,9 +34,14 @@ interface DesktopLayoutActions {
   retainMainPanels(panelIds: readonly string[]): void
 }
 
-/** The panel-info face the 0.1.5 shell and slot entries read through provideRoot. */
+/**
+ * The panel-info face the 0.1.5 shell and slot entries read through
+ * provideRoot. `activePanelId === null` means the conversation panel: the
+ * native rightbar root renders its session content ONLY for null, so the
+ * raw value must pass through — never a string stand-in.
+ */
 interface PanelInfo {
-  activePanelId: string
+  activePanelId: string | null
 }
 
 interface DesktopFrameProps {
@@ -82,7 +86,8 @@ const CENTER_MIN = 640
 type LayoutState = {
   sidebar: number
   rightbar: number
-  activePanelId: string | undefined
+  /** null = the conversation panel (the native panel-info contract). */
+  activePanelId: string | null
   narrow: boolean
   narrowExpanded: boolean
 }
@@ -141,7 +146,7 @@ function createDesktopLayoutStore() {
     init: () => ({
       sidebar: SIDEBAR_DEFAULT,
       rightbar: 0,
-      activePanelId: undefined,
+      activePanelId: null,
       narrow: false,
       narrowExpanded: false,
     }),
@@ -161,14 +166,15 @@ function createDesktopLayoutStore() {
         if (draft.rightbar === 0) draft.rightbar = fullscreen === true ? RIGHTBAR_FULLSCREEN : RIGHTBAR_DEFAULT
       },
       closeRightbar: draft => { draft.rightbar = 0 },
-      selectPanel: (draft, panelId) => { draft.activePanelId = panelId },
+      // 'conversation' is the Oh-DSH alias for the native null panel.
+      selectPanel: (draft, panelId) => { draft.activePanelId = panelId === 'conversation' ? null : panelId },
       beginNavigation: _draft => {
         // The 0.1.5 layout face reserves this seam for navigation-time
         // panel handling; the Oh-DSH frame keeps a single selection.
       },
       retainMainPanels: (draft, panelIds) => {
-        if (draft.activePanelId !== undefined && !panelIds.includes(draft.activePanelId)) {
-          draft.activePanelId = undefined
+        if (draft.activePanelId !== null && !panelIds.includes(draft.activePanelId)) {
+          draft.activePanelId = null
         }
       },
     },
@@ -180,7 +186,8 @@ interface LayoutService {
   openRightbar(track?: unknown, fullscreen?: boolean): void
   closeRightbar(): void
   selectPanel(panelId: string): void
-  beginNavigation(): void
+  /** Returns the navigation signal the 0.1.5 callers race against. */
+  beginNavigation(): AbortSignal
 }
 
 class DesktopLayoutController implements LayoutService {
@@ -198,7 +205,14 @@ class DesktopLayoutController implements LayoutService {
   toggleSidebar(): void { this.require().toggleSidebar() }
   openRightbar(_track?: unknown, fullscreen?: boolean): void { this.require().openRightbar(fullscreen) }
   closeRightbar(): void { this.require().closeRightbar() }
-  beginNavigation(): void { this.require().beginNavigation() }
+  /**
+   * The 0.1.5 navigation seam: callers race in-flight work against the
+   * returned signal (AbortSignal.any in uiWorkspace.startSession and the
+   * upstream sidebar's fork), so it must be a real signal. The Oh-DSH frame
+   * keeps a single selection and never aborts an in-flight navigation; a
+   * fresh non-aborted signal per call expresses exactly that.
+   */
+  beginNavigation(): AbortSignal { this.require().beginNavigation(); return new AbortController().signal }
 
   selectPanel(panelId: string): void {
     if (panelId === 'conversation' || this.hasMainPanel(panelId)) {
@@ -271,11 +285,12 @@ function DragHandle(props: {
 
 function DesktopFrame(props: DesktopFrameProps): JSX.Element {
   const panels = props.useStore(state => state)
-  const activePanelId = props.usePanelInfo(info => info.activePanelId) ?? 'conversation'
-  const rightbarSession = props.useSessions(state => {
-    const current = state.current
-    return current !== undefined && state.byId[current]?.blank === false ? current : undefined
-  })
+  const activePanelId = props.usePanelInfo(info => info.activePanelId)
+  // Any current session carries the rightbar: the native seat owns its own
+  // visibility (expanded + syncPresentation), and gating the column width on
+  // our own blank flag made canShow flicker on session-list updates — the
+  // seat reads that as "host hid me" and collapses itself permanently.
+  const rightbarSession = props.useSessions(state => state.current)
   const frameRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState(() => window.innerWidth)
   const [dragging, setDragging] = useState(false)
@@ -342,7 +357,7 @@ function DesktopFrame(props: DesktopFrameProps): JSX.Element {
         </div>
       </div>
       <div className="oh-dsh-desktop-frame-center">
-        {props.renderSlot('main', {}, { entryKey: activePanelId })}
+        {props.renderSlot('main', {}, { entryKey: activePanelId ?? 'conversation' })}
       </div>
       <div className="oh-dsh-desktop-frame-details">
         {props.renderSlot('rightbar', {
@@ -393,7 +408,7 @@ export function apply(ctx: ClientContext): void {
     // The 0.1.5 shell reads panel info through the root hooks; without this
     // provider every slot entry calling usePanelInfo crashes.
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: {
-      getSnapshot: (): PanelInfo => ({ activePanelId: instance.getSnapshot().activePanelId ?? 'conversation' }),
+      getSnapshot: (): PanelInfo => ({ activePanelId: instance.getSnapshot().activePanelId }),
       subscribe: (listener: () => void) => instance.subscribe(listener),
     } } })
     const layout = new DesktopLayoutController(panelId =>

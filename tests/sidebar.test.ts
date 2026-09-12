@@ -123,51 +123,13 @@ test('desktop sidebar restores sessions and deduplicates registered tabs', async
   assert.equal(sidebar.getSnapshot().tabs[0]?.type, 'file')
 })
 
-test('desktop sidebar matches viewers by priority, sniffing, and enablement', async () => {
-  const sidebar = new DesktopSidebarService(new MemorySidebarStorage())
-  await sidebar.start()
-  sidebar.registerViewer({
-    extensions: [],
-    fetchStrategy: 'text',
-    id: 'text',
-    order: -100,
-    title: 'Text',
-  })
-  sidebar.registerViewer({
-    extensions: ['png'],
-    fetchStrategy: 'media-url',
-    id: 'image',
-    title: 'Image',
-  })
-  sidebar.registerViewer({
-    detect: (_path, head) => head.includes(0),
-    extensions: [],
-    fetchStrategy: 'binary-download',
-    id: 'binary',
-    order: 100,
-    title: 'Binary',
-  })
 
-  assert.equal(sidebar.matchViewer('photo.PNG')?.id, 'image')
-  assert.equal(
-    sidebar.matchViewer('blob.data', new Uint8Array([1, 0, 2]))?.id,
-    'binary',
-  )
-  sidebar.setViewerEnabled('image', false)
-  assert.equal(sidebar.matchViewer('photo.png')?.id, 'text')
-})
 
 test('desktop sidebar persists bounded per-session state outside Web storage', async () => {
   const storage = new MemorySidebarStorage()
   const sidebar = new DesktopSidebarService(storage)
   await sidebar.start()
   sidebar.registerTab(tab('browser'))
-  sidebar.registerViewer({
-    extensions: [],
-    fetchStrategy: 'text',
-    id: 'text',
-    title: 'Text',
-  })
   sidebar.setSession('conversation-1')
   sidebar.openTab({
     resource: 'https://example.com',
@@ -177,26 +139,18 @@ test('desktop sidebar persists bounded per-session state outside Web storage', a
   sidebar.setWidth(512)
   sidebar.setOpenByDefault(true)
   sidebar.setTabEnabled('browser', false)
-  sidebar.setViewerEnabled('text', false)
   await sidebar.settle()
 
   assert.equal(storage.value.defaultWidth, 480)
   assert.equal(storage.value.openByDefault, true)
   assert.equal(storage.value.tabsEnabled.browser, false)
-  assert.equal(storage.value.viewersEnabled.text, false)
   assert.equal(storage.value.sessions['conversation-1']?.tabs.length, 1)
   assert.equal(storage.writes.length, 1)
 })
 
-test('desktop panel toolbar stays compact when the side panel is maximized', async () => {
+test('the floating panel toolbar is fully retired', async () => {
   const sourceText = await readFile(join(process.cwd(), 'plugins/sidebar/src/client/sidebar.css'), 'utf8')
-  const toolbarRule = sourceText.match(/\.oh-dsh-panel-toolbar\s*\{([\s\S]*?)\n\}/)?.[1]
-  assert.ok(toolbarRule)
-  assert.match(toolbarRule, /box-sizing:\s*border-box/)
-  assert.match(toolbarRule, /height:\s*36px/)
-  assert.match(toolbarRule, /min-height:\s*36px/)
-  assert.match(toolbarRule, /max-height:\s*36px/)
-  assert.match(toolbarRule, /width:\s*max-content/)
+  assert.doesNotMatch(sourceText, /oh-dsh-panel-toolbar/)
 })
 
 test('desktop sidebar preferences migrate from the pre-rename durable file', async () => {
@@ -221,25 +175,13 @@ test('desktop sidebar preferences migrate from the pre-rename durable file', asy
 })
 
 
-test('workspace review uses one SVG icon language', async () => {
+test('retired review views leave no glyph residue', async () => {
   const sourceText = await readFile(join(process.cwd(), 'plugins/sidebar/src/client/plugin.tsx'), 'utf8')
-  assert.match(sourceText, /function WorkspaceIcon\(/)
+  // The review/files/browser views moved to the upstream sidebar plugin;
+  // our surface keeps only the action tabs and must not re-grow the old
+  // unicode glyph language.
   for (const glyph of ['▣', '◷', '▱', '⑂', '—◯—', '›_']) {
     assert.doesNotMatch(sourceText, new RegExp(glyph))
   }
-  assert.match(sourceText, /<WorkspaceIcon name="changes" \/>/)
-  assert.match(sourceText, /const \[changesOpen, setChangesOpen\] = useState\(false\)/)
-  assert.match(sourceText, /aria-expanded=\{changesOpen\}/)
-  assert.match(sourceText, /const \[historyOpen, setHistoryOpen\] = useState\(false\)/)
-  assert.match(sourceText, /aria-expanded=\{historyOpen\}/)
-  assert.match(sourceText, /oh-dsh-review-history-toggle/)
-  assert.match(sourceText, /from '\.\/diff-stats\.ts'/)
-  assert.match(sourceText, /const \[changeStats, setChangeStats\]/)
-  assert.match(sourceText, /prepareDiffSummaryRefresh/)
-  assert.match(sourceText, /<WorkspaceIcon name="chevron" \/>/)
-  assert.match(sourceText, /<WorkspaceIcon name="branch" \/>/)
-  assert.match(sourceText, /<WorkspaceIcon name="commit" \/>/)
-  assert.match(sourceText, /function WorkspaceDropdown\(/)
-  assert.match(sourceText, /role="listbox"/)
-  assert.doesNotMatch(sourceText, /<select/)
+  assert.match(sourceText, /this\.native\.openTab\('changes'\)/)
 })

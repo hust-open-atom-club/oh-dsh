@@ -71,12 +71,7 @@ function buildSurfaceFixture() {
   }
   writeFile(join(repo, 'dist', 'plugins', 'tui'), 'cordis.patch.yml', 'patch: tui\n')
 
-  // better-sidebar-runtime (dependency wiring covered by its own test).
-  writeManifest(join(repo, 'plugins', 'better-sidebar-runtime'), {
-    name: '@oh-dsh/better-sidebar-runtime', version: '0.1.0',
-    dependencies: {}, ohDsh: { hostDependencies: [] },
-  })
-  writeFile(join(repo, 'dist', 'plugins', 'better-sidebar-runtime'), 'index.js', 'export {}\n')
+
 
   // Web surface package.
   writeManifest(join(repo, 'web'), {
@@ -85,6 +80,26 @@ function buildSurfaceFixture() {
   })
   for (const name of ['index.js', 'client.js', 'client.js.map', 'cordis.patch.yml']) {
     writeFile(join(repo, 'dist', 'web'), name, 'web:' + name + '\n')
+  }
+
+  // The upstream workspace sidebar ships whole (host + client + chunks).
+  writeManifest(join(repo, 'upstream', 'DSH-better-sidebar'), {
+    name: 'dsh-better-sidebar', version: '0.19.0',
+    dependencies: {}, dsh: {
+      client: { inject: ['@deepseek-ai/dsh-client-ui-sidebar-right'] },
+    },
+  })
+  for (const artifact of ['index.js', 'invariant.js', 'client.js',
+    'client-terminal.js', 'client-editor.js', 'client-mermaid.js', 'client-locale.js']) {
+    writeFile(join(repo, 'upstream', 'DSH-better-sidebar', 'lib'), artifact, 'export {}\n')
+  }
+  writeFile(join(repo, 'upstream', 'DSH-better-sidebar'), 'LICENSE', 'MIT\n')
+  writeFile(join(repo, 'upstream', 'DSH-better-sidebar'), 'cordis.patch.yml', 'patch: sidebar\n')
+  for (const dependency of ['node-pty', 'schemastery', 'ws']) {
+    writeFile(join(repo, 'upstream', 'DSH-better-sidebar', 'node_modules', dependency),
+      'package.json', JSON.stringify({ name: dependency, version: '1.0.0', main: 'index.js' }))
+    writeFile(join(repo, 'upstream', 'DSH-better-sidebar', 'node_modules', dependency),
+      'index.js', 'module.exports = {}\n')
   }
 
   // Upstream trees (published release layouts).
@@ -116,6 +131,12 @@ function buildSurfaceFixture() {
   // Minimal runtime: DSH manifest + node-pty for the sidebar alignment.
   writeManifest(runtime, { name: '@deepseek-ai/dsh', version: '0.1.1-rc.7', dependencies: {} })
   writeManifest(join(runtime, 'node_modules', 'node-pty'), { name: 'node-pty', version: '1.1.0' })
+  // Staged DSH peers the upstream sidebar host links against.
+  for (const peer of ['dsh-settings', 'dsh-tools']) {
+    writeManifest(join(runtime, 'node_modules', '@deepseek-ai', peer), {
+      name: `@deepseek-ai/${peer}`, version: '0.1.5-rc.1',
+    })
+  }
 
   const adapterCalls: string[] = []
   const staging = createStageRuntime({
@@ -143,7 +164,6 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
   assert.deepEqual(sorted(SURFACE_PACKAGE_NAMES.desktop), [
     '@deepseek-harness-tui/dsh-auth',
     '@oh-dsh/about',
-    '@oh-dsh/better-sidebar-runtime',
     '@oh-dsh/desktop',
     '@oh-dsh/desktop-frame',
     '@oh-dsh/liangshen',
@@ -154,12 +174,12 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/sidebar',
     '@oh-dsh/skins',
     '@oh-dsh/update-button',
+    'dsh-better-sidebar',
     'dsh-context',
   ])
   assert.deepEqual(sorted(SURFACE_PACKAGE_NAMES.web), [
     '@deepseek-harness-tui/dsh-auth',
     '@oh-dsh/about',
-    '@oh-dsh/better-sidebar-runtime',
     '@oh-dsh/liangshen',
     '@oh-dsh/panel-controls',
     '@oh-dsh/pinned-summary',
@@ -168,6 +188,7 @@ test('stage-runtime-lib keeps the official surface package manifest', () => {
     '@oh-dsh/sidebar',
     '@oh-dsh/skins',
     '@oh-dsh/web',
+    'dsh-better-sidebar',
     'dsh-context',
   ])
   assert.deepEqual(sorted(SURFACE_PACKAGE_NAMES.tui), [
@@ -191,7 +212,7 @@ test('web surface installs exactly the official web closure', () => {
 
     const modules = join(runtime, 'node_modules')
     for (const name of [
-      '@oh-dsh/web', '@oh-dsh/liangshen', '@oh-dsh/better-sidebar-runtime',
+      '@oh-dsh/web', '@oh-dsh/liangshen', 'dsh-better-sidebar',
       '@oh-dsh/about', '@oh-dsh/skins',
       '@oh-dsh/pinned-summary', '@oh-dsh/sidebar', '@oh-dsh/panel-controls',
       '@oh-dsh/plugin-marketplace', '@oh-dsh/save-as-image', 'dsh-context',
@@ -219,8 +240,9 @@ test('web surface installs exactly the official web closure', () => {
     assert.equal(stagedWeb.devDependencies, undefined, 'devDependencies stripped')
     assert.equal(stagedWeb.build, undefined, 'build stripped')
 
-    const sidebar = JSON.parse(readFileSync(join(modules, '@oh-dsh', 'better-sidebar-runtime', 'package.json'), 'utf8'))
-    assert.equal(sidebar.dependencies['node-pty'], '1.1.0', 'sidebar pty aligned to the runtime copy')
+    const sidebar = JSON.parse(readFileSync(join(modules, 'dsh-better-sidebar', 'package.json'), 'utf8'))
+    const sidebarPty = readFileSync(join(modules, 'dsh-better-sidebar', 'node_modules', 'node-pty', 'package.json'), 'utf8')
+    assert.equal(JSON.parse(sidebarPty).version, '1.1.0', 'sidebar pty aligned to the runtime copy')
 
     const runtimeManifest = JSON.parse(readFileSync(join(runtime, 'package.json'), 'utf8'))
     assert.equal(runtimeManifest.dependencies['@oh-dsh/web'], '0.1.8', 'profile fallback lists web')
@@ -278,7 +300,7 @@ test('tui closure excludes web, desktop, and the Liangshen plugin', () => {
     }
     for (const name of [
       '@oh-dsh/web', '@oh-dsh/desktop', '@oh-dsh/liangshen',
-      '@oh-dsh/better-sidebar-runtime', 'dsh-context', '@deepseek-harness-tui/dsh-auth',
+      'dsh-better-sidebar', 'dsh-context', '@deepseek-harness-tui/dsh-auth',
     ]) {
       assert.equal(existsSync(join(modules, ...name.split('/'))), false, name + ' stays out of the tui closure')
     }

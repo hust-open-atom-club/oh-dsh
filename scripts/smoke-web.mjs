@@ -120,7 +120,7 @@ assert.equal(dump.status, 0, dump.stderr || dump.stdout)
 for (const row of [
   'oh-web',
   'oh-liangshen',
-  'oh-better-sidebar-runtime',
+  'dsh-better-sidebar',
   'oh-skins',
   'oh-pinned-summary',
   'oh-sidebar',
@@ -280,16 +280,26 @@ try {
     loaded.push({ bytes: bundle.length, id: pluginId })
   }
 
-  // The host-only PTY runtime ships inside the web distribution.
+  // The upstream sidebar ships whole inside the web distribution: its host
+  // half (lib/index.js) and the lazy chunk scripts the host serves.
   assert.ok(existsSync(join(
     resources,
     'dsh-runtime',
     'node_modules',
-    '@oh-dsh',
-    'better-sidebar-runtime',
-    'dist',
+    'dsh-better-sidebar',
+    'lib',
     'index.js',
-  )), '@oh-dsh/better-sidebar-runtime Host bundle is missing')
+  )), 'dsh-better-sidebar host bundle is missing')
+  for (const chunk of ['terminal', 'editor', 'mermaid', 'locale']) {
+    assert.ok(existsSync(join(
+      resources,
+      'dsh-runtime',
+      'node_modules',
+      'dsh-better-sidebar',
+      'lib',
+      `client-${chunk}.js`,
+    )), `dsh-better-sidebar chunk ${chunk} is missing`)
+  }
   assert.ok(existsSync(join(
     resources,
     'dsh-runtime',

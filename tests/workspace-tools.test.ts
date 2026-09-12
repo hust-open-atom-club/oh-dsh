@@ -8,11 +8,6 @@ import {
   mutateWorkspace,
   readWorkspaceFacts,
 } from '../plugins/sidebar/src/git-workspace.ts'
-import {
-  mapBetterSidebarFile,
-  mapBetterSidebarTree,
-  workspaceChangesFromBetterSidebar,
-} from '../plugins/sidebar/src/client/better-sidebar-api.ts'
 
 function git(cwd: string, args: string[]): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
@@ -42,47 +37,3 @@ test('workspace extension provides repository facts and branch creation', async 
   }
 })
 
-test('Better Sidebar status maps into the Oh-DSH workspace model', () => {
-  assert.deepEqual(workspaceChangesFromBetterSidebar([
-    { path: 'staged.ts', xy: 'M ' },
-    { path: 'renamed.ts', xy: 'R ' },
-    { path: 'loose.txt', xy: '??' },
-  ]), [
-    { path: 'loose.txt', oldPath: null, status: 'untracked', staged: false, unstaged: true },
-    { path: 'renamed.ts', oldPath: null, status: 'renamed', staged: true, unstaged: false },
-    { path: 'staged.ts', oldPath: null, status: 'modified', staged: true, unstaged: false },
-  ])
-})
-
-test('workspace files adapt Better Sidebar responses to the Oh-DSH UI', () => {
-  const root = mapBetterSidebarTree('/workspace', {
-    path: '/workspace/src',
-    entries: [
-      { name: 'nested', path: '/workspace/src/nested', isDir: true, hidden: false },
-      { name: 'index.ts', path: '/workspace/src/index.ts', isDir: false, hidden: false },
-    ],
-    truncated: false,
-  })
-  assert.equal(root.kind, 'directory')
-  if (root.kind !== 'directory') return
-  assert.equal(root.parent, '/workspace')
-  assert.deepEqual(root.entries.map(entry => [entry.name, entry.kind]), [
-    ['nested', 'directory'],
-    ['index.ts', 'file'],
-  ])
-  const preview = mapBetterSidebarFile('/workspace', '/workspace/src/index.ts', {
-    kind: 'text',
-    content: 'export const ready = true\n',
-    truncated: false,
-  })
-  assert.equal(preview.kind, 'file')
-  if (preview.kind === 'file') assert.match(preview.content ?? '', /ready = true/)
-})
-
-test('Better Sidebar status preserves both staged and unstaged sides', () => {
-  assert.deepEqual(workspaceChangesFromBetterSidebar([
-    { path: 'mixed.ts', xy: 'MM' },
-  ]), [
-    { path: 'mixed.ts', oldPath: null, status: 'modified', staged: true, unstaged: true },
-  ])
-})
