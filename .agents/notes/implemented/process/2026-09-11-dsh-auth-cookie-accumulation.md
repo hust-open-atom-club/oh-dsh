@@ -38,7 +38,7 @@ Three layers, one per blast radius:
 3. The task diagnostics harness does the same (`ohdsh-diag`), which is
    what let the failure reproduce reliably during forensics.
 
-## Alternatives rejected
+## Alternatives considered
 
 - Chunking the bundle URL or splitting batches: a runtime-side change in
   pinned upstream code; the accumulation would still grow unbounded.

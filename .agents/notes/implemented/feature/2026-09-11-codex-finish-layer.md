@@ -49,7 +49,7 @@ The desktop frame proportions tighten (sidebar 280→260px default,
 rightbar default 360→420px), the sidebar loses its border-right, and the
 right column floats on a hairline plus a diffuse left shadow.
 
-## Alternatives rejected
+## Alternatives considered
 
 - Styling hashed runtime classes (`hHd-Xa_*`, `uV2eYG_*`): silently
   breaks on every runtime pin bump; structural hooks survive.

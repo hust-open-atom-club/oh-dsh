@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-11-dsh-auth-cookie-accumulation.md
-2026-09-11-dsh-auth-cookie-accumulation.md: eef5791038ce127e410dbad873a384eef4bc6d77
-2026-09-11-dsh-auth-cookie-accumulation.zh.md: eaa94e0e7ab0945161de16e88461dbdcb7ada360
+2026-09-11-dsh-auth-cookie-accumulation.md: 6dc52c6038af5ee1b7ee4e9a2647cf2407cd62a0
+2026-09-11-dsh-auth-cookie-accumulation.zh.md: 3639d8688b036333ea989496608dc67c53e8ca10
