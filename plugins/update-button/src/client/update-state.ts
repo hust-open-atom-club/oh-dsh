@@ -1,43 +1,38 @@
 /**
- * Update UI state for the sidebar entry: a tiny store bridging the About-style
- * update snapshots (DesktopBridge.aboutUpdate) to the two icon instances.
- * The entry stays 'hidden' unless the snapshot reports an installable update —
- * it then turns 'available' and shows the badge. An 'unsupported' manager
- * (dev / non-packaged runs and unsupported platforms) reports nothing
- * installable, so it stays hidden like any up-to-date packaged run —
- * packaged and dev surfaces behave alike, with no dev-only affordance.
+ * Update state for the Settings update section: a tiny store bridging the
+ * About-style update snapshots (DesktopBridge.aboutUpdate) to the section's
+ * status row. An 'unsupported' manager (dev / non-packaged runs and
+ * unsupported platforms) reports nothing installable and reads like any
+ * up-to-date run — packaged and dev surfaces behave alike.
  */
 import type { AboutUpdateSnapshot } from '../../../../src/contracts.ts'
 
-export type UpdateUiState = 'hidden' | 'available'
-
-export function updateUiFromSnapshot(snapshot: AboutUpdateSnapshot): UpdateUiState {
-  return snapshot.status === 'available'
-    || snapshot.status === 'downloading'
-    || snapshot.status === 'downloaded'
-    ? 'available'
-    : 'hidden'
-}
-
-export interface UpdateUiStore {
-  get(): UpdateUiState
+export interface UpdateSnapshotStore {
+  get(): AboutUpdateSnapshot | undefined
   subscribe(listener: () => void): () => void
-  set(state: UpdateUiState): void
+  set(snapshot: AboutUpdateSnapshot): void
 }
 
-export function createUpdateUiStore(initial: UpdateUiState = 'hidden'): UpdateUiStore {
-  let state = initial
+export function createUpdateSnapshotStore(): UpdateSnapshotStore {
+  let snapshot: AboutUpdateSnapshot | undefined
   const listeners = new Set<() => void>()
   return {
-    get: () => state,
+    get: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },
     set: (next) => {
-      if (next === state) return
-      state = next
+      snapshot = next
       for (const listener of listeners) listener()
     },
   }
+}
+
+/** Whether a snapshot reports something the update window would act on. */
+export function updateIsActionable(snapshot: AboutUpdateSnapshot | undefined): boolean {
+  return snapshot !== undefined
+    && (snapshot.status === 'available'
+      || snapshot.status === 'downloading'
+      || snapshot.status === 'downloaded')
 }
