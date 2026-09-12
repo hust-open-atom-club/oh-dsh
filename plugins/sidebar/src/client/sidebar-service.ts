@@ -46,28 +46,6 @@ export interface DesktopSidebarTabDescriptor {
   title: string | (() => string)
 }
 
-export type SidebarFileFetchStrategy =
-  | 'binary-download'
-  | 'custom'
-  | 'media-url'
-  | 'text'
-
-export interface DesktopSidebarViewerDescriptor {
-  detect?: (path: string, head: Uint8Array) => boolean
-  extensions: readonly string[]
-  fetchStrategy: SidebarFileFetchStrategy
-  icon?: ReactNode | ((size: number) => ReactNode)
-  id: string
-  order?: number
-  render?: (input: {
-    content?: string
-    path: string
-    resourceUrl?: string
-    title: string
-  }) => ReactNode
-  title: string | (() => string)
-}
-
 export interface DesktopSidebarSnapshot {
   activeId: string | null
   error: string | null
@@ -79,7 +57,6 @@ export interface DesktopSidebarSnapshot {
   sessionId: string | null
   tabs: readonly DesktopSidebarTab[]
   tabsEnabled: Readonly<Record<string, boolean>>
-  viewersEnabled: Readonly<Record<string, boolean>>
   width: number
 }
 
@@ -93,23 +70,15 @@ export interface DesktopSidebar {
   getSnapshot(): DesktopSidebarSnapshot
   getTab(id: string): DesktopSidebarTabDescriptor | undefined
   getTabs(): readonly DesktopSidebarTabDescriptor[]
-  getViewers(): readonly DesktopSidebarViewerDescriptor[]
   isTabEnabled(id: string): boolean
-  isViewerEnabled(id: string): boolean
-  matchViewer(
-    path: string,
-    head?: Uint8Array,
-  ): DesktopSidebarViewerDescriptor | undefined
   openTab(seed: DesktopSidebarTabSeed): OpenTabResult
   patchTab(id: string, patch: { resource?: string; title?: string }): void
   registerTab(descriptor: DesktopSidebarTabDescriptor): () => void
-  registerViewer(descriptor: DesktopSidebarViewerDescriptor): () => void
   setMaximized(maximized: boolean): void
   setOpen(open: boolean): void
   setOpenByDefault(open: boolean): void
   setSession(sessionId: string | null): void
   setTabEnabled(id: string, enabled: boolean): void
-  setViewerEnabled(id: string, enabled: boolean): void
   setWidth(width: number): void
   subscribe(listener: () => void): () => void
 }
@@ -119,7 +88,6 @@ function freshPreferences(): DesktopSidebarPreferences {
     ...DEFAULT_SIDEBAR_PREFERENCES,
     sessions: {},
     tabsEnabled: {},
-    viewersEnabled: {},
   }
 }
 
@@ -133,14 +101,7 @@ function clonePreferences(
       ([id, session]) => [id, { ...session, tabs: session.tabs.map(tab => ({ ...tab })) }],
     )),
     tabsEnabled: { ...preferences.tabsEnabled },
-    viewersEnabled: { ...preferences.viewersEnabled },
   }
-}
-
-function extensionOf(path: string): string {
-  const separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  const dot = path.lastIndexOf('.')
-  return dot > separator ? path.slice(dot + 1).toLowerCase() : ''
 }
 
 function titleOf(descriptor: DesktopSidebarTabDescriptor): string {
@@ -156,10 +117,6 @@ function messageOf(error: unknown): string {
 export class DesktopSidebarService implements DesktopSidebar {
   private readonly listeners = new Set<() => void>()
   private readonly tabDescriptors = new Map<string, DesktopSidebarTabDescriptor>()
-  private readonly viewerDescriptors = new Map<
-    string,
-    DesktopSidebarViewerDescriptor
-  >()
   private preferences = freshPreferences()
   private dirty = false
   private disposed = false
@@ -177,7 +134,6 @@ export class DesktopSidebarService implements DesktopSidebar {
     sessionId: null,
     tabs: [],
     tabsEnabled: {},
-    viewersEnabled: {},
     width: DEFAULT_SIDEBAR_PREFERENCES.defaultWidth,
   }
 
@@ -206,7 +162,6 @@ export class DesktopSidebarService implements DesktopSidebar {
         revision: this.snapshot.revision + 1,
         sessionId: requestedSession,
         tabsEnabled: { ...this.preferences.tabsEnabled },
-        viewersEnabled: { ...this.preferences.viewersEnabled },
         width: this.preferences.defaultWidth,
       })
     } catch (error) {
@@ -238,29 +193,9 @@ export class DesktopSidebarService implements DesktopSidebar {
     }
   }
 
-  registerViewer(descriptor: DesktopSidebarViewerDescriptor): () => void {
-    if (this.viewerDescriptors.has(descriptor.id)) {
-      throw new Error(`sidebar: duplicate viewer "${descriptor.id}"`)
-    }
-    this.viewerDescriptors.set(descriptor.id, descriptor)
-    this.touch()
-    return () => {
-      if (this.viewerDescriptors.get(descriptor.id) === descriptor) {
-        this.viewerDescriptors.delete(descriptor.id)
-        this.touch()
-      }
-    }
-  }
-
   getTabs(): readonly DesktopSidebarTabDescriptor[] {
     return [...this.tabDescriptors.values()].sort(
       (left, right) => (left.order ?? 100) - (right.order ?? 100),
-    )
-  }
-
-  getViewers(): readonly DesktopSidebarViewerDescriptor[] {
-    return [...this.viewerDescriptors.values()].sort(
-      (left, right) => (right.order ?? 0) - (left.order ?? 0),
     )
   }
 
@@ -270,31 +205,6 @@ export class DesktopSidebarService implements DesktopSidebar {
 
   isTabEnabled(id: string): boolean {
     return this.preferences.tabsEnabled[id] !== false
-  }
-
-  isViewerEnabled(id: string): boolean {
-    return this.preferences.viewersEnabled[id] !== false
-  }
-
-  matchViewer(
-    path: string,
-    head?: Uint8Array,
-  ): DesktopSidebarViewerDescriptor | undefined {
-    const extension = extensionOf(path)
-    for (const viewer of this.getViewers()) {
-      if (!this.isViewerEnabled(viewer.id)) continue
-      if (head !== undefined && viewer.detect !== undefined) {
-        if (viewer.detect(path, head)) return viewer
-        if (viewer.extensions.length === 0) continue
-      } else if (viewer.extensions.length === 0) {
-        if (viewer.detect === undefined) return viewer
-        continue
-      }
-      if (viewer.extensions.map(value => value.toLowerCase()).includes(extension)) {
-        return viewer
-      }
-    }
-    return undefined
   }
 
   setSession(sessionId: string | null): void {
@@ -429,18 +339,6 @@ export class DesktopSidebarService implements DesktopSidebar {
       ...this.snapshot,
       revision: this.snapshot.revision + 1,
       tabsEnabled: { ...this.preferences.tabsEnabled },
-    })
-    this.schedulePersist()
-  }
-
-  setViewerEnabled(id: string, enabled: boolean): void {
-    if (this.isViewerEnabled(id) === enabled
-      && Object.hasOwn(this.preferences.viewersEnabled, id)) return
-    this.preferences.viewersEnabled[id] = enabled
-    this.publish({
-      ...this.snapshot,
-      revision: this.snapshot.revision + 1,
-      viewersEnabled: { ...this.preferences.viewersEnabled },
     })
     this.schedulePersist()
   }

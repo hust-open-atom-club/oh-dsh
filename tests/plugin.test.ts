@@ -93,7 +93,6 @@ test('desktop sidebar exposes one configurable tool registry in settings', () =>
   assert.match(runtimeSettings, /betterSidebarApi/)
   assert.match(runtimeSettings, /settingsUpdate\(patch, previous\.revision\)/)
   assert.match(client, /desktopSidebar\.setTabEnabled/)
-  assert.match(client, /desktopSidebar\.setViewerEnabled/)
   assert.match(manifest, /@deepseek-ai\/dsh-client-ui-settings/)
   assert.match(manifest, /@deepseek-ai\/dsh-client-ui-slots/)
 })

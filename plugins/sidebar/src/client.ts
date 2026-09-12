@@ -8,7 +8,5 @@ export type {
   DesktopSidebarTab,
   DesktopSidebarTabDescriptor,
   DesktopSidebarTabSeed,
-  DesktopSidebarViewerDescriptor,
   OpenTabResult,
-  SidebarFileFetchStrategy,
 } from './client/sidebar-service.ts'

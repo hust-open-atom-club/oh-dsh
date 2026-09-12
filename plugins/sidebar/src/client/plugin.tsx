@@ -12,11 +12,9 @@ import type { DesktopBridge } from '../../../../src/contracts.ts'
 import type { DesktopPanels } from '../../../panel-controls/src/client.ts'
 import type { PinnedSummary } from '../../../pinned-summary/src/client.ts'
 import type {
-  WorkspaceChange,
   WorkspaceFacts,
   WorkspaceHostMutationResponse,
   WorkspaceMutation,
-  WorkspaceSnapshot,
 } from '../protocol.ts'
 import { WORKSPACE_API_PATH } from '../protocol.ts'
 import {
@@ -55,28 +53,6 @@ import {
   type ComposerHistoryInputTriggers,
 } from './composer-history-bridge.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
-import {
-  addDiffStats,
-  diffStats,
-  prepareDiffSummaryRefresh,
-  textLineCount,
-  type DiffStats,
-} from './diff-stats.ts'
-import {
-  betterSidebarApi,
-  type BetterSidebarGitLogEntry,
-  type BetterSidebarScope,
-  workspaceChangesFromBetterSidebar,
-} from './better-sidebar-api.ts'
-import {
-  nextReviewCommentId,
-  ReviewCommentsService,
-  type ReviewCommentSide,
-  type ReviewSessionsService,
-  type ReviewInputTriggersService,
-} from './review-comments.ts'
-import { reviewCommitFromBetterSidebar } from './review-diff.ts'
-import type { GitReviewCommit } from './review-types.ts'
 import {
   SidebarRuntimeSettingsService,
   type SidebarRuntimePreferences,
@@ -117,14 +93,16 @@ interface SessionBinding {
   }
 }
 
-interface SessionsService extends ReviewSessionsService {
+interface SessionsService {
   list: ObservableSnapshot<SessionListState>
   binding(id: string): SessionBinding | undefined
   fork(options: { sessionId: string; increaseTitle?: boolean }): Promise<string>
   open(id: string): void
+  /** The runtime's per-session scope (conversation input resolution). */
+  scope?(id: string): unknown
 }
 
-interface InputTriggersService extends ComposerHistoryInputTriggers, ReviewInputTriggersService {}
+interface InputTriggersService extends ComposerHistoryInputTriggers {}
 
 interface WorkspaceView {
   workspaceId: string
@@ -152,7 +130,6 @@ interface SidebarSettingsState {
   openByDefault: boolean
   revision: number
   tabsEnabled: Record<string, boolean>
-  viewersEnabled: Record<string, boolean>
   width: number
 }
 
@@ -161,7 +138,6 @@ interface BoundSidebarSettingsActions {
     openByDefault: boolean,
     revision: number,
     tabsEnabled: Record<string, boolean>,
-    viewersEnabled: Record<string, boolean>,
     width: number,
   ): void
 }
@@ -170,7 +146,6 @@ interface SidebarSettingsProps {
   reset(): void
   setOpenByDefault(open: boolean): void
   setTabEnabled(id: string, enabled: boolean): void
-  setViewerEnabled(id: string, enabled: boolean): void
   setWidth(width: number): void
   runtime: SidebarRuntimeSettingsService
   sidebar: DesktopSidebar
@@ -258,15 +233,6 @@ async function responseJson<T>(
 
 
 
-
-type ReviewCommentTarget = {
-  kind: 'commit'
-} | {
-  kind: 'line'
-  filePath: string
-  line: number
-  side: Exclude<ReviewCommentSide, null>
-}
 
 
 
@@ -641,7 +607,6 @@ function activeSidebarScope(sessions: SessionsService): {
 function registerBuiltinSidebarTools(options: {
   openExternalPath(path: string): Promise<void>
   panels: DesktopPanels
-  reviewComments: ReviewCommentsService
   service: WorkspaceToolsService
   sessions: SessionsService
   sidebar: DesktopSidebar
@@ -651,7 +616,6 @@ function registerBuiltinSidebarTools(options: {
   const {
     openExternalPath,
     panels,
-    reviewComments,
     service,
     sessions,
     sidebar,
@@ -698,7 +662,6 @@ function SidebarSettingsRow({
   runtime,
   setOpenByDefault,
   setTabEnabled,
-  setViewerEnabled,
   setWidth,
   sidebar,
   t,
@@ -710,7 +673,6 @@ function SidebarSettingsRow({
     runtime.getSnapshot,
   )
   const tabs = sidebar.getTabs().filter(descriptor => descriptor.hidden !== true)
-  const viewers = sidebar.getViewers()
   const updateRuntime = (
     key: keyof SidebarRuntimePreferences,
     enabled: boolean,
@@ -842,24 +804,6 @@ function SidebarSettingsRow({
           ))}
         </div>
       </section>
-      <section>
-        <h4>{t('settings.viewers')}</h4>
-        <p>{t('settings.viewers-description')}</p>
-        <div className="oh-dsh-sidebar-settings-list">
-          {viewers.map(descriptor => (
-            <label key={descriptor.id}>
-              <span>{sidebarLabel(descriptor.title)}</span>
-              <input
-                type="checkbox"
-                checked={state.viewersEnabled[descriptor.id] !== false}
-                onChange={event => {
-                  setViewerEnabled(descriptor.id, event.currentTarget.checked)
-                }}
-              />
-            </label>
-          ))}
-        </div>
-      </section>
     </div>
   )
 }
@@ -872,7 +816,6 @@ function syncSidebarSettings(
     snapshot.openByDefault,
     snapshot.revision,
     { ...snapshot.tabsEnabled },
-    { ...snapshot.viewersEnabled },
     snapshot.width,
   )
 }
@@ -906,11 +849,6 @@ export function apply(ctx: ClientContext): void {
   const openExternalPath = async (path: string): Promise<void> => {
     await originalOpenPath.call(workspaces, path)
   }
-  const reviewComments = new ReviewCommentsService(
-    sessions,
-    inputTriggers,
-    window.localStorage,
-  )
   const desktopSidebar = new DesktopSidebarService(
     new HttpSidebarPreferencesStorage(fetch.bind(globalThis)),
   )
@@ -934,7 +872,6 @@ export function apply(ctx: ClientContext): void {
   const unregisterBuiltins = registerBuiltinSidebarTools({
     openExternalPath,
     panels,
-    reviewComments,
     service,
     sessions,
     sidebar: desktopSidebar,
@@ -962,7 +899,6 @@ export function apply(ctx: ClientContext): void {
         draft.openByDefault = openByDefault
         draft.revision = revision
         draft.tabsEnabled = tabsEnabled
-        draft.viewersEnabled = viewersEnabled
         draft.width = width
       },
     },
@@ -1115,7 +1051,6 @@ export function apply(ctx: ClientContext): void {
       }
       service.dispose()
       unregisterBuiltins()
-      reviewComments.dispose()
       desktopSidebar.dispose()
       runtimeSettings.dispose()
       void removeSidebar?.()
@@ -1137,17 +1072,11 @@ export function apply(ctx: ClientContext): void {
           for (const descriptor of desktopSidebar.getTabs()) {
             desktopSidebar.setTabEnabled(descriptor.id, true)
           }
-          for (const descriptor of desktopSidebar.getViewers()) {
-            desktopSidebar.setViewerEnabled(descriptor.id, true)
-          }
           void runtimeSettings.reset()
         },
         setOpenByDefault: open => { desktopSidebar.setOpenByDefault(open) },
         setTabEnabled: (id, enabled) => {
           desktopSidebar.setTabEnabled(id, enabled)
-        },
-        setViewerEnabled: (id, enabled) => {
-          desktopSidebar.setViewerEnabled(id, enabled)
         },
         setWidth: width => { desktopSidebar.setWidth(width) },
         runtime: runtimeSettings,
