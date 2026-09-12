@@ -214,7 +214,8 @@ let
       stage_root="$TMPDIR/oh-dsh-stage-root"
       rm -rf "$stage_root"
       mkdir -p "$stage_root/upstream/dsh-TUI/dsh-auth" \
-        "$stage_root/upstream/dsh-context"
+        "$stage_root/upstream/dsh-context" \
+        "$stage_root/upstream/DSH-better-sidebar"
       cp package.json "$stage_root/package.json"
       ln -s "$PWD/dist" "$stage_root/dist"
       ln -s "$PWD/plugins" "$stage_root/plugins"
@@ -267,6 +268,23 @@ let
         upstream/dsh-context/LICENSE \
         "$stage_root/upstream/dsh-context/"
       cp -r upstream/dsh-context/lib "$stage_root/upstream/dsh-context/"
+
+      # The upstream sidebar ships whole: the build phase compiled its lib/
+      # inside the workspace tree, and its node_modules links resolve the
+      # host closure (node-pty, schemastery, ws) the staging spec installs.
+      cp upstream/DSH-better-sidebar/package.json \
+        upstream/DSH-better-sidebar/cordis.patch.yml \
+        upstream/DSH-better-sidebar/LICENSE \
+        "$stage_root/upstream/DSH-better-sidebar/"
+      cp -r upstream/DSH-better-sidebar/lib \
+        "$stage_root/upstream/DSH-better-sidebar/"
+      mkdir -p "$stage_root/upstream/DSH-better-sidebar/node_modules"
+      if [ -d upstream/DSH-better-sidebar/node_modules ]; then
+        for dep in upstream/DSH-better-sidebar/node_modules/*; do
+          ln -s "$PWD/$dep" \
+            "$stage_root/upstream/DSH-better-sidebar/node_modules/$(basename "$dep")"
+        done
+      fi
 
       # Install the selected surface packages into a copy of the DSH runtime
       # with the same assembler as scripts/stage-dsh.mjs, so the Nix closure
