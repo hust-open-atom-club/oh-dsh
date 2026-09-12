@@ -255,7 +255,10 @@ cd oh-dsh-tui-*/
 
 Windows 使用 `bin\ohdsh.cmd tui`。TUI 需要真实交互终端；默认从当前终端位置
 inline 启动，与 Codex 风格一致；需要 alternate screen 时显式传入
-`--fullscreen`。
+`--fullscreen`。在终端多路复用器（tmux、zellij、screen）内默认改用
+alternate screen——inline 帧锚定在复用窗格中会错位；`--inline` 仍可强制
+保留回滚区。切换多路复用器标签页再返回时可能残留堆叠旧帧；按
+`Ctrl+L` 清屏并重绘。
 
 ## 统一启动命令
 
@@ -280,7 +283,7 @@ TUI 常用选项：
 | `--resume` | 新会话 | 恢复指定 Session id |
 | `--lang` | 上游设置 | `zh` 或 `en` |
 | `--preset` | `standard` | 初始 Agent preset |
-| `--inline` | 开启 | 保留终端 scrollback，不使用 alternate screen |
+| `--inline` | 普通终端开启 | 保留终端 scrollback，不使用 alternate screen（多路复用器默认全屏） |
 
 ### Agent preset
 
@@ -313,7 +316,7 @@ HTTP(S) URL，即可使用同样的原生图片输入。
 
 Desktop 和 Web 内置
 [dsh-context](https://github.com/bowenliang123/dsh-context)（固定版本
-`v0.41.0`）插件。它提供 Context 面板，展示上下文容量、余量、组成、历史、事件与
+`v0.47.0`）插件。它提供 Context 面板，展示上下文容量、余量、组成、历史、事件与
 消息统计，并提供 `/context` 命令在会话内快速查看当前上下文组成。该插件只做只读
 洞察：通过 DSH 自身驱动的 projection 观察会话，不会改动对话内容。
 

@@ -61,6 +61,34 @@ test('TUI arguments keep environment defaults behind explicit flags', () => {
 
   assert.equal(parseTuiArgs([], {}, '/default/workspace', '/default/home').fullscreen, false)
 
+  // Multiplexed panes answer the inline renderer's cursor/size probes
+  // differently, so an unchosen default flips to the alternate screen;
+  // explicit flags and env still win.
+  assert.equal(
+    parseTuiArgs([], { ZELLIJ: '1' }, '/default/workspace', '/default/home').fullscreen,
+    true,
+  )
+  assert.equal(
+    parseTuiArgs([], { TMUX: '/tmp/tmux-0/default,1,0' }, '/default/workspace', '/default/home').fullscreen,
+    true,
+  )
+  assert.equal(
+    parseTuiArgs([], { TERM: 'screen-256color' }, '/default/workspace', '/default/home').fullscreen,
+    true,
+  )
+  assert.equal(
+    parseTuiArgs(['--inline'], { ZELLIJ: '1' }, '/default/workspace', '/default/home').fullscreen,
+    false,
+  )
+  assert.equal(
+    parseTuiArgs([], { ZELLIJ: '1', DSH_OH_TUI_FULLSCREEN: '0' }, '/default/workspace', '/default/home').fullscreen,
+    false,
+  )
+  assert.equal(
+    parseTuiArgs([], { TERM: 'xterm-256color' }, '/default/workspace', '/default/home').fullscreen,
+    false,
+  )
+
   assert.equal(
     parseTuiArgs([], { OH_DSH_HOME: '/shared/home' }).dataRoot,
     '/shared/home',
@@ -160,8 +188,12 @@ test('TUI bundle mounts Oh-DSH adapters before the upstream renderer', () => {
     join(root, 'plugins', 'tui', 'cordis.patch.yml'),
     'utf8',
   ).replace(/\r\n?/g, '\n')
-  assert.match(patch, /- id: cc-tui\n  disabled: true/)
   assert.match(patch, /- id: dsh-tui\n  disabled: true/)
+  // The upstream retired the legacy cc-tui row name (v0.10.0 removed the
+  // row entirely); only the dsh-tui row is disabled and remounted, and the
+  // remount mirrors the upstream row's inject list including tuiThemes.
+  assert.doesNotMatch(patch, /id: cc-tui/)
+  assert.match(patch, /- id: oh-tui-renderer\n    name: '@deepseek-harness-tui\/dsh-tui'\n    inject: \[workspaceRegistry, agents, tuiWorkspaces, tuiScenes, tuiDialogs, tuiStatus, tuiShortcuts, tuiRenderers, tuiThemes\]/)
   assert.match(patch, /fullscreen: !!js "process\.env\.OH_DSH_TUI_FULLSCREEN === '1'"/)
   const surface = patch.indexOf("name: '@oh-dsh/tui'")
   const marketplace = patch.indexOf("name: '@oh-dsh/plugin-marketplace'")
@@ -187,7 +219,9 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
     adaptTuiLiangshenPresentation(root)
     const paths = readFileSync(join(lib, 'utils', 'paths.js'), 'utf8')
     assert.match(paths, /OH_DSH_TUI_CONFIG_HOME/)
-    assert.match(paths, /LEGACY_DATA_DIR = DATA_DIR/)
+    // v0.10.0 retired the ~/.dsh-cc legacy migration wholesale, so the
+    // adapter no longer rewrites a LEGACY_DATA_DIR export.
+    assert.doesNotMatch(paths, /LEGACY_DATA_DIR/)
     assert.doesNotMatch(paths, /join\(homeDir\(\), '\.dsh-(?:tui|cc)'\)/)
     const logo = readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8')
     assert.match(logo, /CodexStartupOverlay/)

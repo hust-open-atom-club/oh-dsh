@@ -293,7 +293,12 @@ cd oh-dsh-tui-*/
 
 Use `bin\ohdsh.cmd tui` on Windows. TUI requires a real interactive terminal.
 It keeps the current terminal position by default, matching the Codex-style
-inline startup; pass `--fullscreen` to use the alternate screen.
+inline startup; pass `--fullscreen` to use the alternate screen. Inside a
+terminal multiplexer (tmux, zellij, screen) the default flips to the
+alternate screen, because inline frame anchoring misplaces the composer in
+multiplexed panes; `--inline` still forces scrollback. Switching a
+multiplexer tab away and back can leave stale stacked frames; press
+`Ctrl+L` to clear and repaint the screen.
 
 ## Unified commands
 
@@ -320,7 +325,7 @@ Common TUI options:
 | `--resume` | New session | Resume a Session id |
 | `--lang` | Upstream preference | `zh` or `en` |
 | `--preset` | `standard` | Initial Agent preset |
-| `--inline` | On | Preserve terminal scrollback instead of alternate screen |
+| `--inline` | On in a plain terminal | Preserve terminal scrollback instead of alternate screen (multiplexers default to fullscreen) |
 
 ### Agent presets
 
@@ -359,7 +364,7 @@ the prompt to use the same native image input.
 
 Desktop and Web bundle
 [dsh-context](https://github.com/bowenliang123/dsh-context) (pinned release
-`v0.41.0`) as a built-in plugin. It contributes a Context panel with capacity,
+`v0.47.0`) as a built-in plugin. It contributes a Context panel with capacity,
 remaining, composition, history, event, and message statistics, and a
 `/context` command that summarizes the current context composition inside the
 conversation. The plugin is read-only insight: it observes the session through

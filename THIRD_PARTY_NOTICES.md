@@ -11,12 +11,12 @@ releases and features are reviewed regularly.
 ## DeepSeek Harness
 
 - Project: <https://github.com/deepseek-ai/deepseek-harness>
-- Pinned npm release: `@deepseek-ai/dsh@0.1.2-alpha.3`
+- Pinned npm release: `@deepseek-ai/dsh@0.1.2-rc.1`
 - Declared license: MIT
 
 Oh-DSH packages the published DSH CLI release as its runtime. The release
 tarball and SHA-512 integrity are pinned in `dsh-source.json`; the dependency
-closure is pinned in `scripts/dsh-runtime-0.1.2-alpha.3-lock.yaml`.
+closure is pinned in `scripts/dsh-runtime-0.1.2-rc.1-lock.yaml`.
 
 ## dsh-web-panel
 
@@ -30,8 +30,8 @@ separate Web Terminal or shell plugin is required.
 ## DSH-better-sidebar
 
 - Project: <https://github.com/omdsh-dev/DSH-better-sidebar>
-- Pinned release: `v0.18.0-alpha.0`
-- Pinned revision: `9494774c4867cdb661c8f9a805c40f7982518868`
+- Pinned release: `v0.18.1`
+- Pinned revision: `146840bb4f1b67e9b9ab8c556355613b20bd20e3`
 - Declared license: MIT
 - Oh-DSH components: `@oh-dsh/better-sidebar-runtime` and
   `@oh-dsh/sidebar`
@@ -66,9 +66,9 @@ skins, a desktop Settings interface, and Host-backed persistence.
 ## dsh-context
 
 - Project: <https://github.com/bowenliang123/dsh-context>
-- Upstream package: `dsh-context@0.41.0`
-- Pinned release: `v0.41.0`
-- Pinned revision: `3179715f57404b4429436685526674659b5e86e9`
+- Upstream package: `dsh-context@0.47.0`
+- Pinned release: `v0.47.0`
+- Pinned revision: `30892c8dd48850b27e3179651396c649f884d87a`
 - Declared license: Apache-2.0
 - Oh-DSH component: built-in Desktop and Web context insight plugin
 
@@ -82,15 +82,15 @@ and keep the license with the packaged plugin.
 ## dsh-TUI
 
 - Project: <https://github.com/ccch1mneyyy/dsh-TUI>
-- Upstream package: `@deepseek-harness-tui/dsh-tui@0.10.0-beta.4`
-- Pinned revision: `f7db605713a861b28c004b2dc18813bb74d61154`
+- Upstream package: `@deepseek-harness-tui/dsh-tui@0.10.0`
+- Pinned revision: `1626398e079be1b5d8e92737f87bd02f865f2a53`
 - Ecosystem specification: <https://github.com/T-Auto/dsh-ecosystem-spec>
 - Pinned ecosystem revision: `d28c267fe7fd775428ec2dccd65b0b7efd4dacee`
 - Protocol packages: <https://github.com/Yan-Zero/dsh-std>
 - Pinned protocol revision: `614dfa1ac168db79fcf4577cf0ebb34e2e3b944b`
 - Bundled OAuth package: <https://github.com/ccch1mneyyy/dsh-auth>
   (`@deepseek-harness-tui/dsh-auth@0.1.0`, pinned revision
-  `4e7cba3854e8874c8114bac2133aba3a7e1a65fe`, MIT) — also mounted directly
+  `94fdf81e775e8d884af4dfb64a94b617c3751936`, MIT) — also mounted directly
   as the built-in Desktop and Web host plugin behind the `/auth` command
 - Declared license: MIT
 - Oh-DSH component: `@oh-dsh/tui`

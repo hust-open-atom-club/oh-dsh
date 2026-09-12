@@ -930,6 +930,21 @@ function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
       portableSymlink(relative(dirname(link), dependencyTarget), link)
     } catch (error) {
       if (optional) continue
+      // The staged source tree cannot always provide the dependency: the
+      // Nix assembly materializes no workspace node_modules beside an
+      // upstream-pinned prebuilt package (dsh-context's zod). The Windows
+      // path already lets the runtime's hoisted closure carry such deps;
+      // resolve the same way before declaring the dependency missing.
+      const staged = [
+        join(runtime, 'node_modules', ...dependency.split('/')),
+        join(runtime, 'node_modules', '.pnpm', 'node_modules', ...dependency.split('/')),
+      ].find(candidate => existsSync(join(candidate, 'package.json')))
+      if (staged !== undefined) {
+        const link = join(installRoot, ...dependency.split('/'))
+        mkdirSync(dirname(link), { recursive: true })
+        portableSymlink(relative(dirname(link), staged), link)
+        continue
+      }
       throw new Error(`${sourceManifest.name} is missing runtime dependency ${dependency}`, { cause: error })
     }
   }

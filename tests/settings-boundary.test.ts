@@ -26,7 +26,7 @@ function fixture(layout = 'pnpm') {
       root,
       'node_modules',
       '.pnpm',
-      '@deepseek-ai+dsh-api-settings-controller@0.1.2-alpha.3',
+      '@deepseek-ai+dsh-api-settings-controller@0.1.2-rc.1',
       'node_modules',
       '@deepseek-ai',
       'dsh-api-settings-controller',
