@@ -88,7 +88,7 @@
     "semver": "7.7.4"
   },
   "optionalDependencies": {
-    "@deepseek-ai/node-addon-landlock-run-linux-x64": "0.1.1"
+    "@deepseek-ai/node-addon-system-linux-x64": "0.1.2"
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",

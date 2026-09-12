@@ -123,9 +123,9 @@ importers:
         specifier: 2.8.1
         version: 2.8.1
     optionalDependencies:
-      '@deepseek-ai/node-addon-landlock-run-linux-x64':
-        specifier: 0.1.1
-        version: 0.1.1
+      '@deepseek-ai/node-addon-system-linux-x64':
+        specifier: 0.1.2
+        version: 0.1.2
 
   plugins/about:
     devDependencies:
@@ -2190,12 +2190,6 @@ packages:
       '@deepseek-ai/dsh-storage': 0.1.5-rc.1
       '@deepseek-ai/dsh-storage-domain': 0.1.5-rc.1
       '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.1
-
-  '@deepseek-ai/node-addon-landlock-run-linux-x64@0.1.1':
-    resolution: {integrity: sha512-OHAzPW2Coe/iYobAJAAA8CeVrBoKV4BnNHsgwvXwOfishxkUVSWSvdyxrZPiwYRXutpIGVrSo9zV3WOQy2euBA==}
-    engines: {node: '>=20'}
-    cpu: [x64]
-    os: [linux]
 
   '@deepseek-ai/node-addon-system-darwin-arm64@0.1.2':
     resolution: {integrity: sha512-IR0cx8um19mLCZaJ+H5PLblKr6Eg3PWvVo8eTQBr/SwH2nh5tM9CD9/5fHweNS9Pjt15UdFlGqnvLSd/w+O6Rw==}
@@ -6618,9 +6612,6 @@ snapshots:
       '@deepseek-ai/dsh-storage-domain': 0.1.5-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-storage@0.1.5-rc.1(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.1(@deepseek-ai/cordis@4.0.1)
       zod: 4.4.3
-
-  '@deepseek-ai/node-addon-landlock-run-linux-x64@0.1.1':
-    optional: true
 
   '@deepseek-ai/node-addon-system-darwin-arm64@0.1.2':
     optional: true

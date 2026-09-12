@@ -107,8 +107,8 @@ let
     hash = "sha512-vggwtl0+fuZ9Xuwq9NC5MznT3ZpBfnqGTBgPUfEaqoTPXrxI0S+jcNcO3ou9Akn23cUAZikgmS7zHMVr+ZlXbw==";
   };
   landlockLauncherRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-ai/node-addon-landlock-run-linux-x64/-/node-addon-landlock-run-linux-x64-0.1.1.tgz";
-    hash = "sha512-OHAzPW2Coe/iYobAJAAA8CeVrBoKV4BnNHsgwvXwOfishxkUVSWSvdyxrZPiwYRXutpIGVrSo9zV3WOQy2euBA==";
+    url = "https://registry.npmjs.org/@deepseek-ai/node-addon-system-linux-x64/-/node-addon-system-linux-x64-0.1.2.tgz";
+    hash = "sha512-S2aPVHvYCpNCppCFyNlooMYuTB7ucK5lvD9oXQQ42v5Z2s5AoaiCdjz9r2l+ED2rI5oS1x0cUZmKjJH2dxV0pg==";
   };
   tuiEcosystemSpecSrc = pkgs.fetchFromGitHub {
     owner = "T-Auto";
@@ -327,7 +327,7 @@ pkgs.stdenv.mkDerivation {
       # The assembler stages the runtime from an offline DSH source, so
       # install the same pinned static Landlock launcher explicitly and
       # validate its published metadata.
-      landlock_package="$out/dsh-runtime/node_modules/@deepseek-ai/node-addon-landlock-run-linux-x64"
+      landlock_package="$out/dsh-runtime/node_modules/@deepseek-ai/node-addon-system-linux-x64"
       landlock_source="$TMPDIR/landlock-launcher-package"
       rm -rf "$landlock_package" "$landlock_source"
       mkdir -p "$landlock_package" "$landlock_source"
