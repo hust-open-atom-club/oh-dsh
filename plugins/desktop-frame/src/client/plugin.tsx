@@ -331,13 +331,8 @@ function DesktopFrame(props: DesktopFrameProps): JSX.Element {
   useEffect(() => {
     const root = document.documentElement
     root.style.setProperty('--oh-dsh-details-width', `${cols.rightbar}px`)
-    // The macOS drag band yields the sidebar's width to its risen first row.
-    root.style.setProperty('--oh-dsh-sidebar-col', `${cols.sidebar}px`)
-    return () => {
-      root.style.removeProperty('--oh-dsh-details-width')
-      root.style.removeProperty('--oh-dsh-sidebar-col')
-    }
-  }, [cols.rightbar, cols.sidebar])
+    return () => { root.style.removeProperty('--oh-dsh-details-width') }
+  }, [cols.rightbar])
   // An active session puts the conversation top bar's own controls (Session
   // log) in the top-right corner; only then does floating chrome need to step
   // aside from it.

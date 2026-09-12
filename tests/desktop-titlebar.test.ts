@@ -73,11 +73,9 @@ test('desktop chrome keeps platform title bars and panel controls distinct', () 
   assert.match(client, /delete document\.documentElement\.dataset\.ohDshDesktopPlatform/)
   // macOS drags by the whole reserved band: the native traffic lights float
   // above it and the panel toolbar opts out on its own.
-  // The drag band starts at the sidebar's edge: the sidebar's first row
-  // rides the traffic-light line and must stay clickable.
   assert.match(
     client,
-    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-titlebar-drag-region \{[\s\S]*?left: var\(--oh-dsh-sidebar-col, 264px\);[\s\S]*?right: 0;[\s\S]*?-webkit-app-region: drag/,
+    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-titlebar-drag-region \{[\s\S]*?left: 0;[\s\S]*?right: 0;[\s\S]*?-webkit-app-region: drag/,
   )
 
   // The floating panel toolbar is retired: the native right sidebar and
@@ -225,16 +223,8 @@ test('desktop v21 uses a replacement root frame without the v20 collapse workaro
   // runs to the window edge under the floating traffic lights.
   assert.match(
     css,
-    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-center,[\s\S]*?data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-details \{[\s\S]*?padding-top: var\(--oh-dsh-titlebar-height, 40px\)/,
+    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-sidebar,[\s\S]*?data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-center,[\s\S]*?data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-details \{[\s\S]*?padding-top: var\(--oh-dsh-titlebar-height, 40px\)/,
   )
-  // The sidebar rides the traffic-light line: a short inset, its first row
-  // indented past the lights, and the brand mark shrunk to fit.
-  assert.match(css, /frame-sidebar \{[\s\S]*?padding-top: 6px/)
-  assert.match(
-    css,
-    /\[data-slot='sidebar'\] > div > div:first-child \{[\s\S]*?padding-left: 74px/,
-  )
-  assert.match(css, /sidebar\.brand\.mark.*?width: 18px/s)
   assert.match(frame, /let frame: number \| null = null/)
   assert.match(frame, /requestAnimationFrame\(\(\) => \{/)
   assert.match(frame, /data-shell-overlay/)

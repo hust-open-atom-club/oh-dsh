@@ -39,33 +39,14 @@
   flex-direction: column;
 }
 
-/* macOS floats the traffic lights over the content. The center and right
- * columns reserve the chrome row internally; the sidebar rides the light
- * row itself — its brand row indents past the lights (see below), so the
- * whole column gains the chrome row's height back (the Windows body
- * padding plays this role there, which is why the inset is darwin-scoped). */
+/* macOS floats the traffic lights over the content: the columns keep their
+ * fills running to the window edge and reserve the chrome row internally,
+ * so the sidebar tint reaches the very top (the Windows body padding plays
+ * this role there, which is why the inset is darwin-scoped). */
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-desktop-frame-sidebar,
 html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-desktop-frame-center,
 html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-desktop-frame-details {
   padding-top: var(--oh-dsh-titlebar-height, 40px);
-}
-
-/* The sidebar's first row (brand mark, name, collapse toggle) shares the
- * traffic-light line: indent past the lights and center on their band.
- * The structural selector targets the native sidebar root's first child;
- * the pinned runtime keeps this shape stable. */
-html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-desktop-frame-sidebar {
-  padding-top: 6px;
-}
-html[data-oh-dsh-desktop-platform='darwin'] [data-slot='sidebar'] > div > div:first-child {
-  padding-left: 74px;
-  min-height: 28px;
-}
-
-/* The brand mark shrinks to fit the shared line. */
-html[data-oh-dsh-desktop-platform='darwin'] [data-slot='sidebar.brand.mark'] svg,
-html[data-oh-dsh-desktop-platform='darwin'] [data-slot='sidebar.brand.mark'] img {
-  width: 18px;
-  height: 18px;
 }
 
 /* The right column floats on the canvas: a hairline ring plus a diffuse

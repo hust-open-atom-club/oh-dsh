@@ -75,9 +75,7 @@ html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-titlebar-drag-region {
   position: fixed;
   z-index: 2147483646;
   top: 0;
-  /* The sidebar's first row rides the traffic-light line, so the drag band
-     starts at the sidebar's edge (the frame publishes its live width). */
-  left: var(--oh-dsh-sidebar-col, 264px);
+  left: 0;
   right: 0;
   height: var(--oh-dsh-titlebar-height);
   user-select: none;
