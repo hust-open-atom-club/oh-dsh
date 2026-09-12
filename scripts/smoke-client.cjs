@@ -162,10 +162,9 @@ void app.whenReady().then(async () => {
               window.__OH_DSH_SMOKE_ATTACHMENT_REQUESTED__ = true
               composerInput.dispatchEvent(paste)
             } else {
-              // 0.1.5 keeps the composer inert until a workspace is chosen and
-              // its picker menu ignores untrusted synthetic events, so the
-              // page side only reports geometry; the poll loop drives the
-              // menu through Electron's trusted sendInputEvent.
+              // 0.1.5 keeps the composer inert until a workspace is chosen;
+              // the preload delivers the open-paths command that creates the
+              // smoke workspace directly, so no picker interaction is needed.
               const workspaceTrigger = [...document.querySelectorAll(
                 '[data-composer-card] [data-composer-input="true"][aria-label="Choose workspace"], '
                 + '[data-composer-card] [data-composer-input="true"][aria-label="选择工作区"]',

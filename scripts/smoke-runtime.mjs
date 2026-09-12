@@ -43,6 +43,34 @@ function parseBootEntries(index) {
 
 ensureDesktopProfile(dshHome)
 
+// Pre-seed the runtime's workspace storage with the smoke repository so the
+// open-paths command the preload delivers resolves to a known workspace
+// (get-or-create) and starts its session immediately; creating the workspace
+// from scratch in the smoke window does not settle inside the poll budget.
+mkdirSync(join(dshHome, 'storages'), { recursive: true })
+const smokeWorkspaceId = '11111111-2222-4333-8444-555555555555'
+writeFileSync(join(dshHome, 'storages', 'workspace.json'), JSON.stringify({
+  unit: { name: 'workspace', version: 2 },
+  global: {
+    initialized: true,
+    workspaceIds: [smokeWorkspaceId],
+    archivedSessionIds: [],
+  },
+  tables: {
+    workspaces: {
+      [smokeWorkspaceId]: {
+        path: smokeRoot,
+        title: 'desktop-smoke',
+        sessionIds: [],
+        createdAt: '2026-09-12T00:00:00.000Z',
+        updatedAt: '2026-09-12T00:00:00.000Z',
+      },
+    },
+  },
+}, undefined, 2) + '\n')
+
+
+
 const runtimeEnvironment = {
   ...process.env,
   DSH_DESKTOP: '1',

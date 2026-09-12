@@ -41,7 +41,17 @@ contextBridge.exposeInMainWorld('dshDesktop', Object.freeze({
     runtimeUrl: null,
     status: 'ready',
   }),
-  onCommand: () => () => {},
+  onCommand: (listener) => {
+    // Deliver the same command the real main process sends when a folder is
+    // opened with the app: the client creates the workspace and starts its
+    // session, lifting the composer out of the inert first-run phase without
+    // driving the 0.1.5 picker menu (it ignores synthetic input).
+    const workspace = process.env.OH_DSH_SMOKE_WORKSPACE
+    if (workspace !== undefined && workspace !== '' && typeof listener === 'function') {
+      setTimeout(() => { listener({ type: 'open-paths', paths: [workspace] }) }, 1200)
+    }
+    return () => {}
+  },
   onWindowState: () => () => {},
   openExternal: async () => {},
   pluginMarketplace: Object.freeze({
