@@ -160,6 +160,7 @@ function adaptScrollBoxContentGrowth(path) {
 }
 
 function disableUpstreamUpdateCheck(path) {
+  // v0.10.1 renamed channel.notify to notifyChannel; the guard stays.
   const before = `    void checkForTuiUpdate().then((update) => {
         if (update === undefined || exited || updateRequested)
             return;
@@ -171,7 +172,7 @@ function disableUpstreamUpdateCheck(path) {
         const suffix = update.isStandalone && update.checksumUrl === undefined
             ? \` \${t('update-standalone-no-checksum')}\`
             : '';
-        channel.notify(\`\${t(key, { current: update.current, latest: update.latest })}\${suffix}\`, { color: 'warning', timeoutMs: 12000 });
+        notifyChannel(\`\${t(key, { current: update.current, latest: update.latest })}\${suffix}\`, { color: 'warning', timeoutMs: 12000 });
     });`
   const after = `    if (process.env.DSH_OH_TUI !== '1') {
         void checkForTuiUpdate().then((update) => {
@@ -185,7 +186,7 @@ function disableUpstreamUpdateCheck(path) {
             const suffix = update.isStandalone && update.checksumUrl === undefined
                 ? \` \${t('update-standalone-no-checksum')}\`
                 : '';
-            channel.notify(\`\${t(key, { current: update.current, latest: update.latest })}\${suffix}\`, { color: 'warning', timeoutMs: 12000 });
+            notifyChannel(\`\${t(key, { current: update.current, latest: update.latest })}\${suffix}\`, { color: 'warning', timeoutMs: 12000 });
         });
     }`
   replaceOnce(path, before, after)
@@ -289,16 +290,18 @@ export function adaptTuiRendererPackage(packageDir) {
     '`$DSH_HOME/.credentials.yaml`',
   )
 
-  const channel = join(lib, 'dsh-adapter', 'channel.js')
+  // v0.10.1 split the channel into channel/*.js submodules; the export and
+  // config-source seams moved to channel/reports.js.
+  const reports = join(lib, 'dsh-adapter', 'channel', 'reports.js')
   replaceOnce(
-    channel,
+    reports,
     '`dsh-tui-export-${Date.now()}.md`',
     '`oh-dsh-tui-export-${Date.now()}.md`',
   )
   replaceOnce(
-    channel,
-    "join(userHome, '.dsh-tui/cordis.yml')",
-    "join(process.env.OH_DSH_TUI_CONFIG_HOME ?? join(userHome, '.ohdsh', 'tui'), 'cordis.yml')",
+    reports,
+    "join(homeDir(), '.dsh-tui/cordis.yml')",
+    "join(process.env.OH_DSH_TUI_CONFIG_HOME ?? join(homeDir(), '.ohdsh', 'tui'), 'cordis.yml')",
   )
 
   const compatibility = join(lib, 'dsh-adapter', 'compat', 'sessionLog.js')

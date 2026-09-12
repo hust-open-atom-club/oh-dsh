@@ -36,14 +36,14 @@ declare global {
 }
 
 const DESKTOP_CHROME_CSS = `
-/* Every desktop surface publishes the chrome row height. macOS and Windows
-   spend it on the in-page title bar; framed platforms spend it inside the
-   frame, where the floating panel toolbar lives. */
+/* Every desktop surface publishes the chrome row height. Windows spends it
+   on the in-page title bar of its framed window; macOS extends the frame to
+   the window edge (vibrancy titlebar) and the frame's own columns reserve
+   the row, so the sidebar tint reaches the very top (Codex-like). */
 html[data-oh-dsh-desktop='true'] {
   --oh-dsh-titlebar-height: ${DESKTOP_TITLEBAR_HEIGHT}px;
 }
 
-html[data-oh-dsh-desktop-platform='darwin'] body,
 html[data-oh-dsh-desktop-platform='win32'] body {
   box-sizing: border-box;
   padding-top: var(--oh-dsh-titlebar-height);
@@ -52,7 +52,6 @@ html[data-oh-dsh-desktop-platform='win32'] body {
   overflow: hidden;
 }
 
-html[data-oh-dsh-desktop-platform='darwin'] body::before,
 html[data-oh-dsh-desktop-platform='win32'] body::before {
   content: '';
   position: fixed;
@@ -71,8 +70,8 @@ html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-titlebar-drag-region {
   position: fixed;
   z-index: 2147483646;
   top: 0;
-  left: 88px;
-  right: 112px;
+  left: 0;
+  right: 0;
   height: var(--oh-dsh-titlebar-height);
   user-select: none;
   -webkit-app-region: drag;

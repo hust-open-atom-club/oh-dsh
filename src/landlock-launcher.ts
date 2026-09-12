@@ -1,7 +1,7 @@
 import { accessSync, constants, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-export const LANDLOCK_LAUNCHER_PACKAGE = '@deepseek-ai/node-addon-landlock-run-linux-x64'
+export const LANDLOCK_LAUNCHER_PACKAGE = '@deepseek-ai/node-addon-system-linux-x64'
 
 export function resolveLandlockLauncher(
   runtimeRoot: string,

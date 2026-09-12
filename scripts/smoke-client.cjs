@@ -39,6 +39,11 @@ void app.whenReady().then(async () => {
     // visible (rc.5 behavior).
     show: true,
     webPreferences: {
+      // Throwaway partition: the runtime plants a dsh-auth-* cookie per boot
+      // and cookies are shared across loopback ports, so a persistent jar
+      // accumulates dead tokens run over run until bundle URLs trip the
+      // server's header limit (431). Each smoke run starts with a clean jar.
+      partition: 'oh-dsh-smoke',
       backgroundThrottling: false,
       contextIsolation: true,
       nodeIntegration: false,
@@ -50,6 +55,10 @@ void app.whenReady().then(async () => {
   const startedAt = Date.now()
   let navigationReadyAt = null
   let settled = false
+  let workspaceMenuClickedAt = 0
+  let workspaceTriggerClickedAt = 0
+  let workspaceDialogClickedAt = 0
+  let workspaceMenuHovered
 
   const settle = error => {
     if (settled) return
@@ -153,6 +162,9 @@ void app.whenReady().then(async () => {
               window.__OH_DSH_SMOKE_ATTACHMENT_REQUESTED__ = true
               composerInput.dispatchEvent(paste)
             } else {
+              // 0.1.5 keeps the composer inert until a workspace is chosen;
+              // the preload delivers the open-paths command that creates the
+              // smoke workspace directly, so no picker interaction is needed.
               const workspaceTrigger = [...document.querySelectorAll(
                 '[data-composer-card] [data-composer-input="true"][aria-label="Choose workspace"], '
                 + '[data-composer-card] [data-composer-input="true"][aria-label="选择工作区"]',
@@ -160,27 +172,10 @@ void app.whenReady().then(async () => {
                 && element.getClientRects().length > 0)
               if (workspaceTrigger instanceof HTMLElement
                 && workspaceTrigger.getAttribute('aria-expanded') !== 'true'
-                && Date.now() - (window.__OH_DSH_SMOKE_WORKSPACE_REQUESTED_AT__ ?? 0) > 500) {
+                && window.__OH_DSH_SMOKE_WORKSPACE_REQUESTED_AT__ === undefined) {
                 window.__OH_DSH_SMOKE_WORKSPACE_REQUESTED_AT__ = Date.now()
-                const count = (window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ ?? 0) + 1
-                window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ = count
-                // rc.7 binds the hero picker open on the trigger textarea itself
-                // (a card-level click no longer lands) and the untrusted click
-                // lands only intermittently, so alternate between the card and
-                // the textarea and keep trying until aria-expanded flips
-                // instead of toggling an open picker shut on the next poll.
-                const target = count % 2 === 1
-                  ? (workspaceTrigger.closest('[data-composer-card]') ?? workspaceTrigger)
-                  : workspaceTrigger
-                target.dispatchEvent(new PointerEvent('pointerdown', {
-                  bubbles: true,
-                  cancelable: true,
-                }))
-                target.dispatchEvent(new MouseEvent('click', {
-                  bubbles: true,
-                  cancelable: true,
-                  view: window,
-                }))
+                window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ =
+                  (window.__OH_DSH_SMOKE_WORKSPACE_REQUEST_COUNT__ ?? 0) + 1
               }
               const directoryDialog = [...document.querySelectorAll('[role="dialog"]')]
                 .find(dialog => /^(Select Workspace Directory|选择工作区目录)$/i.test(
@@ -201,7 +196,35 @@ void app.whenReady().then(async () => {
           const current = [...document.querySelectorAll('[data-composer-card] img')]
             .find(candidate => candidate instanceof HTMLImageElement
               && candidate.getClientRects().length > 0)
+          const center = element => {
+            const rect = element.getBoundingClientRect()
+            return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) }
+          }
+          const visible = element => element instanceof HTMLElement
+            && element.getClientRects().length > 0
+          const inertTrigger = [...document.querySelectorAll(
+            '[data-composer-card] [data-composer-input="true"][aria-label="Choose workspace"], '
+            + '[data-composer-card] [data-composer-input="true"][aria-label="选择工作区"]',
+          )].find(visible)
+          const menuEntries = [...document.querySelectorAll(
+            '[role=menu] [role=menuitem], [role=menu] [role=option], [role=listbox] [role=option], [data-radix-popper-content-wrapper] [role=menuitem]',
+          )].filter(visible)
+            .map(element => ({
+              text: (element.textContent ?? '').trim().slice(0, 32),
+              ...center(element),
+            }))
+          const directoryDialog = [...document.querySelectorAll('[role="dialog"]')]
+            .find(dialog => /^(Select Workspace Directory|选择工作区目录)$/i.test(
+              dialog.querySelector('h2')?.textContent?.trim() ?? '',
+            ))
+          const openButton = [...(directoryDialog?.querySelectorAll('button') ?? [])]
+            .find(button => /^(Open|打开)$/i.test((button.textContent ?? '').trim())
+              && !button.disabled)
           return {
+            dialogOpen: openButton instanceof HTMLButtonElement ? center(openButton) : null,
+            trigger: inertTrigger === undefined ? null : center(inertTrigger),
+            menuItem: menuEntries.find(entry => entry.text !== '' && !/^(add|添加)/i.test(entry.text))
+              ?? (menuEntries.length > 0 ? menuEntries[0] : null),
             error: null,
             facts: window.__OH_DSH_SMOKE_ATTACHMENT_FACTS__ ?? null,
             removeAvailable: window.__OH_DSH_SMOKE_ATTACHMENT_FACTS__?.removeLabel !== null
@@ -294,6 +317,39 @@ void app.whenReady().then(async () => {
           + JSON.stringify(state.navigation),
         ))
         return
+      }
+      // The 0.1.5 workspace picker menu ignores untrusted synthetic
+      // events; drive it with Electron's trusted sendInputEvent instead.
+      if (state.attachment.requested !== true) {
+        if (state.attachment.dialogOpen !== null
+          && Date.now() - (workspaceDialogClickedAt ?? 0) > 800) {
+          workspaceDialogClickedAt = Date.now()
+          const { x, y } = state.attachment.dialogOpen
+          window.webContents.sendInputEvent({ type: 'mouseMove', x, y })
+          window.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 })
+          window.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 })
+        } else if (state.attachment.menuItem !== null
+          && Date.now() - (workspaceMenuClickedAt ?? 0) > 900) {
+          workspaceMenuClickedAt = Date.now()
+          const { x, y } = state.attachment.menuItem
+          // Menu entries register the click only after a hover beat, so
+          // move first and click in the following poll.
+          if (workspaceMenuHovered === undefined
+            || workspaceMenuHovered.x !== x || workspaceMenuHovered.y !== y) {
+            workspaceMenuHovered = { x, y }
+            window.webContents.sendInputEvent({ type: 'mouseMove', x, y })
+          } else {
+            window.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 })
+            window.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 })
+          }
+        } else if (state.attachment.trigger !== null
+          && Date.now() - (workspaceTriggerClickedAt ?? 0) > 1000) {
+          workspaceTriggerClickedAt = Date.now()
+          const { x, y } = state.attachment.trigger
+          window.webContents.sendInputEvent({ type: 'mouseMove', x, y })
+          window.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 })
+          window.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 })
+        }
       }
       if (state.attachment.error !== null) {
         settle(new Error(`Pasted image thumbnail failed: ${state.attachment.error}`))

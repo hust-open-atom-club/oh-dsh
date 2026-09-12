@@ -3,6 +3,8 @@ import { posix, win32 } from 'node:path'
 /** Files bundled beside the packaged Electron application. */
 export interface BundledRuntimePaths {
   cliEntry: string
+  /** Programmatic desktop-profile boot the 0.1.5 CLI reserves for Electron hosts. */
+  desktopBootEntry: string
   nodeBinary: string
   nodeBinDirectory: string
   pnpmBinary: string
@@ -40,6 +42,7 @@ export function bundledRuntimePaths(
     : paths.join(nodeRoot, 'bin')
   return {
     cliEntry: paths.join(runtimeRoot, 'lib', 'bin.js'),
+    desktopBootEntry: paths.join(runtimeRoot, 'lib', 'ohdsh-desktop.mjs'),
     nodeBinary: paths.join(nodeBinDirectory, platform === 'win32' ? 'node.exe' : 'node'),
     nodeBinDirectory,
     pnpmBinary: paths.join(nodeBinDirectory, platform === 'win32' ? 'pnpm.cmd' : 'pnpm'),

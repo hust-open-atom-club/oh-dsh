@@ -17,19 +17,35 @@ test('desktop chrome keeps platform title bars and panel controls distinct', () 
     main,
     /: process\.platform === 'win32'[\s\S]*?autoHideMenuBar: true, frame: false[\s\S]*?: \{\}\)/,
   )
-  // macOS keeps the hiddenInset row and every other platform keeps the frame.
-  assert.match(main, /process\.platform === 'darwin'[\s\S]*?titleBarStyle: 'hiddenInset'/)
+  // macOS floats the traffic lights over a transparent 'menu' vibrancy
+  // material (ChatGPT desktop's own primary-window recipe): no native
+  // titlebar strip or hairline — the web content owns the top edge.
+  assert.match(
+    main,
+    /process\.platform === 'darwin'[\s\S]*?titleBarStyle: 'hiddenInset'[\s\S]*?vibrancy: 'menu'[\s\S]*?acceptFirstMouse: true/,
+  )
 
   assert.match(contracts, /export const DESKTOP_TITLEBAR_HEIGHT = 40/)
 
-  // Desktop publishes its platform to CSS. Only the hidden/frameless macOS
-  // and Windows variants reserve the in-page titlebar row; Linux keeps its
-  // native frame, while Web never loads the Desktop bridge or overrides.
+  // Desktop publishes its platform to CSS. Only Windows reserves the chrome
+  // row as body padding and draws its framed in-page title bar; macOS
+  // extends the frame to the window edge and the frame's columns carry the
+  // inset (see frame.css), Linux keeps its native frame, and Web never
+  // loads the Desktop bridge or overrides.
   assert.match(client, /installDesktopChrome\(bridge\.platform\)/)
   assert.match(client, /dataset\.ohDshDesktopPlatform = platform/)
   assert.match(
     client,
-    /data-oh-dsh-desktop-platform='darwin'\] body,[\s\S]*?data-oh-dsh-desktop-platform='win32'\] body \{[\s\S]*?padding-top: var\(--oh-dsh-titlebar-height\);[\s\S]*?border-radius: 14px/,
+    /data-oh-dsh-desktop-platform='win32'\] body \{[\s\S]*?padding-top: var\(--oh-dsh-titlebar-height\);[\s\S]*?border: 1px solid var\(--dsw-alias-border-l1\);[\s\S]*?border-radius: 14px/,
+  )
+  // macOS carries no titlebar strip, no body padding, and no window chrome.
+  assert.doesNotMatch(
+    client,
+    /data-oh-dsh-desktop-platform='darwin'\] body::before/,
+  )
+  assert.doesNotMatch(
+    client,
+    /data-oh-dsh-desktop-platform='darwin'\] body,[\s\S]*?padding-top/,
   )
   assert.doesNotMatch(client, /data-oh-dsh-desktop-platform='linux'[\s\S]*?padding-top:/)
   assert.doesNotMatch(client, /data-oh-dsh-desktop='true'\] body \{[\s\S]*?border-radius:/)
@@ -44,7 +60,7 @@ test('desktop chrome keeps platform title bars and panel controls distinct', () 
   )
   assert.match(
     frame,
-    /root\.style\.setProperty\('--oh-dsh-details-width', `\$\{cols\.details\}px`\)/,
+    /root\.style\.setProperty\('--oh-dsh-details-width', `\$\{cols\.rightbar\}px`\)/,
   )
   assert.match(
     frame,
@@ -55,9 +71,11 @@ test('desktop chrome keeps platform title bars and panel controls distinct', () 
   assert.match(client, /if \(platform === 'darwin'\)[\s\S]*?oh-dsh-titlebar-drag-region/)
   assert.match(client, /dragRegion\?\.remove\(\)/)
   assert.match(client, /delete document\.documentElement\.dataset\.ohDshDesktopPlatform/)
+  // macOS drags by the whole reserved band: the native traffic lights float
+  // above it and the panel toolbar opts out on its own.
   assert.match(
     client,
-    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-titlebar-drag-region \{[\s\S]*?left: 88px;[\s\S]*?right: 112px;[\s\S]*?-webkit-app-region: drag/,
+    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-titlebar-drag-region \{[\s\S]*?left: 0;[\s\S]*?right: 0;[\s\S]*?-webkit-app-region: drag/,
   )
 
   // Web and framed Linux keep the shared top-right position. The toolbar owns
@@ -223,14 +241,27 @@ test('desktop v21 uses a replacement root frame without the v20 collapse workaro
   assert.match(build, /directory: 'desktop-frame', id: '@oh-dsh\/desktop-frame'/)
   assert.match(stage, /desktop-frame/)
   assert.match(frame, /name: 'root'/)
+  // 0.1.5 slot contract: keyed main panels and a root-scope rightbar, plus
+  // the panel-info hooks provider the shell's slot entries read through.
   assert.match(frame, /sidebar: \{ kind: 'single', scope: 'root' \}/)
-  assert.match(frame, /conversation: \{ kind: 'single', scope: 'session-maybe' \}/)
-  assert.match(frame, /details: \{ kind: 'single', scope: 'session' \}/)
+  assert.match(frame, /main: \{ kind: 'keyed', scope: 'root' \}/)
+  assert.match(frame, /rightbar: \{ kind: 'single', scope: 'root' \}/)
   assert.match(frame, /'shell\.overlay': \{ kind: 'list', scope: 'root' \}/)
+  assert.match(frame, /provideRoot\(\{ hooks: \{ panelInfo:/)
+  assert.match(frame, /renderSlot\('main', \{\}, \{ entryKey: activePanelId \}\)/)
   assert.match(frame, /gridTemplateColumns/)
-  assert.match(css, /grid-template-columns var\(--ds-transition-duration-slow\) var\(--ds-ease-in-out\)/)
-  assert.match(frame, /const lastSession = useRef\(detailsSession\)/)
-  assert.match(frame, /lastSession\.current !== detailsSession[\s\S]*?actions\.closeDetails\(\)/)
+  // Codex finish: the frame rides the shared Oh-DSH motion curve; region
+  // separation is luminance-based, so the sidebar has no border and the
+  // right column floats with a hairline plus diffuse left shadow.
+  assert.match(css, /grid-template-columns var\(--ohdsh-duration-panel, 200ms\) var\(--ohdsh-ease, ease\)/)
+  assert.doesNotMatch(css, /\.oh-dsh-desktop-frame-sidebar \{[\s\S]*?border-right/)
+  assert.match(css, /\.oh-dsh-desktop-frame-details \{[\s\S]*?border-left: 1px solid var\(--dsw-alias-border-l1\);[\s\S]*?box-shadow: -12px 0 24px/)
+  // macOS reserves the chrome row inside the columns so the sidebar tint
+  // runs to the window edge under the floating traffic lights.
+  assert.match(
+    css,
+    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-sidebar,[\s\S]*?data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-center,[\s\S]*?data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-desktop-frame-details \{[\s\S]*?padding-top: var\(--oh-dsh-titlebar-height, 40px\)/,
+  )
   assert.match(frame, /let frame: number \| null = null/)
   assert.match(frame, /requestAnimationFrame\(\(\) => \{/)
   assert.match(frame, /data-shell-overlay/)

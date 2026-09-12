@@ -286,8 +286,13 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
     )
     assert.match(providerWizard, /\$DSH_HOME\/\.credentials\.yaml/)
     assert.doesNotMatch(providerWizard, /~\/\.dsh\/\.credentials\.yaml/)
+    // v0.10.1 split the channel into channel/*.js submodules; the export and
+    // config-source seams live in channel/reports.js.
+    const reports = readFileSync(join(lib, 'dsh-adapter', 'channel', 'reports.js'), 'utf8')
+    assert.match(reports, /oh-dsh-tui-export-/)
+    assert.doesNotMatch(reports, /`dsh-tui-export-/)
+    assert.match(reports, /OH_DSH_TUI_CONFIG_HOME/)
     const channel = readFileSync(join(lib, 'dsh-adapter', 'channel.js'), 'utf8')
-    assert.match(channel, /oh-dsh-tui-export-/)
     assert.doesNotMatch(
       channel,
       /const fileName = `dsh-tui-export-|join\(userHome, '\.dsh-tui\//,

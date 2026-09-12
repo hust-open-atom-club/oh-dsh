@@ -6,18 +6,19 @@
   height: 100%;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
-  transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  transition: grid-template-columns var(--ohdsh-duration-panel, 200ms) var(--ohdsh-ease, ease);
 }
 
 .oh-dsh-desktop-frame[data-dragging] {
   transition: none;
 }
 
+/* Region separation comes from the skin's luminance ladder (the sidebar fill
+ * sits one step below the canvas), so the sidebar carries no border. */
 .oh-dsh-desktop-frame-sidebar {
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
-  border-right: 1px solid var(--dsw-alias-border-l1);
 }
 
 .oh-dsh-desktop-frame-sidebar-content {
@@ -38,12 +39,30 @@
   flex-direction: column;
 }
 
+/* macOS floats the traffic lights over the content: the columns keep their
+ * fills running to the window edge and reserve the chrome row internally,
+ * so the sidebar tint reaches the very top (the Windows body padding plays
+ * this role there, which is why the inset is darwin-scoped). */
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-desktop-frame-sidebar,
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-desktop-frame-center,
+html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-desktop-frame-details {
+  padding-top: var(--oh-dsh-titlebar-height, 40px);
+}
+
+/* The right column floats on the canvas: a hairline ring plus a diffuse
+ * left-facing shadow instead of a single hard rule. */
 .oh-dsh-desktop-frame-details {
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  box-shadow: -12px 0 24px -12px rgba(0, 0, 0, 0.05);
+}
+
+[data-ds-dark-theme] .oh-dsh-desktop-frame-details {
+  box-shadow: -12px 0 24px -12px rgba(0, 0, 0, 0.35);
 }
 
 .oh-dsh-desktop-frame[data-details-collapsed] .oh-dsh-desktop-frame-details {
   border-left: none;
+  box-shadow: none;
 }
 
 .oh-dsh-desktop-frame-overlay {
@@ -66,7 +85,7 @@
   margin-left: -4px;
   cursor: col-resize;
   touch-action: none;
-  transition: left var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  transition: left var(--ohdsh-duration-panel, 200ms) var(--ohdsh-ease, ease);
 }
 
 .oh-dsh-desktop-frame[data-dragging] .oh-dsh-desktop-frame-handle {

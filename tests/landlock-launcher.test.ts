@@ -16,7 +16,7 @@ import {
 } from '../scripts/landlock-launcher.mjs'
 import { landlockPreviewCommand, resolveLandlockLauncher } from '../src/landlock-launcher.ts'
 
-const packageVersion = '0.1.1'
+const packageVersion = '0.1.2'
 
 function writePackageManifest(packageRoot: string, version = packageVersion) {
   mkdirSync(packageRoot, { recursive: true })
@@ -114,8 +114,8 @@ test('resolves and invokes the staged Linux x64 launcher', () => {
 
 test('Nix packaging pins and stages the Linux x64 Landlock launcher', () => {
   const nix = readFileSync(new URL('../nix/oh-dsh.nix', import.meta.url), 'utf8')
-  assert.ok(nix.includes('node-addon-landlock-run-linux-x64-0.1.1.tgz'))
-  assert.ok(nix.includes('sha512-OHAzPW2Coe/iYobAJAAA8CeVrBoKV4BnNHsgwvXwOfishxkUVSWSvdyxrZPiwYRXutpIGVrSo9zV3WOQy2euBA=='))
+  assert.ok(nix.includes('node-addon-system-linux-x64-0.1.2.tgz'))
+  assert.ok(nix.includes('sha512-S2aPVHvYCpNCppCFyNlooMYuTB7ucK5lvD9oXQQ42v5Z2s5AoaiCdjz9r2l+ED2rI5oS1x0cUZmKjJH2dxV0pg=='))
   assert.ok(nix.includes('system == "x86_64-linux"'))
   assert.ok(nix.includes('restoreLandlockLauncher'))
   assert.ok(nix.includes('test -x "$landlock_package/bin/landlock-run"'))

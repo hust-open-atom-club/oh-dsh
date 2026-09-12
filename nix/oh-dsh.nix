@@ -79,36 +79,36 @@ let
   betterSidebarSrc = pkgs.fetchFromGitHub {
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
-    rev = "146840bb4f1b67e9b9ab8c556355613b20bd20e3";
-    hash = "sha256-2jUJgv8GHYZ+mSGjzToeqj66PxothU8jWwjsehRfx0E=";
+    rev = "754974afeaf5c0aa310d6104dfd892ef56a6297d";
+    hash = "sha256-qS7ERxKYw6mAvXmjwUX81l6oUfjBfgRQWbJWBuEIWrw=";
   };
   contextRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.47.0.tgz";
-    hash = "sha512-wymzyVR3fWpQeECZjfMn/LGB7x7nvWi0rU1vMAEUKf6T8uBe1vhnTySMCJER1MnOzI7wnX6vdvNfyBMLfx/4ZA==";
+    url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.49.2.tgz";
+    hash = "sha512-RDBZH0n9FwHyaxTCm8hHNDJltjexKCcA8gfzlKpT/xVjr9HdGlEQtgHdeYlr/POAphFvhVqhTG58FM7TtrYP0A==";
   };
   tuiSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
-    rev = "1626398e079be1b5d8e92737f87bd02f865f2a53";
-    hash = "sha256-i49UdJ/uHCB1G7Jm7MPy/HDgbrCLUJjY9J1sl0xL6Mw=";
+    rev = "78081cebde1ee1b47a561ef57c04f128c5623476";
+    hash = "sha256-ny97a8TZ1wdJBjXvWiMysdOLZNF3MpGTVHIODQtarY0=";
   };
   dshAuthSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-auth";
-    rev = "94fdf81e775e8d884af4dfb64a94b617c3751936";
-    hash = "sha256-gSkDJnjm4N2qOqnEstDU12S4D9FvomrxB9UVwlFN2M4=";
+    rev = "cc6ec5224b62b6e6508c0109ef19e93b0a5c0a0e";
+    hash = "sha256-yL1ruV86qvi4RWfph9ANKcBrHi5p+ZpRPP5O/Q4PBJA=";
   };
   tuiRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.0.tgz";
-    hash = "sha512-0alYtPbQedsdojpywbfoRtQghJKnwg0aazIYDRyp9sXcdMoG3fSt53M91ttOvSraJr7vOYfgA+ZBpqckMqWv8g==";
+    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.1.tgz";
+    hash = "sha512-xnwLON+c28zt1Yg5nrI2fNHysUEF63TsIC7XndtIJIiDOBEomcSfydnc9DrT+Xzx7p2/qAi6d7+GFB0eSyJ2uw==";
   };
   dshAuthRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-auth/-/dsh-auth-0.1.0.tgz";
     hash = "sha512-vggwtl0+fuZ9Xuwq9NC5MznT3ZpBfnqGTBgPUfEaqoTPXrxI0S+jcNcO3ou9Akn23cUAZikgmS7zHMVr+ZlXbw==";
   };
   landlockLauncherRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-ai/node-addon-landlock-run-linux-x64/-/node-addon-landlock-run-linux-x64-0.1.1.tgz";
-    hash = "sha512-OHAzPW2Coe/iYobAJAAA8CeVrBoKV4BnNHsgwvXwOfishxkUVSWSvdyxrZPiwYRXutpIGVrSo9zV3WOQy2euBA==";
+    url = "https://registry.npmjs.org/@deepseek-ai/node-addon-system-linux-x64/-/node-addon-system-linux-x64-0.1.2.tgz";
+    hash = "sha512-S2aPVHvYCpNCppCFyNlooMYuTB7ucK5lvD9oXQQ42v5Z2s5AoaiCdjz9r2l+ED2rI5oS1x0cUZmKjJH2dxV0pg==";
   };
   tuiEcosystemSpecSrc = pkgs.fetchFromGitHub {
     owner = "T-Auto";
@@ -166,7 +166,7 @@ let
     pnpmDeps = pkgs.fetchPnpmDeps {
       inherit pname version src;
       fetcherVersion = 4;
-      hash = "sha256-UYl423Ip/gonkrqBPgfel08bMviWfxVVWk9PQ3n3yS4=";
+      hash = "sha256-CK48vw3LrpkBq3hIWTfbt99qZx6H3m/Xb1/cf/p+E+E=";
     };
 
     nativeBuildInputs = [
@@ -327,7 +327,7 @@ pkgs.stdenv.mkDerivation {
       # The assembler stages the runtime from an offline DSH source, so
       # install the same pinned static Landlock launcher explicitly and
       # validate its published metadata.
-      landlock_package="$out/dsh-runtime/node_modules/@deepseek-ai/node-addon-landlock-run-linux-x64"
+      landlock_package="$out/dsh-runtime/node_modules/@deepseek-ai/node-addon-system-linux-x64"
       landlock_source="$TMPDIR/landlock-launcher-package"
       rm -rf "$landlock_package" "$landlock_source"
       mkdir -p "$landlock_package" "$landlock_source"

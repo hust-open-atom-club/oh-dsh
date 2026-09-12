@@ -24,7 +24,7 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const resources = resolve(process.argv[2] ?? join(root, '.stage'))
 const paths = bundledRuntimePaths(resources)
-const { cliEntry, nodeBinary } = paths
+const { cliEntry, desktopBootEntry, nodeBinary } = paths
 const smokeRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-desktop-smoke-'))
 const dshHome = join(smokeRoot, 'dsh-home')
 const lines = []
@@ -42,6 +42,34 @@ function parseBootEntries(index) {
 }
 
 ensureDesktopProfile(dshHome)
+
+// Pre-seed the runtime's workspace storage with the smoke repository so the
+// open-paths command the preload delivers resolves to a known workspace
+// (get-or-create) and starts its session immediately; creating the workspace
+// from scratch in the smoke window does not settle inside the poll budget.
+mkdirSync(join(dshHome, 'storages'), { recursive: true })
+const smokeWorkspaceId = '11111111-2222-4333-8444-555555555555'
+writeFileSync(join(dshHome, 'storages', 'workspace.json'), JSON.stringify({
+  unit: { name: 'workspace', version: 2 },
+  global: {
+    initialized: true,
+    workspaceIds: [smokeWorkspaceId],
+    archivedSessionIds: [],
+  },
+  tables: {
+    workspaces: {
+      [smokeWorkspaceId]: {
+        path: smokeRoot,
+        title: 'desktop-smoke',
+        sessionIds: [],
+        createdAt: '2026-09-12T00:00:00.000Z',
+        updatedAt: '2026-09-12T00:00:00.000Z',
+      },
+    },
+  },
+}, undefined, 2) + '\n')
+
+
 
 const runtimeEnvironment = {
   ...process.env,
@@ -68,7 +96,8 @@ writeFileSync(join(pluginRoot, 'package.json'), JSON.stringify({
 writeFileSync(join(pluginRoot, 'index.js'), 'export function apply() {}\n')
 writeFileSync(join(pluginRoot, 'cordis.patch.yml'), '[]\n')
 const install = spawnSync(nodeBinary, [
-  cliEntry, 'plugin', '--profile', 'desktop', 'add', pluginRoot,
+  // The staged launcher owns the reserved desktop profile on 0.1.5.
+  desktopBootEntry, 'plugin', 'add', pluginRoot,
 ], {
   cwd: smokeRoot,
   encoding: 'utf8',
@@ -103,7 +132,7 @@ git('add', 'review-smoke.txt')
 git('commit', '-m', 'review smoke baseline')
 writeFileSync(join(smokeRoot, 'review-smoke.txt'), 'after\n')
 
-const child = spawn(nodeBinary, [cliEntry, '--profile', 'desktop'], {
+const child = spawn(nodeBinary, [desktopBootEntry], {
   cwd: smokeRoot,
   env: runtimeEnvironment,
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -283,6 +312,7 @@ try {
     env: {
       ...runtimeEnvironment,
       DSH_SMOKE_RUNTIME_URL: base.href,
+      OH_DSH_SMOKE_WORKSPACE: smokeRoot,
     },
     timeout: 30_000,
   })

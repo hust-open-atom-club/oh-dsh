@@ -76,7 +76,11 @@ import { DesktopUpdateManager, detectPackageType } from './update-manager.ts'
 import { scheduleImmediateUpdateInstall, singleFlight } from './update-lifecycle.ts'
 
 const PRODUCT_NAME = 'Oh-DSH Desktop'
-const DEFAULT_UI_ZOOM_FACTOR = 1.12
+// Zoom 1.0 keeps every device pixel integral on standard 1x/2x displays:
+// the Codex-finish hairlines (1px elevation rings) render as continuous
+// lines, exactly like the ChatGPT desktop they are modeled on. A fractional
+// factor (the previous 1.12) shimmers them into dashed fragments.
+const DEFAULT_UI_ZOOM_FACTOR = 1
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const PRODUCT_VERSION = resolveProductVersion(join(currentDir, '..'))
 const splashPath = join(currentDir, 'splash.html')
@@ -240,8 +244,10 @@ function runtimeOptions(): DshRuntimeOptions {
     throw new Error(`packaged DSH CLI is missing: ${paths.cliEntry}`)
   }
   return {
-    args: ['--profile', DESKTOP_PROFILE],
-    cliEntry: paths.cliEntry,
+    // The 0.1.5 CLI reserves `--profile desktop` for the official DSH
+    // Desktop; the staged launcher drives the same programmatic boot.
+    args: [],
+    cliEntry: paths.desktopBootEntry,
     cwd: workspaceRoot,
     env: runtimeEnvironment(paths),
     nodeBinary: paths.nodeBinary,
@@ -272,8 +278,9 @@ function previewRuntimeOptions(input: {
     })
     : undefined
   return {
-    args: ['--profile', DESKTOP_PROFILE],
-    cliEntry: paths.cliEntry,
+    // Same programmatic desktop-profile boot as the main runtime.
+    args: [],
+    cliEntry: paths.desktopBootEntry,
     cwd: workspaceRoot,
     env: {
       ...runtimeEnvironment(paths, {
@@ -353,7 +360,15 @@ function createWindow(options: { preview?: boolean; title?: string } = {}): Brow
     show: false,
     title: options.title ?? PRODUCT_NAME,
     ...(process.platform === 'darwin'
-      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 16 } }
+      // ChatGPT desktop's own primary-window recipe: hiddenInset traffic
+      // lights over a 'menu' vibrancy material, so the web content shows
+      // through the titlebar region and the sidebar reaches the top edge.
+      ? {
+        titleBarStyle: 'hiddenInset' as const,
+        trafficLightPosition: { x: 16, y: 16 },
+        vibrancy: 'menu' as const,
+        acceptFirstMouse: true,
+      }
       : process.platform === 'win32'
         ? { autoHideMenuBar: true, frame: false }
         : {}),
@@ -726,6 +741,22 @@ function handleRuntimeExit(exit: RuntimeExit): void {
   })
 }
 
+/**
+ * The runtime plants one `dsh-auth-*` session cookie per boot on its loopback
+ * origin, and cookie storage is shared across ports. Dead tokens accumulate
+ * across launches until requests carrying the combined client-bundle URL
+ * exceed the runtime server's header limit (HTTP 431, blank shell). Drop
+ * them before a surface loads; the boot flow replants a live one.
+ */
+async function pruneRuntimeAuthCookies(origin: string): Promise<void> {
+  const { host, protocol } = new URL(origin)
+  const jar = session.defaultSession.cookies
+  const cookies = await jar.get({ url: `${protocol}//${host}` }).catch(() => [])
+  await Promise.all(cookies
+    .filter(cookie => cookie.name.startsWith('dsh-auth-'))
+    .map(cookie => jar.remove(`${protocol}//${host}`, cookie.name).catch(() => {})))
+}
+
 async function startRuntime(): Promise<void> {
   const info = desktopInfo()
   if (desktopReadOnly === false || !existsSync(join(info.dshHome, 'profiles', DESKTOP_PROFILE))) {
@@ -741,6 +772,7 @@ async function startRuntime(): Promise<void> {
   runtimeUrl = url
   runtimeOrigin = url.origin
   if (mainWindow === undefined || mainWindow.isDestroyed()) mainWindow = createWindow()
+  await pruneRuntimeAuthCookies(url.origin)
   await mainWindow.loadURL(url.href)
   flushQueuedPaths()
 }
@@ -790,6 +822,7 @@ async function startPreviewSurface(input: {
       title: `Preview ${input.pluginId} — ${PRODUCT_NAME}`,
     })
     previewWindow = window
+    await pruneRuntimeAuthCookies(url.origin)
     await window.loadURL(url.href)
     return {}
   } catch (error) {
@@ -884,7 +917,8 @@ async function installLocalPlugin(): Promise<void> {
     await runtime?.stop()
     runtime = undefined
     const options = runtimeOptions()
-    await runDshCommand(options, ['plugin', '--profile', DESKTOP_PROFILE, 'add', pluginPath])
+    // The staged launcher pins the desktop profile; only pnpm args follow.
+    await runDshCommand(options, ['plugin', 'add', pluginPath])
     await startRuntime()
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)

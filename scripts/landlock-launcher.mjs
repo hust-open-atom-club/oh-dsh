@@ -8,7 +8,10 @@ import {
 } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
-export const landlockLauncherPackageName = '@deepseek-ai/node-addon-landlock-run-linux-x64'
+// The 0.1.5 runtime retired the standalone landlock-run package family;
+// the launcher binary now ships as the linux-x64 member of node-addon-system
+// (same prebuilds.json manifest, same landlock-run tool).
+export const landlockLauncherPackageName = '@deepseek-ai/node-addon-system-linux-x64'
 const landlockLauncherToolName = 'landlock-run'
 
 function readJson(path) {

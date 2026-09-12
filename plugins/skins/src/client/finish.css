@@ -1,0 +1,115 @@
+/*
+ * Oh-DSH shared surface finish (all surfaces via @oh-dsh/skins).
+ *
+ * The finish layer carries the Oh-DSH rendering identity that the pinned DSH
+ * runtime does not ship: continuous (superellipse) corners, layered elevation
+ * built from half-pixel strokes plus diffuse shadows instead of hard borders,
+ * and the shared motion curve. It styles only structural hooks the runtime
+ * commits to (data-slot regions, data-composer-card) so pinned-runtime class
+ * hashes never appear here.
+ */
+
+:root {
+  /* Motion: the Oh-DSH curve, snappier than the runtime default ease. */
+  --ohdsh-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ohdsh-duration-fast: 120ms;
+  --ohdsh-duration-panel: 180ms;
+
+  /* Radius ladder (base steps; the squircle gate below widens them). */
+  --ohdsh-radius-md: 8px;
+  --ohdsh-radius-lg: 10px;
+  --ohdsh-radius-xl: 14px;
+  --ohdsh-radius-2xl: 20px;
+
+  /* Elevation: half-pixel stroke ring + two diffuse layers, light scheme.
+   * The composer stack mirrors ChatGPT desktop's own token pair:
+   * `0 0 0 1px #0000000a, 0 2px 8px 0 #0000000a, 0 4px 80px 8px #00000006`. */
+  --ohdsh-elevation-stroke: rgba(0, 0, 0, 0.055);
+  --ohdsh-elevation-card:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 4px 16px rgba(0, 0, 0, 0.05);
+  --ohdsh-elevation-panel:
+    0 0 0 0.5px rgba(0, 0, 0, 0.05),
+    0 3px 7.5px rgba(0, 0, 0, 0.03),
+    0 0 16px rgba(0, 0, 0, 0.025);
+  --ohdsh-elevation-composer:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 2px 8px 0 rgba(0, 0, 0, 0.04),
+    0 4px 80px 8px rgba(0, 0, 0, 0.024);
+}
+
+[data-ds-dark-theme] {
+  --ohdsh-elevation-stroke: rgba(255, 255, 255, 0.09);
+  --ohdsh-elevation-card:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.32);
+  --ohdsh-elevation-panel:
+    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 3px 7.5px rgba(0, 0, 0, 0.22),
+    0 0 16px rgba(0, 0, 0, 0.16);
+  --ohdsh-elevation-composer:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 2px 8px rgba(0, 0, 0, 0.26),
+    0 4px 48px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* Continuous corners: widen the ladder and round every finished control the
+ * way the platform rounds its own chrome. Unsupported engines keep plain
+ * circular corners at the base sizes. */
+@supports (corner-shape: superellipse(1.5)) {
+  :root {
+    --ohdsh-radius-md: 10px;
+    --ohdsh-radius-lg: 12.5px;
+    --ohdsh-radius-xl: 17.5px;
+    --ohdsh-radius-2xl: 25px;
+    --ohdsh-corner-shape: superellipse(1.5);
+  }
+}
+
+/* Sidebar rows: uniform continuous-cornered rows. The runtime's outline
+ * chrome (the New session button's 1px rules) reads as dated against the
+ * luminance ladder, so bordered sidebar buttons drop their rules and rely
+ * on fill states alone. */
+[data-slot='sidebar'] button {
+  border-color: transparent;
+  border-radius: var(--ohdsh-radius-lg);
+  corner-shape: var(--ohdsh-corner-shape, round);
+  transition:
+    background-color var(--ohdsh-duration-fast) var(--ohdsh-ease),
+    color var(--ohdsh-duration-fast) var(--ohdsh-ease);
+}
+
+[data-slot='sidebar'] [role='menu'],
+[data-slot='sidebar'] [role='listbox'] {
+  border-radius: var(--ohdsh-radius-xl);
+}
+
+/* Composer card: layered elevation instead of the flat runtime shadow. */
+[data-composer-card] {
+  border-radius: var(--ohdsh-radius-2xl) !important;
+  corner-shape: var(--ohdsh-corner-shape, round);
+  box-shadow: var(--ohdsh-elevation-composer) !important;
+  transition: box-shadow var(--ohdsh-duration-fast) var(--ohdsh-ease);
+}
+
+[data-composer-card]:focus-within {
+  box-shadow:
+    0 0 0 1px var(--dsw-alias-brand-primary),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    0 4px 48px 6px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Runtime popovers/menus ride above the shell; give them the panel
+ * elevation and continuous corners. */
+[data-radix-popper-content-wrapper] > * {
+  border-radius: var(--ohdsh-radius-xl);
+  corner-shape: var(--ohdsh-corner-shape, round);
+  box-shadow: var(--ohdsh-elevation-panel) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='sidebar'] button,
+  [data-composer-card] {
+    transition: none;
+  }
+}
