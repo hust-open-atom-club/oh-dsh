@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-12-upstream-sidebar-takeover.md
-2026-09-12-upstream-sidebar-takeover.md: 86ec7af112a687c1c04e3912827254b67aba33f0
-2026-09-12-upstream-sidebar-takeover.zh.md: 762a7c7f1adde0d3a8a7ee66cb90cf7b8f66ee9d
+2026-09-12-upstream-sidebar-takeover.md: 4e240d65c9f17953b4f7de379aa86245936adc36
+2026-09-12-upstream-sidebar-takeover.zh.md: 348c28bccb36d3188698821858ced4db47104e24

@@ -61,8 +61,10 @@ the theme and UI finish, upstream keeps the feature surface.
   (the service goes with it); if wanted again it returns as a native tab,
   not a private panel.
 - The workspace lockfile grew the upstream build's dependency closure
-  (codemirror, mermaid, xterm, …); nix fixed-output hashes need the
-  recorded refresh round before the pinned builds pass again.
+  (codemirror, mermaid, xterm, …); the recorded refresh round landed the
+  new fetchPnpmDeps hash, and the nix bundle source now stages the
+  plugin's manifest, built lib/, and node_modules links alongside the
+  other published-release overlays — both pinned builds verified green.
 - The upstream bottom workbench toggle now appears in the session header
   next to the native expand control; retiring our bottom terminal drawer
   is a follow-up once the dock proves out in daily use.

@@ -54,7 +54,8 @@ dock 并存——两套面板系统并排。而 pin 住的上游 DSH-better-side
 - 我们的提交评审评论功能随 review 面板失去 UI（服务一并移除）；若
   再需要，以原生 tab 形式回归，而非私有面板。
 - workspace 锁文件长出了上游构建的依赖闭包（codemirror、mermaid、
-  xterm……）；nix 固定输出哈希需要按记录流程再刷一轮，pinned 构建才能
-  重新通过。
+  xterm……）；按记录流程刷落了新的 fetchPnpmDeps 哈希，nix bundle
+  source 也会与其他发布版覆盖层并列暂存该插件的清单、构建产物 lib/
+  与 node_modules 链接——两个 pinned 构建均已验证通过。
 - 上游底部工作台开关现在出现在会话头部、与原生展开控件并列；退役
   我们自己的底部终端抽屉是后续事项，待 dock 在日常使用中验证。
