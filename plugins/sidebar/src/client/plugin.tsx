@@ -24,13 +24,7 @@ import {
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
 } from '../sidebar-preferences.ts'
-import {
-  BrowserView,
-  FilesView,
-  FileView,
-  SideToolsPanel,
-  ToolIcon,
-} from './SideToolsPanel.tsx'
+import { SideToolsPanel, ToolIcon } from './SideToolsPanel.tsx'
 import sideToolsCss from './side-tools.css'
 import workspaceCss from './sidebar.css'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
@@ -139,6 +133,10 @@ interface WorkspaceView {
 interface WorkspacesService {
   create(input: { path: string }): Promise<WorkspaceView>
   openPath(path: string): Promise<void>
+}
+
+/** The 0.1.5 navigation face: session starts live on uiWorkspace. */
+interface UiWorkspaceService {
   startSession(workspaceId?: string): void
 }
 
@@ -237,7 +235,6 @@ export const inject = [
   'workspaces',
 ]
 
-const EMPTY_CONVERSATION: ConversationSnapshot = { runningCalls: [] }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -256,151 +253,12 @@ async function responseJson<T>(
   return payload
 }
 
-function workspaceUrl(cwd: string): string {
-  const url = new URL(WORKSPACE_API_PATH, window.location.origin)
-  url.searchParams.set('cwd', cwd)
-  return url.href
-}
 
-function statusLabel(status: WorkspaceSnapshot['changes'][number]['status']): string {
-  return {
-    added: 'A',
-    modified: 'M',
-    deleted: 'D',
-    renamed: 'R',
-    copied: 'C',
-    untracked: 'U',
-    conflicted: '!',
-  }[status]
-}
 
-interface WorkspaceDiffSummaryState {
-  loading: boolean
-  summary: DiffStats | null
-}
 
-async function readChangeDiffStats(
-  scope: BetterSidebarScope,
-  change: WorkspaceChange,
-  signal: AbortSignal,
-): Promise<DiffStats> {
-  const responses = await Promise.all([
-    betterSidebarApi.gitDiff(scope, change.path, change.staged, signal),
-    ...(change.staged && change.unstaged
-      ? [betterSidebarApi.gitDiff(scope, change.path, false, signal)]
-      : []),
-  ])
-  const trackedStats = responses.map(response => diffStats(response.diff))
-  if (change.status !== 'untracked' || responses.some(response => response.diff !== '')) {
-    return addDiffStats(...trackedStats)
-  }
-  const file = await betterSidebarApi.fsRead(scope, change.path, signal)
-  return file.kind === 'text'
-    ? addDiffStats(...trackedStats, { additions: textLineCount(file.content), deletions: 0 })
-    : addDiffStats(...trackedStats)
-}
 
-async function readWorkspaceDiffSummary(
-  scope: BetterSidebarScope,
-  changes: readonly WorkspaceChange[],
-  signal: AbortSignal,
-): Promise<DiffStats> {
-  const [worktree, index] = await Promise.all([
-    betterSidebarApi.gitDiff(scope, undefined, false, signal),
-    betterSidebarApi.gitDiff(scope, undefined, true, signal),
-  ])
-  const untrackedStats = await Promise.all(
-    changes.filter(change => change.status === 'untracked').slice(0, 200).map(async change => {
-      const file = await betterSidebarApi.fsRead(scope, change.path, signal)
-      return file.kind === 'text'
-        ? { additions: textLineCount(file.content), deletions: 0 }
-        : { additions: 0, deletions: 0 }
-    }),
-  )
-  return addDiffStats(diffStats(worktree.diff), diffStats(index.diff), ...untrackedStats)
-}
 
-function useWorkspaceDiffSummary(
-  sessionId: string | undefined,
-  cwd: string | undefined,
-  enabled: boolean,
-): WorkspaceDiffSummaryState {
-  const [summary, setSummary] = useState<DiffStats | null>(null)
-  const [loading, setLoading] = useState(false)
-  const activeController = useRef<AbortController | null>(null)
-  const hasSummary = useRef(false)
-  const summaryScope = useRef<string | null>(null)
-  const refresh = useCallback(async (): Promise<void> => {
-    activeController.current?.abort()
-    const nextScope = sessionId === undefined || cwd === undefined
-      ? null
-      : `${sessionId}\u0000${cwd}`
-    const refreshPlan = prepareDiffSummaryRefresh(
-      { scopeKey: summaryScope.current, hasSummary: hasSummary.current },
-      nextScope,
-      enabled,
-    )
-    summaryScope.current = refreshPlan.state.scopeKey
-    hasSummary.current = refreshPlan.state.hasSummary
-    if (refreshPlan.clearSummary) setSummary(null)
-    if (!enabled || sessionId === undefined || cwd === undefined) {
-      setLoading(false)
-      return
-    }
-    const controller = new AbortController()
-    activeController.current = controller
-    setLoading(refreshPlan.loading)
-    try {
-      const scope = { sessionId, cwd }
-      const status = await betterSidebarApi.gitStatus(scope, controller.signal)
-      if (!status.isRepo) {
-        if (!controller.signal.aborted) {
-          setSummary(null)
-          hasSummary.current = false
-        }
-        return
-      }
-      const changes = workspaceChangesFromBetterSidebar(status.entries)
-      const next = await readWorkspaceDiffSummary(scope, changes, controller.signal)
-      if (!controller.signal.aborted) {
-        setSummary(next)
-        hasSummary.current = true
-      }
-    } catch {
-      if (!controller.signal.aborted && !hasSummary.current) setSummary(null)
-    } finally {
-      if (activeController.current === controller) {
-        activeController.current = null
-        setLoading(false)
-      }
-    }
-  }, [cwd, enabled, sessionId])
 
-  useEffect(() => {
-    if (!enabled) {
-      activeController.current?.abort()
-      setSummary(null)
-      hasSummary.current = false
-      setLoading(false)
-      return
-    }
-    void refresh()
-    const timer = window.setInterval(() => { void refresh() }, 4_000)
-    const onFocus = (): void => { void refresh() }
-    window.addEventListener('focus', onFocus)
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
-      activeController.current?.abort()
-    }
-  }, [enabled, refresh])
-
-  return { loading, summary }
-}
-
-function changeKey(change: WorkspaceSnapshot['changes'][number]): string {
-  return change.path + ':' + (change.oldPath ?? '') + ':' + change.status + ':' + String(change.staged) + ':' + String(change.unstaged)
-}
 type ReviewCommentTarget = {
   kind: 'commit'
 } | {
@@ -410,32 +268,79 @@ type ReviewCommentTarget = {
   side: Exclude<ReviewCommentSide, null>
 }
 
-function reviewLineNumber(
-  oldLine: number | null,
-  newLine: number | null,
-): number | null {
-  return newLine ?? oldLine
+
+
+
+/** The native right-sidebar controller face (a slice of the runtime service). */
+interface NativeRightbarController {
+  openTab(kind: string, options?: { params?: unknown; revealIfOpened?: boolean }): void
+  openResource(address: string, options?: { params?: unknown; revealIfOpened?: boolean }): void
+  openTabIn?(sessionId: string, kind: string, options?: { params?: unknown; revealIfOpened?: boolean }): void
+  openResourceIn?(sessionId: string, address: string, options?: { params?: unknown; revealIfOpened?: boolean }): void
 }
 
-function processTitle(call: RunningToolCall): string {
-  try {
-    const args = JSON.parse(call.argsRaw) as Record<string, unknown>
-    const value = args.command ?? args.cmd ?? args.script ?? args.description
-    if (Array.isArray(value)) return value.map(String).join(' ')
-    if (typeof value === 'string' && value.trim() !== '') return value.trim()
-  } catch {
-    // Fall back to the raw tool name for non-JSON arguments.
-  }
-  return call.name
+/** Component-encode one address segment (mirrors the runtime's file-address grammar). */
+function encodeSegment(segment: string): string {
+  return encodeURIComponent(segment).replace(/%3A/gi, ':')
 }
 
-function flattenRunningCalls(calls: readonly RunningToolCall[]): RunningToolCall[] {
-  const result: RunningToolCall[] = []
-  for (const call of calls) {
-    result.push(call)
-    result.push(...flattenRunningCalls(call.subCalls ?? []))
+/**
+ * Opens content in the native right sidebar. The surface exists only while a
+ * session's panel is on screen, so opens for a session without one are
+ * queued and replayed when the session list changes (the same contract the
+ * upstream sidebar plugin's own surface follows).
+ */
+class NativeRightbarSurface {
+  private readonly pending: Array<() => boolean> = []
+
+  constructor(
+    private readonly sessions: SessionsService,
+    private readonly get: () => NativeRightbarController | undefined,
+  ) {}
+
+  flush(): void {
+    for (let index = this.pending.length - 1; index >= 0; index -= 1) {
+      const place = this.pending[index]
+      if (place === undefined || place()) this.pending.splice(index, 1)
+    }
   }
-  return result
+
+  openTab(kind: string, params?: Record<string, unknown>): void {
+    const place = (): boolean => {
+      const api = this.get()
+      if (api === undefined) return false
+      const list = this.sessions.list.getSnapshot()
+      const sessionId = list.current
+      if (sessionId === undefined) return false
+      const options = { params, revealIfOpened: true }
+      api.openTabIn?.(sessionId, kind, options) ?? api.openTab(kind, options)
+      return true
+    }
+    if (!place()) this.pending.push(place)
+  }
+
+  openFile(path: string): void {
+    const place = (): boolean => {
+      const api = this.get()
+      if (api === undefined) return false
+      const list = this.sessions.list.getSnapshot()
+      const sessionId = list.current
+      const cwd = sessionId === undefined ? undefined : list.byId[sessionId]?.cwd
+      if (sessionId === undefined) return false
+      const segments = ['dsh-resource://file', 'session', encodeSegment(sessionId)]
+      const workspaceRelative = cwd !== undefined && path.startsWith(`${cwd}/`)
+        ? path.slice(cwd.length + 1)
+        : path
+      for (const segment of workspaceRelative.split('/')) {
+        if (segment !== '') segments.push(encodeSegment(segment))
+      }
+      const address = segments.join('/')
+      const options = { revealIfOpened: true }
+      api.openResourceIn?.(sessionId, address, options) ?? api.openResource(address, options)
+      return true
+    }
+    if (!place()) this.pending.push(place)
+  }
 }
 
 class WorkspaceToolsService implements WorkspaceTools {
@@ -481,6 +386,8 @@ class WorkspaceToolsService implements WorkspaceTools {
     private readonly pinnedSummary: PinnedSummary,
     private readonly sessions: SessionsService,
     private readonly workspaces: WorkspacesService,
+    private readonly native: NativeRightbarSurface,
+    private readonly uiWorkspace: UiWorkspaceService,
   ) {
     this.state = this.project(sidebar.getSnapshot())
   }
@@ -505,31 +412,18 @@ class WorkspaceToolsService implements WorkspaceTools {
     else this.openReview()
   }
 
-  openReview(): void { this.openView('review') }
+  // The git lens, browser, file explorer, and file viewer are the upstream
+  // DSH-better-sidebar tab types registered as native right-sidebar tabs;
+  // opens route through the native controller instead of our own panel.
+  openReview(): void { this.native.openTab('changes') }
 
-  openBrowser(): void { this.openView('browser') }
+  openBrowser(): void { this.native.openTab('browser') }
 
-  openBrowserUrl(url: string): void {
-    let title = url
-    try { title = new URL(url).hostname || url } catch {}
-    this.pinnedSummary.setOpen(false)
-    this.sidebar.openTab({ resource: url, title, type: 'browser' })
-    this.sidebar.setOpen(true)
-  }
+  openBrowserUrl(url: string): void { this.native.openTab('browser', { url }) }
 
-  openFile(path: string): void {
-    const title = path.split(/[\\/]/).filter(Boolean).pop() ?? path
-    this.pinnedSummary.setOpen(false)
-    this.sidebar.openTab({ resource: path, title, type: 'file' })
-    this.sidebar.setOpen(true)
-  }
+  openFile(path: string): void { this.native.openFile(path) }
 
-  openFiles(): void {
-    const list = this.sessions.list.getSnapshot()
-    const cwd = list.current === undefined ? undefined : list.byId[list.current]?.cwd
-    if (cwd === undefined) return
-    this.openView('files', cwd)
-  }
+  openFiles(): void { this.native.openTab('files') }
 
   openMenu(): void {
     this.pinnedSummary.setOpen(false)
@@ -544,7 +438,7 @@ class WorkspaceToolsService implements WorkspaceTools {
 
   async openSideChat(): Promise<void> {
     const current = this.sessions.list.getSnapshot().current
-    if (current === undefined) this.workspaces.startSession()
+    if (current === undefined) this.uiWorkspace.startSession()
     else {
       const child = await this.sessions.fork({ sessionId: current, increaseTitle: true })
       this.sessions.open(child)
@@ -704,168 +598,6 @@ function PanelIcon({ kind }: { kind: 'expand' | 'summary' | 'terminal' | 'side' 
   return <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2.5" /><path d="M12.5 3.5v13" /></svg>
 }
 
-
-type WorkspaceIconName =
-  | 'add'
-  | 'back'
-  | 'branch'
-  | 'changes'
-  | 'chevron'
-  | 'check'
-  | 'close'
-  | 'commit'
-  | 'environment'
-  | 'history'
-  | 'process'
-  | 'refresh'
-
-/** Render the workspace panel's shared 20px line icon language. */
-function WorkspaceIcon({ name }: { name: WorkspaceIconName }): JSX.Element {
-  const common = {
-    'aria-hidden': true,
-    className: 'oh-dsh-workspace-icon',
-    viewBox: '0 0 20 20',
-  } as const
-  if (name === 'add') return <svg {...common}><path d="M10 4v12M4 10h12" /></svg>
-  if (name === 'back') return <svg {...common}><path d="m12.5 4.5-5.5 5.5 5.5 5.5" /></svg>
-  if (name === 'branch') {
-    return <svg {...common}><circle cx="6" cy="4.5" r="2" /><circle cx="14" cy="15.5" r="2" /><path d="M6 6.5v3a6 6 0 0 0 6 6h0M6 9.5a4 4 0 0 1 4-4h2" /></svg>
-  }
-  if (name === 'changes') {
-    return <svg {...common}><rect x="3.5" y="3" width="10.5" height="14" rx="2" /><path d="M7 7h3M7 10h3M7 13h3M13.5 6.5h3v7" /></svg>
-  }
-  if (name === 'chevron') return <svg {...common}><path d="m6.5 8 3.5 4 3.5-4" /></svg>
-  if (name === 'check') return <svg {...common}><path d="m4.5 10 3.5 3.5 7.5-7" /></svg>
-  if (name === 'close') return <svg {...common}><path d="m5 5 10 10M15 5 5 15" /></svg>
-  if (name === 'commit') {
-    return <svg {...common}><circle cx="5" cy="10" r="2" /><circle cx="15" cy="5" r="2" /><circle cx="15" cy="15" r="2" /><path d="M7 10h4a4 4 0 0 0 4-4V7M11 10a4 4 0 0 1 4 4v-1" /></svg>
-  }
-  if (name === 'environment') {
-    return <svg {...common}><rect x="3" y="4" width="14" height="10" rx="2" /><path d="M7 17h6M10 14v3" /></svg>
-  }
-  if (name === 'history') {
-    return <svg {...common}><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5v4l2.5 1.5M3.5 10H2" /></svg>
-  }
-  if (name === 'process') return <svg {...common}><path d="m4 6 4 4-4 4M10 14h6" /></svg>
-  return <svg {...common}><path d="M16 7.5A6 6 0 1 0 16.5 12" /><path d="M16 4.5v3.5h-3.5" /></svg>
-}
-
-interface WorkspaceDropdownOption {
-  label: string
-  value: string
-}
-
-function WorkspaceDropdown({
-  ariaLabel,
-  disabled = false,
-  onChange,
-  options,
-  value,
-}: {
-  ariaLabel: string
-  disabled?: boolean
-  onChange: (value: string) => void
-  options: readonly WorkspaceDropdownOption[]
-  value: string
-}): JSX.Element {
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const [open, setOpen] = useState(false)
-  const selectedIndex = Math.max(0, options.findIndex(option => option.value === value))
-  const [activeIndex, setActiveIndex] = useState(selectedIndex)
-  const selected = options.find(option => option.value === value)
-
-  useEffect(() => {
-    if (open) setActiveIndex(selectedIndex)
-  }, [open, selectedIndex])
-
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent): void => {
-      if (rootRef.current?.contains(event.target as Node) !== true) setOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setOpen(false)
-        triggerRef.current?.focus()
-        return
-      }
-      if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        setActiveIndex(index => Math.min(options.length - 1, index + 1))
-        return
-      }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        setActiveIndex(index => Math.max(0, index - 1))
-        return
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        const option = options[activeIndex]
-        if (option === undefined) return
-        onChange(option.value)
-        setOpen(false)
-        triggerRef.current?.focus()
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [activeIndex, onChange, open, options])
-
-  return (
-    <div ref={rootRef} className="oh-dsh-workspace-dropdown">
-      <button
-        ref={triggerRef}
-        type="button"
-        className="oh-dsh-workspace-dropdown-trigger"
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        aria-label={ariaLabel}
-        disabled={disabled || options.length === 0}
-        onClick={() => { setOpen(value => !value) }}
-      >
-        <span className="oh-dsh-workspace-dropdown-label">
-          {(selected?.label ?? value) || '—'}
-        </span>
-        <span className={`oh-dsh-workspace-dropdown-chevron${open ? ' is-open' : ''}`}>
-          <WorkspaceIcon name="chevron" />
-        </span>
-      </button>
-      {open && (
-        <div className="oh-dsh-workspace-dropdown-menu" role="listbox" aria-label={ariaLabel}>
-          {options.map((option, index) => {
-            const selectedOption = option.value === value
-            return (
-              <button
-                type="button"
-                key={option.value}
-                role="option"
-                aria-selected={selectedOption}
-                data-active={index === activeIndex || undefined}
-                className="oh-dsh-workspace-dropdown-option"
-                onMouseEnter={() => { setActiveIndex(index) }}
-                onClick={() => {
-                  onChange(option.value)
-                  setOpen(false)
-                  triggerRef.current?.focus()
-                }}
-              >
-                <span>{option.label}</span>
-                {selectedOption && <WorkspaceIcon name="check" />}
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
 function DesktopPanelToolbar({
   service,
   panels,
@@ -924,661 +656,7 @@ function DesktopPanelToolbar({
   )
 }
 
-function useActiveConversation(sessions: SessionsService, sessionId: string | undefined): ConversationSnapshot {
-  const binding = sessionId === undefined ? undefined : sessions.binding(sessionId)
-  const subscribe = useCallback(
-    (listener: () => void) => binding?.session.subscribe(listener) ?? (() => {}),
-    [binding],
-  )
-  const getSnapshot = useCallback(
-    () => binding?.session.getSnapshot() ?? EMPTY_CONVERSATION,
-    [binding],
-  )
-  return useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-  )
-}
 
-function WorkspacePanel({
-  reviewComments,
-  service,
-  sessions,
-  workspaces,
-  t,
-}: {
-  reviewComments: ReviewCommentsService
-  service: WorkspaceToolsService
-  sessions: SessionsService
-  workspaces: WorkspacesService
-  t: Translate<WorkspaceMessage>
-}): JSX.Element {
-  const panelState = useSyncExternalStore(service.subscribe, service.getSnapshot)
-  const sessionList = useSyncExternalStore(sessions.list.subscribe, sessions.list.getSnapshot)
-  const sessionId = sessionList.current
-  const cwd = sessionId === undefined ? undefined : sessionList.byId[sessionId]?.cwd
-  const reviewSummary = useWorkspaceDiffSummary(
-    sessionId,
-    cwd,
-    panelState.open && panelState.view === 'review',
-  )
-  const conversation = useActiveConversation(sessions, sessionId)
-  const processes = useMemo(
-    () => flattenRunningCalls(conversation.runningCalls ?? []),
-    [conversation.runningCalls],
-  )
-  const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null)
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [diff, setDiff] = useState('')
-  const [changesOpen, setChangesOpen] = useState(false)
-  const [changeStats, setChangeStats] = useState<Record<string, DiffStats>>({})
-
-  const [commitOpen, setCommitOpen] = useState(false)
-  const [commitMessage, setCommitMessage] = useState('')
-  const [newBranch, setNewBranch] = useState('')
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [history, setHistory] = useState<BetterSidebarGitLogEntry[]>([])
-  const [selectedCommit, setSelectedCommit] = useState<GitReviewCommit | null>(null)
-  const [reviewLoading, setReviewLoading] = useState(false)
-  const [commentTarget, setCommentTarget] = useState<ReviewCommentTarget | null>(null)
-  const [commentBody, setCommentBody] = useState('')
-  const [commentNotice, setCommentNotice] = useState('')
-  const comments = useSyncExternalStore(
-    reviewComments.subscribe,
-    reviewComments.getSnapshot,
-  )
-  const visibleChanges = useMemo(
-    () => snapshot?.changes.slice(0, 200) ?? [],
-    [snapshot],
-  )
-  const changeSignature = useMemo(
-    () => visibleChanges.map(changeKey).join('\u0000'),
-    [visibleChanges],
-  )
-  const scope = useMemo<BetterSidebarScope | undefined>(
-    () => sessionId === undefined || cwd === undefined
-      ? undefined
-      : { sessionId, cwd },
-    [cwd, sessionId],
-  )
-  const branch = snapshot?.branch ?? null
-  const selectedComments = useMemo(() => comments.filter(comment =>
-    selectedCommit !== null
-    && comment.commitId === selectedCommit.id
-    && comment.sessionId === (sessionId ?? null)
-    && comment.workspacePath === cwd
-    && comment.branch === branch), [
-    branch,
-    comments,
-    cwd,
-    selectedCommit,
-    sessionId,
-  ])
-
-  const refresh = useCallback(async (): Promise<void> => {
-    if (cwd === undefined || sessionId === undefined) {
-      setSnapshot(null)
-      return
-    }
-    try {
-      const nextScope = { sessionId, cwd }
-      const [facts, status] = await Promise.all([
-        responseJson<WorkspaceFacts>(await fetch(workspaceUrl(cwd)), t),
-        betterSidebarApi.gitStatus(nextScope),
-      ])
-      if (!status.isRepo) {
-        setHistory([])
-        setSelectedCommit(null)
-        setSnapshot({
-          ...facts,
-          kind: 'directory',
-          branch: null,
-          branches: [],
-          changes: [],
-        })
-      } else {
-        const [nextBranch, nextHistory] = await Promise.all([
-          betterSidebarApi.gitBranch(nextScope),
-          betterSidebarApi.gitLog(nextScope).catch(() => []),
-        ])
-        setHistory(nextHistory)
-        setSnapshot({
-          ...facts,
-          kind: 'repository',
-          branch: status.branch ?? nextBranch.current,
-          branches: nextBranch.names,
-          changes: workspaceChangesFromBetterSidebar(status.entries),
-        })
-      }
-      setError('')
-    } catch (nextError) {
-      setError(errorMessage(nextError))
-    }
-  }, [cwd, sessionId, t])
-
-  useEffect(() => {
-    if (!panelState.open || panelState.view !== 'review' || cwd === undefined) return
-    void refresh()
-    const timer = window.setInterval(() => { void refresh() }, 4_000)
-    const onFocus = (): void => { void refresh() }
-    window.addEventListener('focus', onFocus)
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [cwd, panelState.open, panelState.view, refresh])
-
-  useEffect(() => {
-    setSelectedPath(null)
-    setDiff('')
-    setChangesOpen(false)
-    setChangeStats({})
-
-    setHistoryOpen(false)
-    setHistory([])
-    setSelectedCommit(null)
-    setCommentTarget(null)
-    setCommentBody('')
-    setCommentNotice('')
-  }, [cwd])
-
-  useEffect(() => {
-    if (!changesOpen || scope === undefined || visibleChanges.length === 0) {
-      setChangeStats({})
-      return
-    }
-    const controller = new AbortController()
-    void Promise.all(visibleChanges.map(async change => {
-      const key = changeKey(change)
-      try {
-        return [key, await readChangeDiffStats(scope, change, controller.signal)] as const
-      } catch {
-        return null
-      }
-    })).then(entries => {
-      if (controller.signal.aborted) return
-      setChangeStats(Object.fromEntries(
-        entries.filter((entry): entry is readonly [string, DiffStats] => entry !== null),
-      ))
-    })
-    return () => { controller.abort() }
-  }, [changeSignature, changesOpen, scope, snapshot])
-
-  useEffect(() => {
-    if (cwd === undefined || branch === null) return
-    reviewComments.activate(sessionId ?? null, cwd, branch)
-  }, [branch, cwd, reviewComments, sessionId])
-
-  const mutate = async (mutation: WorkspaceMutation): Promise<void> => {
-    if (cwd === undefined || scope === undefined || busy) return
-    setBusy(true)
-    try {
-      if (mutation.action === 'checkout') {
-        await betterSidebarApi.gitCheckout(scope, mutation.branch)
-      } else if (mutation.action === 'commit') {
-        await betterSidebarApi.gitStage(scope)
-        await betterSidebarApi.gitCommit(scope, mutation.message)
-        setCommitMessage('')
-      } else {
-        const response = await fetch(workspaceUrl(cwd), {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(mutation),
-        })
-        await responseJson<WorkspaceHostMutationResponse>(response, t)
-      }
-      await refresh()
-      setError('')
-    } catch (nextError) {
-      setError(errorMessage(nextError))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const showDiff = async (
-    change: WorkspaceSnapshot['changes'][number],
-  ): Promise<void> => {
-    if (scope === undefined) return
-    if (selectedPath === change.path) {
-      setSelectedPath(null)
-      setDiff('')
-      return
-    }
-    setSelectedPath(change.path)
-    setDiff(t('workspace.loading-diff'))
-    try {
-      const response = await betterSidebarApi.gitDiff(
-        scope,
-        change.path,
-        change.staged,
-      )
-      setDiff(response.diff || t('workspace.no-text-diff'))
-    } catch (nextError) {
-      setDiff(errorMessage(nextError))
-    }
-  }
-
-  const showCommit = async (entry: BetterSidebarGitLogEntry): Promise<void> => {
-    if (scope === undefined || reviewLoading) return
-    if (selectedCommit?.id === entry.hashFull) {
-      setSelectedCommit(null)
-      setCommentTarget(null)
-      return
-    }
-    setReviewLoading(true)
-    setCommentTarget(null)
-    setCommentBody('')
-    setCommentNotice('')
-    try {
-      const result = await betterSidebarApi.gitCommitDiff(
-        scope,
-        entry.hashFull,
-      )
-      setSelectedCommit(reviewCommitFromBetterSidebar(entry, result.diff))
-      setError('')
-    } catch (nextError) {
-      setError(errorMessage(nextError))
-    } finally {
-      setReviewLoading(false)
-    }
-  }
-
-  const addReviewComment = (): void => {
-    if (selectedCommit === null || cwd === undefined || branch === null
-      || commentTarget === null || commentBody.trim() === '') return
-    const lineTarget = commentTarget.kind === 'line' ? commentTarget : null
-    const result = reviewComments.add(selectedCommit, {
-      id: nextReviewCommentId(),
-      sessionId: sessionId ?? null,
-      workspacePath: cwd,
-      branch,
-      commitId: selectedCommit.id,
-      filePath: lineTarget?.filePath ?? null,
-      line: lineTarget?.line ?? null,
-      side: lineTarget?.side ?? null,
-      body: commentBody.trim(),
-      createdAt: new Date().toISOString(),
-    })
-    setCommentBody('')
-    setCommentTarget(null)
-    setCommentNotice(result === 'inserted'
-      ? t('workspace.comment-added')
-      : t('workspace.comment-saved'))
-  }
-
-  const chooseWorkspace = async (): Promise<void> => {
-    if (window.dshDesktop?.chooseWorkspace === undefined) return
-    const paths = await window.dshDesktop?.chooseWorkspace() ?? []
-    for (const path of paths) {
-      const workspace = await workspaces.create({ path })
-      workspaces.startSession(workspace.workspaceId)
-    }
-  }
-
-  return (
-    <div className="oh-dsh-review-view" aria-label={t('workspace.changes')}>
-      <header className="oh-dsh-workspace-header">
-        <div>
-          <button type="button" aria-label={t('side.back')} onClick={() => { service.openMenu() }}><WorkspaceIcon name="back" /></button>
-          <strong>{snapshot?.name ?? (cwd?.split(/[\\/]/).filter(Boolean).pop() || t('workspace.title'))}</strong>
-        </div>
-        <div>
-          <button type="button" onClick={() => { void refresh() }} aria-label={t('workspace.refresh')} title={t('workspace.refresh')}><WorkspaceIcon name="refresh" /></button>
-          {window.dshDesktop?.chooseWorkspace !== undefined && (
-            <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}><WorkspaceIcon name="add" /></button>
-          )}
-          <button type="button" onClick={() => { service.setOpen(false) }} aria-label={t('workspace.close-review')} title={t('workspace.close-review')}><WorkspaceIcon name="close" /></button>
-        </div>
-      </header>
-
-      {cwd === undefined
-        ? <div className="oh-dsh-workspace-empty">{t('workspace.select')}</div>
-        : (
-          <div className="oh-dsh-workspace-content">
-            {error !== '' && <div className="oh-dsh-workspace-error" role="alert">{error}</div>}
-            <section>
-              <button
-                type="button"
-                className="oh-dsh-workspace-section-toggle"
-                aria-expanded={changesOpen}
-                onClick={() => { setChangesOpen(value => !value) }}
-              >
-                <span className="oh-dsh-workspace-section-icon"><WorkspaceIcon name="changes" /></span>
-                <strong>{t('workspace.changes')}</strong>
-                {(reviewSummary.loading || reviewSummary.summary !== null) && (
-                  <span className="oh-dsh-change-stats" aria-label="diff summary">
-                    {reviewSummary.loading
-                      ? <span className="oh-dsh-change-stats-loading">…</span>
-                      : (
-                        <>
-                          <span className="oh-dsh-change-stat-add">+{reviewSummary.summary?.additions ?? 0}</span>
-                          <span className="oh-dsh-change-stat-delete">-{reviewSummary.summary?.deletions ?? 0}</span>
-                        </>
-                      )}
-                  </span>
-                )}
-                <span className="oh-dsh-workspace-count">{snapshot?.changes.length ?? 0}</span>
-                <span className={`oh-dsh-workspace-section-chevron${changesOpen ? ' is-open' : ''}`}>
-                  <WorkspaceIcon name="chevron" />
-                </span>
-              </button>
-              {changesOpen && <div className="oh-dsh-change-list">
-                {visibleChanges.map(change => (
-                  <div key={`${change.path}:${change.oldPath ?? ''}`}>
-                    <button
-                      type="button"
-                      className="oh-dsh-change-row"
-                      data-selected={selectedPath === change.path || undefined}
-                      onClick={() => { void showDiff(change) }}
-                    >
-                      <span className={`oh-dsh-change-status is-${change.status}`}>{statusLabel(change.status)}</span>
-                      {changeStats[changeKey(change)] !== undefined && (
-                        <span className="oh-dsh-change-row-stats">
-                          <span className="oh-dsh-change-stat-add">+{changeStats[changeKey(change)]?.additions}</span>
-                          <span className="oh-dsh-change-stat-delete">-{changeStats[changeKey(change)]?.deletions}</span>
-                        </span>
-                      )}
-                      <span title={change.path}>{change.path}</span>
-                      {change.staged && <small>{t('workspace.staged')}</small>}
-                    </button>
-                    {selectedPath === change.path && <pre className="oh-dsh-change-diff">{diff}</pre>}
-                  </div>
-                ))}
-                {(snapshot?.changes.length ?? 0) > visibleChanges.length && (
-                  <div className="oh-dsh-workspace-muted">
-                    {t('workspace.more-changes', {
-                      count: (snapshot?.changes.length ?? 0) - visibleChanges.length,
-                    })}
-                  </div>
-                )}
-                {snapshot?.kind === 'repository' && snapshot.changes.length === 0 && (
-                  <div className="oh-dsh-workspace-muted">{t('workspace.clean')}</div>
-                )}
-                {snapshot?.kind === 'directory' && (
-                  <div className="oh-dsh-workspace-muted">{t('workspace.not-git')}</div>
-                )}
-              </div>}
-            </section>
-
-
-            {snapshot?.kind === 'repository' && (
-              <section className="oh-dsh-review-history">
-                <button
-                  type="button"
-                  className="oh-dsh-workspace-section-toggle oh-dsh-review-history-toggle"
-                  aria-expanded={historyOpen}
-                  onClick={() => { setHistoryOpen(value => !value) }}
-                >
-                  <span className="oh-dsh-workspace-section-icon"><WorkspaceIcon name="history" /></span>
-                  <strong>{t('workspace.review-history')}</strong>
-                  <span className="oh-dsh-workspace-count">{history.length}</span>
-                  <span className={`oh-dsh-workspace-section-chevron${historyOpen ? ' is-open' : ''}`}>
-                    <WorkspaceIcon name="chevron" />
-                  </span>
-                </button>
-                {historyOpen && <>
-                <div className="oh-dsh-review-commit-list">
-                  {history.map(entry => (
-                    <button
-                      type="button"
-                      key={entry.hashFull}
-                      className="oh-dsh-review-commit-row"
-                      data-selected={selectedCommit?.id === entry.hashFull || undefined}
-                      disabled={reviewLoading}
-                      onClick={() => { void showCommit(entry) }}
-                    >
-                      <code>{entry.hash}</code>
-                      <span title={entry.subject}>{entry.subject}</span>
-                      <small>{entry.author}</small>
-                    </button>
-                  ))}
-                  {history.length === 0 && (
-                    <div className="oh-dsh-workspace-muted">
-                      {t('workspace.no-commits')}
-                    </div>
-                  )}
-                </div>
-
-                {selectedCommit !== null && (
-                  <div className="oh-dsh-review-commit-detail">
-                    <header>
-                      <div>
-                        <code>{selectedCommit.shortId}</code>
-                        <strong>{selectedCommit.subject}</strong>
-                        <small>
-                          {selectedCommit.author} · {selectedCommit.authoredAt}
-                        </small>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCommentTarget({ kind: 'commit' })
-                          setCommentNotice('')
-                        }}
-                      >{t('workspace.comment-commit')}</button>
-                    </header>
-
-                    {selectedComments.length > 0 && (
-                      <div className="oh-dsh-review-comments">
-                        <strong>{t('workspace.pending-comments')}</strong>
-                        {selectedComments.map(comment => (
-                          <div key={comment.id}>
-                            <span>
-                              {comment.filePath === null
-                                ? t('workspace.review-commit')
-                                : `${comment.filePath}:${String(comment.line)}`}
-                            </span>
-                            <p>{comment.body}</p>
-                            <button
-                              type="button"
-                              aria-label={t('workspace.remove-comment')}
-                              title={t('workspace.remove-comment')}
-                              onClick={() => { reviewComments.remove(comment.id) }}
-                            >×</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {selectedCommit.files.map(file => (
-                      <details key={`${file.oldPath ?? ''}:${file.path}`} open>
-                        <summary>
-                          <span title={file.path}>{file.path}</span>
-                          <small>
-                            <b>+{file.additions}</b> −{file.deletions}
-                          </small>
-                        </summary>
-                        <div className="oh-dsh-review-diff-lines">
-                          {file.lines.slice(0, 400).map(line => {
-                            const lineNumber = reviewLineNumber(
-                              line.oldLine,
-                              line.newLine,
-                            )
-                            return (
-                              <button
-                                type="button"
-                                key={line.key}
-                                data-type={line.type}
-                                disabled={lineNumber === null}
-                                title={t('workspace.comment-line')}
-                                onClick={() => {
-                                  if (lineNumber === null) return
-                                  setCommentTarget({
-                                    kind: 'line',
-                                    filePath: file.path,
-                                    line: lineNumber,
-                                    side: line.type === 'deletion' ? 'old' : 'new',
-                                  })
-                                  setCommentNotice('')
-                                }}
-                              >
-                                <span>{line.oldLine ?? ''}</span>
-                                <span>{line.newLine ?? ''}</span>
-                                <code>{line.content || ' '}</code>
-                              </button>
-                            )
-                          })}
-                          {file.lines.length > 400 && (
-                            <div className="oh-dsh-workspace-muted">
-                              {t('workspace.diff-truncated', {
-                                count: file.lines.length - 400,
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </details>
-                    ))}
-
-                    {commentTarget !== null && (
-                      <div className="oh-dsh-review-comment-form">
-                        <strong>
-                          {commentTarget.kind === 'commit'
-                            ? t('workspace.comment-commit')
-                            : `${commentTarget.filePath}:${String(commentTarget.line)}`}
-                        </strong>
-                        <textarea
-                          autoFocus
-                          value={commentBody}
-                          placeholder={t('workspace.comment-placeholder')}
-                          onChange={event => { setCommentBody(event.currentTarget.value) }}
-                        />
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCommentTarget(null)
-                              setCommentBody('')
-                            }}
-                          >{t('workspace.cancel')}</button>
-                          <button
-                            type="button"
-                            disabled={commentBody.trim() === ''}
-                            onClick={addReviewComment}
-                          >{t('workspace.add-comment')}</button>
-                        </div>
-                      </div>
-                    )}
-                    {commentNotice !== '' && (
-                      <p className="oh-dsh-review-comment-notice">
-                        {commentNotice}
-                      </p>
-                    )}
-                  </div>
-                )}
-                </>}
-              </section>
-            )}
-
-            <section className="oh-dsh-workspace-facts">
-
-              <div className="oh-dsh-workspace-fact">
-                <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="environment" /></span>
-                <span className="oh-dsh-workspace-fact-copy">
-                  <small>{t('workspace.execution-environment')}</small>
-                  <WorkspaceDropdown
-                    ariaLabel={t('workspace.execution-environment')}
-                    options={[{ value: 'local', label: t('workspace.local') }]}
-                    value="local"
-                    onChange={() => {}}
-                  />
-                </span>
-              </div>
-              <div className="oh-dsh-workspace-fact">
-                <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="branch" /></span>
-                <span className="oh-dsh-workspace-fact-copy">
-                  <small>{t('workspace.current-branch')}</small>
-                  <WorkspaceDropdown
-                    ariaLabel={t('workspace.current-branch')}
-                    options={(snapshot?.branches ?? []).map(branch => ({ value: branch, label: branch }))}
-                    value={snapshot?.branch ?? ''}
-                    disabled={snapshot?.kind !== 'repository' || busy}
-                    onChange={branch => { void mutate({ action: 'checkout', branch }) }}
-                  />
-                </span>
-              </div>
-              {snapshot?.kind === 'repository' && (
-                <div className="oh-dsh-new-branch">
-                  <input
-                    value={newBranch}
-                    placeholder={t('workspace.new-branch')}
-                    aria-label={t('workspace.new-branch-name')}
-                    onChange={event => { setNewBranch(event.currentTarget.value) }}
-                  />
-                  <button
-                    type="button"
-                    disabled={busy || newBranch.trim() === ''}
-                    onClick={() => { void mutate({ action: 'create-branch', branch: newBranch }).then(() => { setNewBranch('') }) }}
-                  >{t('workspace.create')}</button>
-                </div>
-              )}
-              <button
-                type="button"
-                className="oh-dsh-workspace-fact oh-dsh-commit-toggle"
-                onClick={() => { setCommitOpen(open => !open) }}
-                aria-expanded={commitOpen}
-              >
-                <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="commit" /></span>
-                <span className="oh-dsh-workspace-fact-copy">
-                  <small>{t('workspace.git-actions')}</small>
-                  <strong>{t('workspace.commit-or-push')}</strong>
-                </span>
-                <span className="oh-dsh-workspace-chevron"><WorkspaceIcon name="chevron" /></span>
-              </button>
-              {commitOpen && snapshot?.kind === 'repository' && (
-                <div className="oh-dsh-commit-box">
-                  <textarea
-                    value={commitMessage}
-                    placeholder={t('workspace.commit-message')}
-                    aria-label={t('workspace.commit-message')}
-                    onChange={event => { setCommitMessage(event.currentTarget.value) }}
-                  />
-                  <div>
-                    <button
-                      type="button"
-                      disabled={busy || snapshot.changes.length === 0 || commitMessage.trim() === ''}
-                      onClick={() => { void mutate({ action: 'commit', message: commitMessage }) }}
-                    >{t('workspace.commit-all')}</button>
-                    <button
-                      type="button"
-                      disabled={busy || !snapshot.hasRemote}
-                      onClick={() => { void mutate({ action: 'push' }) }}
-                    >{t('workspace.push')}{snapshot.ahead > 0 ? ` (${String(snapshot.ahead)})` : ''}</button>
-                  </div>
-                  {snapshot.behind > 0 && (
-                    <small>{t('workspace.behind', { count: snapshot.behind })}</small>
-                  )}
-                </div>
-              )}
-            </section>
-
-            <section className="oh-dsh-workspace-directory">
-              <span><WorkspaceIcon name="environment" />{snapshot?.name ?? cwd.split(/[\\/]/).filter(Boolean).pop()}</span>
-              <small title={cwd}>{cwd}</small>
-              {window.dshDesktop?.chooseWorkspace !== undefined && (
-                <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}><WorkspaceIcon name="add" /></button>
-              )}
-            </section>
-
-            <section className="oh-dsh-processes">
-              <h3>{t('workspace.background-processes')}</h3>
-              {processes.map(process => (
-                <div key={process.callId} className="oh-dsh-process-row">
-                  <span><WorkspaceIcon name="process" /></span>
-                  <code title={processTitle(process)}>{processTitle(process)}</code>
-                </div>
-              ))}
-              {processes.length === 0 && (
-                <div className="oh-dsh-workspace-muted">{t('workspace.no-background-processes')}</div>
-              )}
-            </section>
-          </div>
-        )}
-    </div>
-  )
-}
 
 function WorkspaceToolsSurface(props: {
   locale: LocaleService
@@ -1595,11 +673,6 @@ function WorkspaceToolsSurface(props: {
   const sessionList = useSyncExternalStore(props.sessions.list.subscribe, props.sessions.list.getSnapshot)
   const sessionId = sessionList.current
   const cwd = sessionId === undefined ? undefined : sessionList.byId[sessionId]?.cwd
-  const reviewSummary = useWorkspaceDiffSummary(
-    sessionId,
-    cwd,
-    panelState.open && panelState.view !== 'review',
-  )
   return (
     <>
       <DesktopPanelToolbar
@@ -1614,8 +687,6 @@ function WorkspaceToolsSurface(props: {
         width={panelState.width}
         maximized={panelState.maximized}
         sidebar={props.sidebar}
-        reviewSummary={reviewSummary.summary}
-        reviewSummaryLoading={reviewSummary.loading}
         t={t}
         onClose={() => { props.service.setOpen(false) }}
         onResize={width => { props.service.setWidth(width) }}
@@ -1624,63 +695,8 @@ function WorkspaceToolsSurface(props: {
   )
 }
 
-function TextFileViewer({
-  content,
-  path,
-  title,
-}: {
-  content: string
-  path: string
-  title: string
-}): JSX.Element {
-  return (
-    <div className="oh-dsh-file-preview">
-      <div><strong title={path}>{title}</strong></div>
-      <pre>{content}</pre>
-    </div>
-  )
-}
 
-function BinaryFileViewer({
-  onOpen,
-  path,
-  title,
-  t,
-}: {
-  onOpen(): Promise<void>
-  path: string
-  title: string
-  t: Translate<WorkspaceMessage>
-}): JSX.Element {
-  return (
-    <div className="oh-dsh-file-preview">
-      <div>
-        <strong title={path}>{title}</strong>
-        <button type="button" onClick={() => { void onOpen() }}>
-          {t('files.open')}
-        </button>
-      </div>
-      <div className="oh-dsh-side-muted">{t('files.viewer.binary')}</div>
-    </div>
-  )
-}
 
-function HtmlFileViewer({
-  content,
-  path,
-  title,
-}: {
-  content: string
-  path: string
-  title: string
-}): JSX.Element {
-  return (
-    <div className="oh-dsh-file-preview oh-dsh-html-preview">
-      <div><strong title={path}>{title}</strong></div>
-      <iframe title={title} sandbox="" srcDoc={content} />
-    </div>
-  )
-}
 
 function activeWorkspace(sessions: SessionsService): string | undefined {
   const snapshot = sessions.list.getSnapshot()
@@ -1721,75 +737,12 @@ function registerBuiltinSidebarTools(options: {
   } = options
   const disposers = [
     sidebar.registerTab({
-      chrome: 'custom',
-      icon: <ToolIcon kind="review" />,
-      id: 'review',
-      order: 10,
-      render: () => (
-        <WorkspacePanel
-          reviewComments={reviewComments}
-          service={service}
-          sessions={sessions}
-          workspaces={workspaces}
-          t={t}
-        />
-      ),
-      requiresWorkspace: true,
-      shortcut: '⌃⇧G',
-      single: true,
-      title: () => t('review'),
-    }),
-    sidebar.registerTab({
       action: () => { panels.toggleBottomPanel() },
       icon: <ToolIcon kind="terminal" />,
       id: 'terminal',
       order: 20,
       shortcut: '⌘J',
       title: () => t('terminal'),
-    }),
-    ...(window.dshDesktop === undefined
-      ? []
-      : [sidebar.registerTab({
-          icon: <ToolIcon kind="browser" />,
-          id: 'browser',
-          order: 30,
-          render: props => <BrowserView {...props} t={t} />,
-          shortcut: '⌘T',
-          title: () => t('browser'),
-        })]),
-    sidebar.registerTab({
-      dedupeKey: tab => tab.resource,
-      icon: <ToolIcon kind="files" />,
-      id: 'files',
-      order: 40,
-      render: props => (
-        <FilesView
-          {...props}
-          scope={activeSidebarScope(sessions)}
-          sidebar={sidebar}
-          t={t}
-        />
-      ),
-      requiresWorkspace: true,
-      shortcut: '⌘P',
-      title: () => t('files'),
-    }),
-    sidebar.registerTab({
-      dedupeKey: tab => tab.resource,
-      hidden: true,
-      icon: <ToolIcon kind="file" />,
-      id: 'file',
-      render: props => (
-        <FileView
-          {...props}
-          scope={activeSidebarScope(sessions)}
-          onOpenPath={openExternalPath}
-          sidebar={sidebar}
-          t={t}
-        />
-      ),
-      requiresWorkspace: true,
-      title: () => t('files'),
     }),
     sidebar.registerTab({
       action: async () => { await service.openSideChat() },
@@ -1806,64 +759,6 @@ function registerBuiltinSidebarTools(options: {
       order: 60,
       requiresWorkspace: true,
       title: () => t('trajectory'),
-    }),
-    sidebar.registerViewer({
-      detect: (_path, head) => head.includes(0),
-      extensions: [],
-      fetchStrategy: 'binary-download',
-      id: 'binary',
-      order: 100,
-      render: input => (
-        <BinaryFileViewer
-          onOpen={async () => { await openExternalPath(input.path) }}
-          path={input.path}
-          title={input.title}
-          t={t}
-        />
-      ),
-      title: () => t('files.viewer.binary'),
-    }),
-    sidebar.registerViewer({
-      extensions: ['html', 'htm'],
-      fetchStrategy: 'text',
-      id: 'html',
-      order: 30,
-      render: input => (
-        <HtmlFileViewer
-          content={input.content ?? ''}
-          path={input.path}
-          title={input.title}
-        />
-      ),
-      title: () => t('files.viewer.html'),
-    }),
-    sidebar.registerViewer({
-      extensions: ['md', 'markdown', 'mdx'],
-      fetchStrategy: 'text',
-      id: 'markdown',
-      order: 20,
-      render: input => (
-        <TextFileViewer
-          content={input.content ?? ''}
-          path={input.path}
-          title={input.title}
-        />
-      ),
-      title: () => t('files.viewer.markdown'),
-    }),
-    sidebar.registerViewer({
-      extensions: [],
-      fetchStrategy: 'text',
-      id: 'text',
-      order: -100,
-      render: input => (
-        <TextFileViewer
-          content={input.content ?? ''}
-          path={input.path}
-          title={input.title}
-        />
-      ),
-      title: () => t('files.viewer.text'),
     }),
   ]
   return () => {
@@ -2098,6 +993,10 @@ export function apply(ctx: ClientContext): void {
   )
   const runtimeSettings = new SidebarRuntimeSettingsService()
   const composerHistory = new ComposerInputHistory()
+  const nativeSurface = new NativeRightbarSurface(
+    sessions,
+    () => ctx.get('sidebarRight') as NativeRightbarController | undefined,
+  )
   const service = new WorkspaceToolsService(
     desktopSidebar,
     panels,
@@ -2106,6 +1005,8 @@ export function apply(ctx: ClientContext): void {
     pinnedSummary,
     sessions,
     workspaces,
+    nativeSurface,
+    ctx.get('uiWorkspace') as UiWorkspaceService,
   )
   const unregisterBuiltins = registerBuiltinSidebarTools({
     openExternalPath,
@@ -2216,7 +1117,10 @@ export function apply(ctx: ClientContext): void {
       })
     }
     syncSession()
-    const stopSessions = sessions.list.subscribe(syncSession)
+    const stopSessions = sessions.list.subscribe(() => {
+      syncSession()
+      nativeSurface.flush()
+    })
     const stopSettings = desktopSidebar.subscribe(() => {
       syncSidebarSettings(settingsActions, desktopSidebar.getSnapshot())
     })
@@ -2231,7 +1135,6 @@ export function apply(ctx: ClientContext): void {
       const snapshot = desktopSidebar.getSnapshot()
       if (runtime.interceptOpenPath
         && snapshot.ready
-        && desktopSidebar.isTabEnabled('file')
         && pathBelongsToActiveWorkspace(sessions, path)) {
         service.openFile(path)
         return
@@ -2256,8 +1159,7 @@ export function apply(ctx: ClientContext): void {
       const snapshot = desktopSidebar.getSnapshot()
       if (window.dshDesktop === undefined
         || !runtime.browserInterceptLinks
-        || !snapshot.ready
-        || !desktopSidebar.isTabEnabled('browser')) return
+        || !snapshot.ready) return
       event.preventDefault()
       service.openBrowserUrl(url.href)
     }

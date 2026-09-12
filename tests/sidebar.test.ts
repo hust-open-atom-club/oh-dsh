@@ -221,25 +221,13 @@ test('desktop sidebar preferences migrate from the pre-rename durable file', asy
 })
 
 
-test('workspace review uses one SVG icon language', async () => {
+test('retired review views leave no glyph residue', async () => {
   const sourceText = await readFile(join(process.cwd(), 'plugins/sidebar/src/client/plugin.tsx'), 'utf8')
-  assert.match(sourceText, /function WorkspaceIcon\(/)
+  // The review/files/browser views moved to the upstream sidebar plugin;
+  // our surface keeps only the action tabs and must not re-grow the old
+  // unicode glyph language.
   for (const glyph of ['▣', '◷', '▱', '⑂', '—◯—', '›_']) {
     assert.doesNotMatch(sourceText, new RegExp(glyph))
   }
-  assert.match(sourceText, /<WorkspaceIcon name="changes" \/>/)
-  assert.match(sourceText, /const \[changesOpen, setChangesOpen\] = useState\(false\)/)
-  assert.match(sourceText, /aria-expanded=\{changesOpen\}/)
-  assert.match(sourceText, /const \[historyOpen, setHistoryOpen\] = useState\(false\)/)
-  assert.match(sourceText, /aria-expanded=\{historyOpen\}/)
-  assert.match(sourceText, /oh-dsh-review-history-toggle/)
-  assert.match(sourceText, /from '\.\/diff-stats\.ts'/)
-  assert.match(sourceText, /const \[changeStats, setChangeStats\]/)
-  assert.match(sourceText, /prepareDiffSummaryRefresh/)
-  assert.match(sourceText, /<WorkspaceIcon name="chevron" \/>/)
-  assert.match(sourceText, /<WorkspaceIcon name="branch" \/>/)
-  assert.match(sourceText, /<WorkspaceIcon name="commit" \/>/)
-  assert.match(sourceText, /function WorkspaceDropdown\(/)
-  assert.match(sourceText, /role="listbox"/)
-  assert.doesNotMatch(sourceText, /<select/)
+  assert.match(sourceText, /this\.native\.openTab\('changes'\)/)
 })

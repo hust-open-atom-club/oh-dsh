@@ -180,7 +180,8 @@ interface LayoutService {
   openRightbar(track?: unknown, fullscreen?: boolean): void
   closeRightbar(): void
   selectPanel(panelId: string): void
-  beginNavigation(): void
+  /** Returns the navigation signal the 0.1.5 callers race against. */
+  beginNavigation(): AbortSignal
 }
 
 class DesktopLayoutController implements LayoutService {
@@ -198,7 +199,14 @@ class DesktopLayoutController implements LayoutService {
   toggleSidebar(): void { this.require().toggleSidebar() }
   openRightbar(_track?: unknown, fullscreen?: boolean): void { this.require().openRightbar(fullscreen) }
   closeRightbar(): void { this.require().closeRightbar() }
-  beginNavigation(): void { this.require().beginNavigation() }
+  /**
+   * The 0.1.5 navigation seam: callers race in-flight work against the
+   * returned signal (AbortSignal.any in uiWorkspace.startSession and the
+   * upstream sidebar's fork), so it must be a real signal. The Oh-DSH frame
+   * keeps a single selection and never aborts an in-flight navigation; a
+   * fresh non-aborted signal per call expresses exactly that.
+   */
+  beginNavigation(): AbortSignal { this.require().beginNavigation(); return new AbortController().signal }
 
   selectPanel(panelId: string): void {
     if (panelId === 'conversation' || this.hasMainPanel(panelId)) {

@@ -20,6 +20,11 @@ interface WorkspaceView {
 
 interface WorkspacesService {
   create(input: { path: string }): Promise<WorkspaceView>
+}
+
+/** The 0.1.5 navigation face: session starts live on uiWorkspace, not the
+ * bare workspace controller. */
+interface UiWorkspaceService {
   startSession(workspaceId?: string): void
 }
 
@@ -655,32 +660,54 @@ function showAbout(): void {
   attempt()
 }
 
-async function openPaths(workspaces: WorkspacesService, paths: readonly string[]): Promise<void> {
+async function openPaths(
+  workspaces: WorkspacesService,
+  uiWorkspace: UiWorkspaceService,
+  paths: readonly string[],
+): Promise<void> {
   for (const path of paths) {
     const workspace = await workspaces.create({ path })
-    workspaces.startSession(workspace.workspaceId)
+    uiWorkspace.startSession(workspace.workspaceId)
   }
 }
 
 function dispatch(
   command: DesktopCommand,
+  ctx: ClientContext,
   workspaces: WorkspacesService,
   panels: DesktopPanels,
   pinnedSummary: PinnedSummary,
   workspaceTools: WorkspaceTools,
 ): void {
+  const navigation = (): UiWorkspaceService | undefined =>
+    ctx.get('uiWorkspace') as UiWorkspaceService | undefined
   switch (command.type) {
     case 'focus-composer':
       focusComposer()
       return
-    case 'new-session':
-      workspaces.startSession()
+    case 'new-session': {
+      const uiWorkspace = navigation()
+      if (uiWorkspace !== undefined) uiWorkspace.startSession()
       return
-    case 'open-paths':
-      void openPaths(workspaces, command.paths).catch((error: unknown) => {
-        console.error('oh-dsh-desktop: failed to open workspace', error)
-      })
+    }
+    case 'open-paths': {
+      const attempt = (retry: boolean): void => {
+        const uiWorkspace = navigation()
+        if (uiWorkspace === undefined) {
+          if (retry) {
+            console.error('oh-dsh-desktop: uiWorkspace service unavailable for open-paths')
+            return
+          }
+          setTimeout(() => { attempt(true) }, 3000)
+          return
+        }
+        void openPaths(workspaces, uiWorkspace, command.paths).catch((error: unknown) => {
+          console.error('oh-dsh-desktop: failed to open workspace', error)
+        })
+      }
+      attempt(false)
       return
+    }
     case 'show-settings':
       showSettings()
       return
@@ -773,7 +800,7 @@ export function apply(ctx: ClientContext): void {
       console.error('oh-dsh-desktop: failed to read desktop info', error)
     })
     const unsubscribe = bridge.onCommand((command) => {
-      dispatch(command, workspaces, panels, pinnedSummary, workspaceTools)
+      dispatch(command, ctx, workspaces, panels, pinnedSummary, workspaceTools)
     })
     return () => {
       disposed = true

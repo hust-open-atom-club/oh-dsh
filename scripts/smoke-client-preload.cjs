@@ -48,7 +48,16 @@ contextBridge.exposeInMainWorld('dshDesktop', Object.freeze({
     // driving the 0.1.5 picker menu (it ignores synthetic input).
     const workspace = process.env.OH_DSH_SMOKE_WORKSPACE
     if (workspace !== undefined && workspace !== '' && typeof listener === 'function') {
-      setTimeout(() => { listener({ type: 'open-paths', paths: [workspace] }) }, 1200)
+      // The client graph needs a few seconds to wire the workspace service;
+      // a too-early delivery logs 'startSession is not a function' and the
+      // smoke never leaves the first-run hero.
+      setTimeout(() => { listener({ type: 'open-paths', paths: [workspace] }) }, 6000)
+      // Diagnostics-only: exercise the native right-sidebar open path
+      // (openTab('changes') through the Oh-DSH surface) after the session
+      // is up; the smoke never sets this variable.
+      if (process.env.OH_DSH_SMOKE_OPEN_REVIEW === '1') {
+        setTimeout(() => { listener({ type: 'open-review' }) }, 11000)
+      }
     }
     return () => {}
   },
