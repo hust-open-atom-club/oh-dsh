@@ -239,6 +239,35 @@ test('manager retries a check once without the configured proxy', async () => {
   assert.deepEqual(states, ['idle', 'checking', 'available'])
 })
 
+test('manager retries a check once when the proxy configuration is unusable', async () => {
+  const updater = new FakeUpdater()
+  let calls = 0
+  updater.checkForUpdates = async () => {
+    calls += 1
+    if (calls === 1) {
+      const error = new Error('net::ERR_NO_SUPPORTED_PROXIES')
+      updater.emit('error', error)
+      throw error
+    }
+    updater.emit('checking-for-update')
+    updater.emit('update-not-available', updateInfo('1.1.0'))
+    return { isUpdateAvailable: false, updateInfo: updateInfo('1.1.0') }
+  }
+  let bypassCalls = 0
+  const manager = new DesktopUpdateManager({
+    currentVersion: '1.1.0',
+    platform: 'darwin',
+    arch: 'arm64',
+    updater,
+    bypassProxy: async () => { bypassCalls += 1 },
+  })
+
+  const state = await manager.check()
+  assert.equal(state.status, 'not-available')
+  assert.equal(calls, 2)
+  assert.equal(bypassCalls, 1)
+})
+
 test('manager retries a download once without the configured proxy', async () => {
   const updater = new FakeUpdater()
   updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }

@@ -490,8 +490,11 @@ async function syncUpdaterProxy(): Promise<void> {
     await updaterSession().setProxy({ mode: 'direct' })
     return
   }
-  const proxyRules = await session.defaultSession.resolveProxy('https://github.com')
-  await updaterSession().setProxy({ proxyRules })
+  // resolveProxy() returns PAC-style strings ("PROXY 127.0.0.1:7890", "DIRECT")
+  // that proxyRules — which expects --proxy-server format — cannot parse; the
+  // round-trip left the updater session failing every request with
+  // ERR_NO_SUPPORTED_PROXIES whenever a system proxy was configured.
+  await updaterSession().setProxy({ mode: 'system' })
 }
 
 async function bypassUpdaterProxy(): Promise<void> {
