@@ -21,9 +21,6 @@
     - id: oh-liangshen
       name: '@oh-dsh/liangshen'
 
-    - id: oh-better-sidebar-runtime
-      name: '@oh-dsh/better-sidebar-runtime'
-
     - id: oh-skins
       name: '@oh-dsh/skins'
 
@@ -47,6 +44,11 @@
 
     # Built-in context insight panel (upstream dsh-context, pinned under
     # upstream/dsh-context), shared with the desktop distribution.
+    # The pinned upstream workspace sidebar (shared with the desktop
+    # distribution); its tabs register as native right-sidebar tab types.
+    - id: dsh-better-sidebar
+      name: 'dsh-better-sidebar'
+
     - id: dsh-context
       name: 'dsh-context'
 

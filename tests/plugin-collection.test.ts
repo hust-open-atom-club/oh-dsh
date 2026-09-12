@@ -22,7 +22,9 @@ test('desktop bundle registers every packaged DSH plugin', () => {
       ? join(root, 'package.json')
       : plugin === 'dsh-context'
         ? join(root, 'upstream', 'dsh-context', 'package.json')
-        : join(root, 'plugins', directory, 'package.json')
+        : plugin === 'dsh-better-sidebar'
+          ? join(root, 'upstream', 'DSH-better-sidebar', 'package.json')
+          : join(root, 'plugins', directory, 'package.json')
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
     assert.equal(manifest.name, plugin)
     assert.equal(manifest.dsh.client.platform, 'web')
