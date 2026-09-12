@@ -80,7 +80,7 @@ let
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
     rev = "754974afeaf5c0aa310d6104dfd892ef56a6297d";
-    hash = "sha256-2jUJgv8GHYZ+mSGjzToeqj66PxothU8jWwjsehRfx0E=";
+    hash = "sha256-qS7ERxKYw6mAvXmjwUX81l6oUfjBfgRQWbJWBuEIWrw=";
   };
   contextRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/dsh-context/-/dsh-context-0.49.2.tgz";
@@ -90,13 +90,13 @@ let
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
     rev = "78081cebde1ee1b47a561ef57c04f128c5623476";
-    hash = "sha256-i49UdJ/uHCB1G7Jm7MPy/HDgbrCLUJjY9J1sl0xL6Mw=";
+    hash = "sha256-ny97a8TZ1wdJBjXvWiMysdOLZNF3MpGTVHIODQtarY0=";
   };
   dshAuthSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-auth";
     rev = "cc6ec5224b62b6e6508c0109ef19e93b0a5c0a0e";
-    hash = "sha256-gSkDJnjm4N2qOqnEstDU12S4D9FvomrxB9UVwlFN2M4=";
+    hash = "sha256-yL1ruV86qvi4RWfph9ANKcBrHi5p+ZpRPP5O/Q4PBJA=";
   };
   tuiRelease = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.10.1.tgz";
