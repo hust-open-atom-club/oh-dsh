@@ -33,7 +33,7 @@ test('desktop Settings stays below portaled menus and above desktop surfaces', (
   // panels (demoting the layer carries both below the dialog backdrop).
   assert.match(
     client,
-    /:has\(\s*#root \[role='presentation'\] > \[role='dialog'\]\s*\) \.oh-dsh-panel-toolbar,[\s\S]*#oh-dsh-sidebar-root,[\s\S]*#oh-dsh-chrome-layer[^}]*\{[^}]*z-index: 999 !important;/s,
+    /:has\(\s*#root \[role='presentation'\] > \[role='dialog'\]\s*\) #oh-dsh-sidebar-root,[\s\S]*#oh-dsh-chrome-layer[^}]*\{[^}]*z-index: 999 !important;/s,
   )
 })
 

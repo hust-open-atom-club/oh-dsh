@@ -45,10 +45,9 @@ test('review, pinned summary, and embedded side tools keep distinct layouts', ()
     summary,
     /document\.addEventListener\('pointerdown', this\.#handleDocumentPointerDown\)/,
   )
-  assert.match(workspace, /data-oh-dsh-summary-toggle=""/)
-  assert.match(workspace, /aria-haspopup="dialog"/)
-  assert.match(summary, /closest\('\[data-oh-dsh-summary-toggle\]'\)/)
-  assert.doesNotMatch(summary, /closest\('\.oh-dsh-panel-toolbar'\)/)
+  // The toolbar button that carried the summary toggle retired with the
+  // toolbar; the summary opens through the application menu command.
+  assert.doesNotMatch(workspace, /data-oh-dsh-summary-toggle/)
   assert.match(summary, /event\.key === 'Escape'/)
   assert.doesNotMatch(workspace, /aria-label="Toggle review panel"/)
   // The review view moved upstream: our surface opens it through the
@@ -66,11 +65,6 @@ test('review, pinned summary, and embedded side tools keep distinct layouts', ()
   assert.match(workspace, /function registerBuiltinSidebarTools/)
   assert.match(workspace, /desktopSidebar\.setSession\(sessions\.list\.getSnapshot\(\)\.current \?\? null\)/)
   assert.match(sideToolsCss, /\.oh-dsh-side-panel\s*\{[^}]*width: 100% !important;[^}]*border-radius: 0;[^}]*box-shadow: none;/s)
-  assert.match(workspace, /const sideOpen = workspaceState\.open/)
-  assert.match(workspace, /\{sideOpen\s*\?\s*\(/)
-  assert.doesNotMatch(workspace, /\{workspaceState\.open\s*\?\s*\(/)
-  assert.match(workspace, /service\.setOpen\(false\); pinnedSummary\.toggle\(\)/)
-  assert.match(workspace, /kind === 'summary'[\s\S]{0,200}M9 5h7M4 10h12/)
   assert.match(workspaceCss, /\.oh-dsh-workspace-panel\[data-open='true'\]/)
   assert.match(summary, /\[data-oh-dsh-pinned-summary\]\[data-open='true'\]/)
 })

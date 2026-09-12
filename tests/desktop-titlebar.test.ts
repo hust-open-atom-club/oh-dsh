@@ -78,56 +78,14 @@ test('desktop chrome keeps platform title bars and panel controls distinct', () 
     /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-titlebar-drag-region \{[\s\S]*?left: 0;[\s\S]*?right: 0;[\s\S]*?-webkit-app-region: drag/,
   )
 
-  // Web and framed Linux keep the shared top-right position. The toolbar owns
-  // the corner; what moves it is whatever squeezes the conversation column —
-  // the details column and the side tools panel — plus one 8px gap.
-  assert.match(
-    panelCss,
-    /\.oh-dsh-panel-toolbar \{[\s\S]*?top: 5px;[\s\S]*?right: min\([\s\S]*?max\([\s\S]*?14px,[\s\S]*?8px[\s\S]*?var\(--oh-dsh-details-width, 0px\)[\s\S]*?var\(--oh-dsh-workspace-panel-inset, 0px\)[\s\S]*?calc\(100vw - 460px\)/,
-  )
-  // The side tools panel squeezes the conversation column, so it publishes the
-  // footprint it takes and the toolbar adds it.
-  assert.match(
-    sidePanel,
-    /style\.setProperty\([\s\S]*?'--oh-dsh-workspace-panel-inset',[\s\S]*?\$\{Math\.round\(width \+ \(globalThis\.innerWidth - right\)\)\}px/,
-  )
-  assert.match(
-    sidePanel,
-    /root\.style\.setProperty\('--oh-dsh-workspace-panel-inset', '0px'\)/,
-  )
-  // A maximized panel owns the whole row, so no inset can clear it: the
-  // toolbar drops to the bottom corner instead of hovering mid-panel, and
-  // stays reachable because the panel header has no restore control.
-  assert.match(sidePanel, /dataset\.ohDshSidePanelMaximized = 'true'/)
-  assert.match(
-    panelCss,
-    /html\[data-oh-dsh-side-panel-maximized='true'\] \.oh-dsh-panel-toolbar \{[\s\S]*?top: auto;[\s\S]*?bottom: 14px;[\s\S]*?right: 14px/,
-  )
-  // The toolbar owns the corner, so the session top bar's utilities stand down
-  // by its clearance — reached through the stable slot contract, not the
-  // hashed utility classes, and only on framed platforms while the side panel
-  // is not maximized. While a session is active the toolbar matches the
-  // Session log button's row.
-  assert.match(panelCss, /--oh-dsh-toolbar-clearance: 89px;/)
-  assert.match(
-    panelCss,
-    /:not\(\[data-oh-dsh-desktop-platform='darwin'\]\):not\(\[data-oh-dsh-desktop-platform='win32'\]\):not\(\[data-oh-dsh-side-panel-maximized='true'\]\)[\s\S]*?\[data-slot='conversation\.session\.header'\][\s\S]*?:has\(> \[data-slot='conversation\.session\.header\.utilities'\]\) \{[\s\S]*?margin-right: var\(--oh-dsh-toolbar-clearance, 89px\)/,
-  )
-  assert.match(
-    panelCss,
-    /html\[data-oh-dsh-session-active='true'\] \.oh-dsh-panel-toolbar \{[\s\S]*?top: 11px/,
-  )
-  assert.match(frame, /dataset\.ohDshSessionActive = 'true'/)
-  assert.match(
-    client,
-    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-panel-toolbar,[\s\S]*?data-oh-dsh-desktop-platform='win32'\] \.oh-dsh-panel-toolbar \{[\s\S]*?top: 4px;[\s\S]*?padding: 1px/,
-  )
-  assert.match(
-    client,
-    /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-panel-toolbar button,[\s\S]*?data-oh-dsh-desktop-platform='win32'\] \.oh-dsh-panel-toolbar button \{[\s\S]*?width: 28px;[\s\S]*?height: 28px/,
-  )
-  assert.match(client, /data-oh-dsh-desktop-platform='darwin'\] \.oh-dsh-panel-toolbar \{[\s\S]*?right: 8px/)
-  assert.match(client, /data-oh-dsh-desktop-platform='win32'\] \.oh-dsh-panel-toolbar \{[\s\S]*?right: 154px/)
+  // The floating panel toolbar is retired: the native right sidebar and
+  // the upstream bottom-workbench toggle own their corners, and the
+  // pinned summary / side panel / bottom panel stay reachable through the
+  // application menu and their shortcuts.
+  for (const source of [panelCss, client]) {
+    assert.doesNotMatch(source, /oh-dsh-panel-toolbar/)
+    assert.doesNotMatch(source, /toolbar-clearance/)
+  }
   assert.match(client, /\.oh-dsh-window-actions \{[\s\S]*?height: var\(--oh-dsh-titlebar-height\)/)
   // Portal overlays with a bare top-level dialog (the pinned runtime's image
   // lightbox) park their fixed close button 20px below the viewport top —

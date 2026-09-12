@@ -587,77 +587,6 @@ class WorkspaceToolsService implements WorkspaceTools {
   }
 }
 
-function PanelIcon({ kind }: { kind: 'expand' | 'summary' | 'terminal' | 'side' }): JSX.Element {
-  if (kind === 'expand') return <svg viewBox="0 0 20 20"><path d="M7 3H3v4M13 3h4v4M17 13v4h-4M7 17H3v-4" /></svg>
-  if (kind === 'summary') {
-    return <svg viewBox="0 0 20 20"><circle cx="5" cy="5" r="1.5" /><path d="M9 5h7M4 10h12" /><circle cx="15" cy="15" r="1.5" /><path d="M4 15h7" /></svg>
-  }
-  if (kind === 'terminal') {
-    return <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2.5" /><path d="M3.5 13.5h13" /></svg>
-  }
-  return <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2.5" /><path d="M12.5 3.5v13" /></svg>
-}
-
-function DesktopPanelToolbar({
-  service,
-  panels,
-  pinnedSummary,
-  t,
-}: {
-  service: WorkspaceToolsService
-  panels: DesktopPanels
-  pinnedSummary: PinnedSummary
-  t: Translate<WorkspaceMessage>
-}): JSX.Element {
-  const workspaceState = useSyncExternalStore(service.subscribe, service.getSnapshot)
-  const terminalOpen = useSyncExternalStore(panels.subscribe, () => panels.isBottomPanelOpen())
-  const summaryOpen = useSyncExternalStore(pinnedSummary.subscribe, () => pinnedSummary.isOpen())
-  const sideOpen = workspaceState.open
-  return (
-    <nav className="oh-dsh-panel-toolbar" aria-label={t('panels.label')}>
-      {sideOpen
-        ? (
-          <button
-            type="button"
-            aria-label={t('side.expand')}
-            aria-pressed={workspaceState.maximized}
-            title={workspaceState.maximized ? t('side.restore') : t('side.expand')}
-            onClick={() => { service.togglePanelMaximized() }}
-          ><PanelIcon kind="expand" /></button>
-        )
-        : (
-          <button
-            type="button"
-            data-oh-dsh-summary-toggle=""
-            aria-label={t('summary.toggle')}
-            aria-pressed={summaryOpen}
-            aria-expanded={summaryOpen}
-            aria-controls="oh-dsh-pinned-summary"
-            aria-haspopup="dialog"
-            title={t('summary.title')}
-            onClick={() => { service.setOpen(false); pinnedSummary.toggle() }}
-          ><PanelIcon kind="summary" /></button>
-        )}
-      <button
-        type="button"
-        aria-label={t('terminal.toggle')}
-        aria-pressed={terminalOpen}
-        title={`${t('terminal.title')} (⌘J)`}
-        onClick={() => { panels.toggleBottomPanel() }}
-      ><PanelIcon kind="terminal" /></button>
-      <button
-        type="button"
-        aria-label={t('side.toggle')}
-        aria-pressed={sideOpen}
-        title={`${t('side.title')} (⌥⌘B)`}
-        onClick={() => { service.toggleSidePanel() }}
-      ><PanelIcon kind="side" /></button>
-    </nav>
-  )
-}
-
-
-
 function WorkspaceToolsSurface(props: {
   locale: LocaleService
   t: Translate<WorkspaceMessage>
@@ -675,12 +604,6 @@ function WorkspaceToolsSurface(props: {
   const cwd = sessionId === undefined ? undefined : sessionList.byId[sessionId]?.cwd
   return (
     <>
-      <DesktopPanelToolbar
-        service={props.service}
-        panels={props.panels}
-        pinnedSummary={props.pinnedSummary}
-        t={t}
-      />
       <SideToolsPanel
         cwd={cwd}
         open={panelState.open}

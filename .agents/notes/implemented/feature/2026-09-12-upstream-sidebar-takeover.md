@@ -66,5 +66,9 @@ the theme and UI finish, upstream keeps the feature surface.
   plugin's manifest, built lib/, and node_modules links alongside the
   other published-release overlays — both pinned builds verified green.
 - The upstream bottom workbench toggle now appears in the session header
-  next to the native expand control; retiring our bottom terminal drawer
-  is a follow-up once the dock proves out in daily use.
+  next to the native expand control, and Oh-DSH's floating panel toolbar
+  is retired with it: the corner belongs to the native controls, and the
+  pinned summary, side panel, and bottom panel stay reachable through the
+  application menu entries and their shortcuts. Retiring our bottom
+  terminal drawer is the remaining follow-up once the dock proves out in
+  daily use.

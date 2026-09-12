@@ -82,29 +82,6 @@ html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-titlebar-drag-region {
   -webkit-app-region: drag;
 }
 
-html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-panel-toolbar,
-html[data-oh-dsh-desktop-platform='win32'] .oh-dsh-panel-toolbar {
-  z-index: 2147483647;
-  top: 4px;
-  padding: 1px;
-  -webkit-app-region: no-drag;
-}
-
-html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-panel-toolbar button,
-html[data-oh-dsh-desktop-platform='win32'] .oh-dsh-panel-toolbar button {
-  width: 28px;
-  height: 28px;
-}
-
-html[data-oh-dsh-desktop-platform='darwin'] .oh-dsh-panel-toolbar {
-  right: 8px;
-}
-
-/* Keep the panel toolbar clear of the Windows window actions. */
-html[data-oh-dsh-desktop-platform='win32'] .oh-dsh-panel-toolbar {
-  right: 154px;
-}
-
 /* In-page menu bar: fills the blank strip corner on Windows with the real
    application menu, popped up natively at the button. */
 html[data-oh-dsh-desktop='true'] .oh-dsh-menubar {
@@ -324,9 +301,6 @@ html[data-oh-dsh-desktop='true']:has(
 html[data-oh-dsh-desktop='true']:has(
   #root [role='presentation'] > [role='dialog']
 ) body::after,
-html[data-oh-dsh-desktop='true']:has(
-  #root [role='presentation'] > [role='dialog']
-) .oh-dsh-panel-toolbar,
 html[data-oh-dsh-desktop='true']:has(
   #root [role='presentation'] > [role='dialog']
 ) #oh-dsh-sidebar-root,

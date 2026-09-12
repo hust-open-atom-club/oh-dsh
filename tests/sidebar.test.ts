@@ -188,15 +188,9 @@ test('desktop sidebar persists bounded per-session state outside Web storage', a
   assert.equal(storage.writes.length, 1)
 })
 
-test('desktop panel toolbar stays compact when the side panel is maximized', async () => {
+test('the floating panel toolbar is fully retired', async () => {
   const sourceText = await readFile(join(process.cwd(), 'plugins/sidebar/src/client/sidebar.css'), 'utf8')
-  const toolbarRule = sourceText.match(/\.oh-dsh-panel-toolbar\s*\{([\s\S]*?)\n\}/)?.[1]
-  assert.ok(toolbarRule)
-  assert.match(toolbarRule, /box-sizing:\s*border-box/)
-  assert.match(toolbarRule, /height:\s*36px/)
-  assert.match(toolbarRule, /min-height:\s*36px/)
-  assert.match(toolbarRule, /max-height:\s*36px/)
-  assert.match(toolbarRule, /width:\s*max-content/)
+  assert.doesNotMatch(sourceText, /oh-dsh-panel-toolbar/)
 })
 
 test('desktop sidebar preferences migrate from the pre-rename durable file', async () => {
