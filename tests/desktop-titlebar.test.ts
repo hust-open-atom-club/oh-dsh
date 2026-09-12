@@ -206,7 +206,12 @@ test('desktop v21 uses a replacement root frame without the v20 collapse workaro
   assert.match(frame, /rightbar: \{ kind: 'single', scope: 'root' \}/)
   assert.match(frame, /'shell\.overlay': \{ kind: 'list', scope: 'root' \}/)
   assert.match(frame, /provideRoot\(\{ hooks: \{ panelInfo:/)
-  assert.match(frame, /renderSlot\('main', \{\}, \{ entryKey: activePanelId \}\)/)
+  assert.doesNotMatch(frame, /\?\? 'conversation' \}\),$/)
+  // The native panel contract: null is the conversation panel (the native
+  // rightbar root renders only for null); the keyed main entry maps null
+  // onto the conversation key at the render boundary.
+  assert.match(frame, /activePanelId: string \| null/)
+  assert.match(frame, /renderSlot\('main', \{\}, \{ entryKey: activePanelId \?\? 'conversation' \}\)/)
   assert.match(frame, /gridTemplateColumns/)
   // Codex finish: the frame rides the shared Oh-DSH motion curve; region
   // separation is luminance-based, so the sidebar has no border and the

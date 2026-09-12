@@ -32,10 +32,13 @@ dock 并存——两套面板系统并排。而 pin 住的上游 DSH-better-side
   openFiles` 改走原生 `sidebarRight` 控制器（`openTab('changes'/
   'browser'/'files')`、`openResource(dsh-resource://file/…)`），并遵循
   与上游 surface 相同的待开队列契约。
-- 顺带修出两个真实的 0.1.5 契约问题：会话启动在 `uiWorkspace` 服务上
+- 顺带修出四个真实的 0.1.5 契约问题：会话启动在 `uiWorkspace` 服务上
   （裸 `workspaces` 控制器没有 `startSession`）；`layout.
   beginNavigation()` 必须返回真正的 `AbortSignal`（uiWorkspace 与上游
-  fork 里的 `AbortSignal.any`）。
+  fork 里的 `AbortSignal.any`）；`panelInfo.activePanelId` 必须为会话
+  面板原样传 null（原生右栏根组件只对 null 渲染会话内容——字符串替身
+  会杀死整个 dock）；frame 不得用自有的 blank 会话标志钳制右栏宽度，
+  因为 seat 在 `canShow` 闪断 false 时会永久收起自己。
 
 ## 备选方案
 

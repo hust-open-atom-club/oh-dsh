@@ -35,10 +35,15 @@ the theme and UI finish, upstream keeps the feature surface.
   `sidebarRight` controller (`openTab('changes'/'browser'/'files')`,
   `openResource(dsh-resource://file/…)`) with the same pending-queue
   contract the upstream surface follows.
-- Two real 0.1.5 contract fixes fell out: session starts live on the
+- Four real 0.1.5 contract fixes fell out: session starts live on the
   `uiWorkspace` service (the bare `workspaces` controller has no
-  `startSession`), and `layout.beginNavigation()` must return a real
-  `AbortSignal` (`AbortSignal.any` in uiWorkspace and the upstream fork).
+  `startSession`); `layout.beginNavigation()` must return a real
+  `AbortSignal` (`AbortSignal.any` in uiWorkspace and the upstream fork);
+  `panelInfo.activePanelId` must pass null through for the conversation
+  panel (the native rightbar root renders its session content only for
+  null — a string stand-in kills the whole dock); and the frame must not
+  gate the rightbar width on its own blank-session flag, because the seat
+  collapses itself permanently whenever its `canShow` flickers false.
 
 ## Alternatives considered
 
